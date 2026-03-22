@@ -13,6 +13,9 @@ Routes that don't depend on topology (auth, schemas, etc.) are tested fully.
 """
 from __future__ import annotations
 
+import sys
+import types
+
 import pytest
 
 # Skip the entire module if FastAPI/httpx test client isn't available
@@ -31,10 +34,16 @@ def client():
 
     # Patch startup so it doesn't attempt real database or backend connections
     import unittest.mock as mock
-    with mock.patch("webui.server.startup_event", new=lambda: None):
-        from webui.server import app
-        with TestClient(app, raise_server_exceptions=False) as c:
-            yield c
+    with mock.patch.dict("os.environ", {"EOS_TRUST_PROXY": "1"}):
+        with mock.patch("webui.server.startup_event", new=lambda: None):
+            from webui.server import app
+            with TestClient(
+                app,
+                raise_server_exceptions=False,
+                base_url="http://127.0.0.1:7860",
+                headers={"X-Real-IP": "127.0.0.1"},
+            ) as c:
+                yield c
 
 
 class TestHealthAndStatus:
@@ -133,6 +142,128 @@ class TestInvestigationContractValidation:
 
 
 class TestGoogleWorkspaceRoutes:
+    @staticmethod
+    def _install_fake_google(monkeypatch, tmp_path):
+        class _Exec:
+            def __init__(self, payload):
+                self.payload = payload
+
+            def execute(self):
+                return self.payload
+
+        class _CalendarEvents:
+            def list(self, **_kwargs):
+                return _Exec({
+                    "items": [
+                        {
+                            "id": "evt-1",
+                            "summary": "Standup",
+                            "description": "Daily sync",
+                            "start": {"dateTime": "2026-03-22T09:00:00Z"},
+                            "end": {"dateTime": "2026-03-22T09:15:00Z"},
+                        }
+                    ]
+                })
+
+        class _CalendarService:
+            def events(self):
+                return _CalendarEvents()
+
+        class _GmailMessages:
+            def __init__(self):
+                self.last_list_kwargs = {}
+
+            def list(self, **kwargs):
+                self.last_list_kwargs = kwargs
+                return _Exec({"messages": [{"id": "msg-1"}]})
+
+            def get(self, **_kwargs):
+                return _Exec({
+                    "payload": {
+                        "headers": [
+                            {"name": "Subject", "value": "Hello"},
+                            {"name": "From", "value": "alice@example.com"},
+                            {"name": "Date", "value": "2026-03-22"},
+                        ]
+                    },
+                    "snippet": "Snippet",
+                })
+
+        class _GmailUsers:
+            def __init__(self):
+                self.messages_api = _GmailMessages()
+
+            def messages(self):
+                return self.messages_api
+
+        class _GmailService:
+            def __init__(self):
+                self.users_api = _GmailUsers()
+
+            def users(self):
+                return self.users_api
+
+        class _DriveFiles:
+            def __init__(self):
+                self.last_list_kwargs = {}
+
+            def list(self, **kwargs):
+                self.last_list_kwargs = kwargs
+                return _Exec({
+                    "files": [
+                        {
+                            "id": "file-1",
+                            "name": "Spec Doc",
+                            "mimeType": "text/plain",
+                            "modifiedTime": "2026-03-22T10:00:00Z",
+                            "webViewLink": "https://example.com/file-1",
+                        }
+                    ]
+                })
+
+        class _DriveService:
+            def __init__(self):
+                self.files_api = _DriveFiles()
+
+            def files(self):
+                return self.files_api
+
+        services = {
+            "calendar": _CalendarService(),
+            "gmail": _GmailService(),
+            "drive": _DriveService(),
+        }
+        token_path = tmp_path / "google_token.json"
+        token_path.write_text("{}", encoding="utf-8")
+        client_secret = tmp_path / "client_secret.json"
+        client_secret.write_text("{}", encoding="utf-8")
+
+        fake_google = types.SimpleNamespace(
+            configure=lambda cfg: None,
+            is_authorized=lambda: True,
+            get_account_info=lambda: {"email": "tester@example.com"},
+            get_credentials=lambda scopes=None: object(),
+            build_authorize_url=lambda redirect_uri: ("https://accounts.example/auth", "state-123"),
+            exchange_code=lambda code, state, redirect_uri: {"ok": True, "account": {"email": "tester@example.com"}},
+            revoke=lambda: {"ok": True},
+            build_service=lambda service_name, version, scopes=None: services[service_name],
+            _client_secret_path=lambda: client_secret,
+            _token_path=lambda: token_path,
+        )
+        monkeypatch.setitem(sys.modules, "core.google_oauth", fake_google)
+
+        import webui.server as server
+        monkeypatch.setattr(server, "_cfg", {
+            "google": {
+                "enabled": True,
+                "calendar_enabled": True,
+                "gmail_enabled": True,
+                "drive_enabled": True,
+                "gmail_send_enabled": False,
+            }
+        }, raising=False)
+        return services
+
     def test_status_returns_json(self, client):
         resp = client.get("/api/google_workspace/status")
         assert resp.status_code == 200
@@ -162,6 +293,32 @@ class TestGoogleWorkspaceRoutes:
         resp = client.get("/api/google_workspace/account")
         # No credentials stored in test env — expect 401
         assert resp.status_code in (200, 401)
+
+    def test_calendar_today_returns_structured_events(self, client, monkeypatch, tmp_path):
+        self._install_fake_google(monkeypatch, tmp_path)
+        resp = client.get("/api/google_workspace/calendar/today")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ok"] is True
+        events = data["data"]["events"]
+        assert isinstance(events, list)
+        assert events[0]["summary"] == "Standup"
+
+    def test_gmail_inbox_honors_query_parameter(self, client, monkeypatch, tmp_path):
+        services = self._install_fake_google(monkeypatch, tmp_path)
+        resp = client.get("/api/google_workspace/gmail/inbox?query=from%3Aalice&max_results=5")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["data"]["query"] == "from:alice"
+        assert services["gmail"].users_api.messages_api.last_list_kwargs["q"] == "from:alice"
+
+    def test_drive_search_accepts_q_alias(self, client, monkeypatch, tmp_path):
+        services = self._install_fake_google(monkeypatch, tmp_path)
+        resp = client.get("/api/google_workspace/drive/search?q=spec")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["data"]["query"] == "spec"
+        assert services["drive"].files_api.last_list_kwargs["q"] == "fullText contains 'spec'"
 
 
 class TestCapabilityContractValidation:

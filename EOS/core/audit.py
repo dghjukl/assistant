@@ -182,6 +182,28 @@ class AuditStore:
             logger.error("[audit] record_tool_execution failed: %s", exc)
         return exec_id
 
+    # ── Compatibility wrappers ────────────────────────────────────────────
+
+    def log_tool_call(
+        self,
+        tool_name: str,
+        params: Optional[Dict[str, Any]] = None,
+        result: Optional[str] = None,
+        caller: str = "",
+        duration_ms: Optional[int] = None,
+    ) -> str:
+        """Backward-compatible alias for older tests/callers."""
+        success = result is None or "error" not in str(result).lower()
+        params_summary = json.dumps(params or {}, ensure_ascii=False, default=str)
+        return self.record_tool_execution(
+            tool_name=tool_name,
+            success=success,
+            params_summary=params_summary,
+            error=None if success else str(result),
+            duration_ms=duration_ms,
+            origin_tier=caller or None,
+        )
+
     # ── Query ─────────────────────────────────────────────────────────────
 
     def query_admin_actions(
@@ -282,6 +304,10 @@ class AuditStore:
         except Exception as exc:
             logger.error("[audit] query_tool_executions failed: %s", exc)
             return []
+
+    def query(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """Backward-compatible query helper for older tests/callers."""
+        return self.query_tool_executions(limit=limit)
 
     def summary(self) -> Dict[str, Any]:
         """Return aggregate statistics for the audit log."""

@@ -2781,9 +2781,10 @@ async function loadGoogleWorkspace() {
 
   try {
     const d = await api('GET', '/api/google_workspace/status');
+    const data = d.data || {};
 
     // ── Badge ──────────────────────────────────────────────
-    const status = (d.overall_status || (d.ok ? 'unknown' : 'error')).toLowerCase();
+    const status = (data.overall_status || (d.ok ? 'unknown' : 'error')).toLowerCase();
     badge.textContent = status.toUpperCase();
     badge.className   = `integ-status-badge ${status}`;
 
@@ -2794,12 +2795,12 @@ async function loadGoogleWorkspace() {
     if (status === 'disabled') {
       _gwShow('gw-hint-disabled'); return;
     }
-    if (!d.client_secret_exists) {
+    if (!data.client_secret_exists) {
       _gwShow('gw-hint-setup'); return;
     }
 
     // ── Auth / connection state ────────────────────────────
-    if (d.token_valid) {
+    if (data.token_valid) {
       _gwShow('gw-connected-info');
       _gwShow('gw-revoke-btn');
       _gwShow('gw-reauth-btn');
@@ -2807,13 +2808,14 @@ async function loadGoogleWorkspace() {
       // Load account hint
       api('GET', '/api/google_workspace/account').then(acc => {
         const el = document.getElementById('gw-account-hint');
-        if (el && acc.connected) {
-          el.textContent = acc.email
-            ? `· ${escHtml(acc.email)}`
+        const account = acc.data?.account || {};
+        if (el && acc.ok && account) {
+          el.textContent = account.email
+            ? `· ${escHtml(account.email)}`
             : '· account connected';
         }
       }).catch(() => {});
-    } else if (d.token_exists && !d.token_valid) {
+    } else if (data.token_exists && !data.token_valid) {
       // Token exists but invalid / expired
       _gwSetHtml('gw-error-box', 'Token exists but is invalid or expired. Re-authorize to reconnect.');
       _gwShow('gw-error-box');
@@ -2824,19 +2826,19 @@ async function loadGoogleWorkspace() {
       _gwShow('gw-authorize-btn');
     }
 
-    if (d.last_auth_error) {
-      _gwSetHtml('gw-error-box', `Auth error: ${escHtml(d.last_auth_error)}`);
+    if (data.last_auth_error) {
+      _gwSetHtml('gw-error-box', `Auth error: ${escHtml(data.last_auth_error)}`);
       _gwShow('gw-error-box');
     }
 
     // ── Service flags ──────────────────────────────────────
-    const svc = d.services_enabled || {};
+    const svc = data.services_enabled || {};
     const flagDefs = [
       { label:'Calendar', on: !!svc.calendar },
       { label:'Gmail',    on: !!svc.gmail },
       { label:'Drive',    on: !!svc.drive },
-      { label:'Token',    on: !!d.token_valid, warn: d.token_exists && !d.token_valid },
-      { label:'Gmail Send', on: !!d.gmail_send_enabled, warn: !!d.gmail_send_enabled },
+      { label:'Token',    on: !!data.token_valid, warn: data.token_exists && !data.token_valid },
+      { label:'Gmail Send', on: !!data.gmail_send_enabled, warn: !!data.gmail_send_enabled },
     ];
     document.getElementById('gw-flags').innerHTML = flagDefs.map(f => `
       <div class="integ-flag">
@@ -2846,14 +2848,14 @@ async function loadGoogleWorkspace() {
       </div>`).join('');
 
     // ── Config summary ─────────────────────────────────────
-    if (d.integration_enabled) {
+    if (data.integration_enabled) {
       const cfgFlags = [
         { label:'Calendar read',   on: !!svc.calendar },
-        { label:'Cal. create',     on: !!(d.calendar_create_enabled ?? false), warn:true },
+        { label:'Cal. create',     on: !!(data.calendar_create_enabled ?? false), warn:true },
         { label:'Gmail read',      on: !!svc.gmail },
-        { label:'Gmail send',      on: !!d.gmail_send_enabled, warn: !!d.gmail_send_enabled },
+        { label:'Gmail send',      on: !!data.gmail_send_enabled, warn: !!data.gmail_send_enabled },
         { label:'Drive read',      on: !!svc.drive },
-        { label:'Drive download',  on: !!(d.drive_download_enabled ?? false), warn:true },
+        { label:'Drive download',  on: !!(data.drive_download_enabled ?? false), warn:true },
       ];
       document.getElementById('gw-config-flags').innerHTML = cfgFlags.map(f => `
         <div class="integ-flag">
@@ -2889,7 +2891,7 @@ async function gwStartAuth() {
     }
 
     // Open auth URL in new tab / popup
-    _gwAuthWindow = window.open(d.auth_url, 'gw_oauth',
+    _gwAuthWindow = window.open(d.data?.auth_url, 'gw_oauth',
       'width=520,height=640,noopener=0');
 
     // Listen for postMessage from the callback page
@@ -2919,7 +2921,7 @@ function _gwStartPoll() {
     attempts++;
     try {
       const d = await api('GET', '/api/google_workspace/status');
-      if (d.token_valid || attempts >= 90) { // 90 × 2s = 3 min timeout
+      if (d.data?.token_valid || attempts >= 90) { // 90 × 2s = 3 min timeout
         _gwStopPoll();
         loadGoogleWorkspace();
       }
@@ -2987,7 +2989,7 @@ async function gwCalToday() {
   try {
     const d = await api('GET', '/api/google_workspace/calendar/today');
     if (!d.ok) { el.innerHTML = `<span style="color:var(--red)">${escHtml(d.error)}</span>`; return; }
-    _gwRenderEvents(d.events, el);
+    _gwRenderEvents(d.data?.events, el);
   } catch(e) { el.innerHTML = `<span style="color:var(--red)">${escHtml(e.message)}</span>`; }
 }
 
@@ -2997,7 +2999,7 @@ async function gwCalWeek() {
   try {
     const d = await api('GET', '/api/google_workspace/calendar/upcoming?days=7&max_results=20');
     if (!d.ok) { el.innerHTML = `<span style="color:var(--red)">${escHtml(d.error)}</span>`; return; }
-    _gwRenderEvents(d.events, el);
+    _gwRenderEvents(d.data?.events, el);
   } catch(e) { el.innerHTML = `<span style="color:var(--red)">${escHtml(e.message)}</span>`; }
 }
 
@@ -3009,7 +3011,7 @@ async function gwCalSearch() {
   try {
     const d = await api('GET', '/api/google_workspace/calendar/upcoming?days=30&max_results=20');
     // Search is done client-side for simplicity (filter by query text)
-    const filtered = (d.events || []).filter(e =>
+    const filtered = (d.data?.events || []).filter(e =>
       (e.summary||'').toLowerCase().includes(q.toLowerCase()) ||
       (e.description||'').toLowerCase().includes(q.toLowerCase())
     );
@@ -3046,7 +3048,7 @@ async function gwGmailLoad(query) {
     const enc = encodeURIComponent(query);
     const d = await api('GET', `/api/google_workspace/gmail/inbox?query=${enc}&max_results=15`);
     if (!d.ok) { el.innerHTML = `<span style="color:var(--red)">${escHtml(d.error)}</span>`; return; }
-    _gwRenderMessages(d.messages, el);
+    _gwRenderMessages(d.data?.messages, el);
   } catch(e) { el.innerHTML = `<span style="color:var(--red)">${escHtml(e.message)}</span>`; }
 }
 
@@ -3081,7 +3083,7 @@ async function gwDriveRecent() {
   try {
     const d = await api('GET', '/api/google_workspace/drive/recent?max_results=15');
     if (!d.ok) { el.innerHTML = `<span style="color:var(--red)">${escHtml(d.error)}</span>`; return; }
-    _gwRenderFiles(d.files, el);
+    _gwRenderFiles(d.data?.files, el);
   } catch(e) { el.innerHTML = `<span style="color:var(--red)">${escHtml(e.message)}</span>`; }
 }
 
@@ -3093,7 +3095,7 @@ async function gwDriveSearch() {
   try {
     const d = await api('GET', `/api/google_workspace/drive/search?q=${encodeURIComponent(q)}`);
     if (!d.ok) { el.innerHTML = `<span style="color:var(--red)">${escHtml(d.error)}</span>`; return; }
-    _gwRenderFiles(d.files, el);
+    _gwRenderFiles(d.data?.files, el);
   } catch(e) { el.innerHTML = `<span style="color:var(--red)">${escHtml(e.message)}</span>`; }
 }
 

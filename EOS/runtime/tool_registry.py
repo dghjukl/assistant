@@ -202,6 +202,8 @@ class ToolSpec:
 
     def __post_init__(self):
         """Validate risk/trust/confirmation values."""
+        if not self.name or not isinstance(self.name, str):
+            raise ValueError("Tool name must be a non-empty string")
         valid_risks = {ToolRiskLevel.READ_ONLY, ToolRiskLevel.DRAFT,
                       ToolRiskLevel.REVERSIBLE_COMMIT, ToolRiskLevel.IRREVERSIBLE_COMMIT}
         if self.risk_level not in valid_risks:

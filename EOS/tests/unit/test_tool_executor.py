@@ -140,7 +140,7 @@ class TestToolExecutorConfirmationGating:
         assert result.success is False
 
     def test_list_pending(self, executor, registry):
-        registry.register(make_spec("p1", confirmation_policy="hard_confirm", name="pending_list_tool"))
+        registry.register(make_spec("pending_list_tool", confirmation_policy="hard_confirm"))
         executor.execute("pending_list_tool", {})
         pending = executor.list_pending()
         assert len(pending) >= 1

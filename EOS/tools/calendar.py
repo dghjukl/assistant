@@ -19,6 +19,8 @@ def _get_service(cfg: dict):
 
 
 async def list_events(days_ahead: int = 7, cfg: dict = {}) -> str:
+    if not cfg.get("google", {}).get("calendar_enabled", False):
+        return "Calendar unavailable: Google calendar integration is disabled."
     try:
         svc = _get_service(cfg)
     except Exception as exc:
@@ -48,6 +50,8 @@ async def create_event(
     description: str = "",
     cfg: dict = {},
 ) -> str:
+    if not cfg.get("google", {}).get("calendar_enabled", False):
+        return "Calendar unavailable: Google calendar integration is disabled."
     try:
         svc = _get_service(cfg)
     except Exception as exc:
