@@ -1,0 +1,141 @@
+<div class="page-header">
+  <div class="page-eyebrow">Advanced</div>
+  <h1 class="page-title">Reference</h1>
+  <p class="page-lead">System requirements, capability degradation, file locations, and port assignments at a glance.</p>
+</div>
+
+<section class="doc-section" id="what-is-eos">
+  <div class="section-eyebrow">Overview</div>
+  <h2 class="section-title">What is EOS</h2>
+  <p class="section-lead">EOS (Entity Operating System) is a local AI companion and assistant. Everything runs on your machine.</p>
+  <div class="card-grid">
+    <div class="cap-card"><div class="cap-card-icon">&#129504;</div><div class="cap-card-title">Local AI</div><div class="cap-card-desc">Runs GGUF language models via llama.cpp. No cloud API required. No data leaves your machine.</div></div>
+    <div class="cap-card"><div class="cap-card-icon">&#129758;</div><div class="cap-card-title">Persistent Identity</div><div class="cap-card-desc">Maintains identity and long-term memory across sessions. Does not reset between conversations.</div></div>
+    <div class="cap-card"><div class="cap-card-icon">&#127897;</div><div class="cap-card-title">Voice I/O</div><div class="cap-card-desc">Local speech-to-text (Whisper) and text-to-speech (Piper/Amy). No cloud dependencies.</div></div>
+    <div class="cap-card"><div class="cap-card-icon">&#128279;</div><div class="cap-card-title">Integrations</div><div class="cap-card-desc">Optional Discord bot, Google Calendar / Gmail / Drive, and sandboxed computer use.</div></div>
+    <div class="cap-card"><div class="cap-card-icon">&#127759;</div><div class="cap-card-title">Worldview</div><div class="cap-card-desc">Deposit source documents and EOS extracts a personalization profile for interpretive calibration.</div></div>
+    <div class="cap-card"><div class="cap-card-icon">&#128421;</div><div class="cap-card-title">Windows-Only</div><div class="cap-card-desc">llama-server and Piper TTS are Windows executables. Linux/Mac not currently supported.</div></div>
+  </div>
+</section>
+
+<hr class="doc-rule"/>
+
+<section class="doc-section" id="requirements">
+  <div class="section-eyebrow">Requirements</div>
+  <h2 class="section-title">System Requirements</h2>
+  <p class="section-lead">Minimum specs run the core system. Recommended specs give comfortable performance.</p>
+  <div class="table-wrap">
+    <table class="doc-table">
+      <thead><tr><th>Component</th><th>Minimum</th><th>Recommended</th></tr></thead>
+      <tbody>
+        <tr><td>OS</td><td>Windows 10 64-bit</td><td>Windows 11 64-bit</td></tr>
+        <tr><td>Python</td><td>3.10</td><td>3.11</td></tr>
+        <tr><td>RAM</td><td>16 GB</td><td>32 GB</td></tr>
+        <tr><td>GPU</td><td>None (CPU-only works)</td><td>NVIDIA with 8 GB+ VRAM</td></tr>
+        <tr><td>VRAM</td><td>N/A</td><td>4 GB = small models only &nbsp;|&nbsp; 8 GB = standard stack &nbsp;|&nbsp; 12 GB+ = full stack with vision</td></tr>
+        <tr><td>Disk</td><td>20 GB free</td><td>30 GB free</td></tr>
+        <tr><td>CUDA</td><td>Not required</td><td>CUDA 13.1 compatible driver</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout tip" style="margin-top:16px">
+    <div class="callout-icon">&#128161;</div>
+    <div class="callout-body">
+      <div class="callout-title">No GPU? That's fine.</div>
+      CPU-only mode works for all features. Responses will be slower, but everything functions. A mid-range GPU makes a significant difference for chat speed.
+    </div>
+  </div>
+</section>
+
+<hr class="doc-rule"/>
+
+<section class="doc-section" id="degradation">
+  <div class="section-eyebrow">Reliability</div>
+  <h2 class="section-title">Capability Degradation</h2>
+  <p class="section-lead">When optional backends are missing, EOS degrades gracefully rather than failing hard.</p>
+
+  <h3 class="sub-title" id="degradation-states">The Three States</h3>
+  <div class="mode-grid">
+    <div class="mode-card on"><div class="mode-name"><span class="badge active">active</span></div><div class="mode-desc">Service running and responding normally. Full capability available.</div></div>
+    <div class="mode-card warn"><div class="mode-name"><span class="badge degraded">degraded</span></div><div class="mode-desc">Service missing but a fallback is in use. Functionality continues at reduced quality or speed.</div></div>
+    <div class="mode-card off"><div class="mode-name"><span class="badge unavail">unavailable</span></div><div class="mode-desc">Feature is cleanly disabled. EOS reports it as unavailable and does not attempt it.</div></div>
+  </div>
+
+  <h3 class="sub-title" id="degradation-table">Degradation by Component</h3>
+  <div class="table-wrap">
+    <table class="doc-table">
+      <thead><tr><th>Missing Component</th><th>State</th><th>Effect</th></tr></thead>
+      <tbody>
+        <tr><td>Tool helper (port 8082)</td><td><span class="badge degraded">degraded</span></td><td>Tool calls fall back to the main model</td></tr>
+        <tr><td>Thinking helper (port 8083)</td><td><span class="badge degraded">degraded</span></td><td>Reasoning falls back to the main model</td></tr>
+        <tr><td>Creativity helper (port 8084)</td><td><span class="badge degraded">degraded</span></td><td>Creativity requests fall back to main / degrade cleanly</td></tr>
+        <tr><td>Vision helper (port 8081)</td><td><span class="badge unavail">unavailable</span></td><td>Vision features cleanly disabled</td></tr>
+        <tr><td>STT model</td><td><span class="badge unavail">unavailable</span></td><td>Voice input disabled. Text chat unaffected.</td></tr>
+        <tr><td>TTS model</td><td><span class="badge unavail">unavailable</span></td><td>Voice output disabled. Text chat unaffected.</td></tr>
+        <tr><td>Discord credential</td><td><span class="badge unavail">unavailable</span></td><td>Discord integration silently skipped at boot</td></tr>
+        <tr><td>Google credential</td><td><span class="badge unavail">unavailable</span></td><td>Google integration silently skipped at boot</td></tr>
+        <tr><td>Embedding model</td><td><span class="badge unavail">unavailable</span></td><td>Memory retrieval disabled. Conversation continues without memory context.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<hr class="doc-rule"/>
+
+<section class="doc-section" id="files">
+  <div class="section-eyebrow">File Locations</div>
+  <h2 class="section-title">Key File Locations</h2>
+  <p class="section-lead">Quick reference for where everything lives.</p>
+  <div class="table-wrap">
+    <table class="doc-table">
+      <thead><tr><th>File / Folder</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>config.json</code></td><td>Main configuration file. The one EOS loads.</td></tr>
+        <tr><td><code>AI personal files\Discord.txt</code></td><td>Discord bot token (one line)</td></tr>
+        <tr><td><code>AI personal files\client_secret_*.json</code></td><td>Google OAuth client secret</td></tr>
+        <tr><td><code>data\entity_state.db</code></td><td>SQLite: identity state, relational model, memory metadata</td></tr>
+        <tr><td><code>data\memory_store\</code></td><td>ChromaDB vector memory (semantic retrieval)</td></tr>
+        <tr><td><code>data\google_token.json</code></td><td>Google OAuth refresh token (generated at runtime)</td></tr>
+        <tr><td><code>data\workspace\context\</code></td><td>Files here appear in EOS's system prompt every turn</td></tr>
+        <tr><td><code>data\workspace\projects\</code></td><td>EOS's ongoing work</td></tr>
+        <tr><td><code>data\worldview\sources\</code></td><td>Documents you deposit for worldview extraction</td></tr>
+        <tr><td><code>data\worldview\profile.md</code></td><td>Extracted worldview profile</td></tr>
+        <tr><td><code>models\primary\</code></td><td>Main language model (.gguf)</td></tr>
+        <tr><td><code>models\stt\</code></td><td>Speech-to-text model (.bin)</td></tr>
+        <tr><td><code>models\tts\</code></td><td>Text-to-speech model (.onnx + .onnx.json)</td></tr>
+        <tr><td><code>models\embedding\all-MiniLM-L6-v2\</code></td><td>Embedding model for memory retrieval</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<hr class="doc-rule"/>
+
+<section class="doc-section" id="ports">
+  <div class="section-eyebrow">Network</div>
+  <h2 class="section-title">Port Reference</h2>
+  <div class="table-wrap">
+    <table class="doc-table">
+      <thead><tr><th>Port</th><th>Service</th><th>URL</th></tr></thead>
+      <tbody>
+        <tr><td><code>7860</code></td><td>WebUI &amp; API</td><td>http://127.0.0.1:7860/</td></tr>
+        <tr><td><code>7860</code></td><td>Admin Panel</td><td>http://127.0.0.1:7860/admin</td></tr>
+        <tr><td><code>7860</code></td><td>Documentation</td><td>http://127.0.0.1:7860/docs</td></tr>
+        <tr><td><code>8080</code></td><td>Main model</td><td>http://127.0.0.1:8080/</td></tr>
+        <tr><td><code>8081</code></td><td>Vision helper</td><td>http://127.0.0.1:8081/</td></tr>
+        <tr><td><code>8082</code></td><td>Tool helper</td><td>http://127.0.0.1:8082/</td></tr>
+        <tr><td><code>8083</code></td><td>Thinking helper</td><td>http://127.0.0.1:8083/</td></tr>
+        <tr><td><code>8084</code></td><td>Creativity helper</td><td>http://127.0.0.1:8084/</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<hr class="doc-rule"/>
+
+<section class="doc-section" id="version">
+  <div class="section-eyebrow">Version</div>
+  <h2 class="section-title">Version</h2>
+  <p class="doc-p">Current version: <strong>1.0.0</strong></p>
+  <p class="doc-p">The <code>VERSION</code> file in the EOS root directory always reflects the installed version.</p>
+</section>

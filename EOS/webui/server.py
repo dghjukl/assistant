@@ -358,7 +358,7 @@ async def _bus_poll_loop() -> None:
 
 # ── FastAPI app ───────────────────────────────────────────────────────────
 
-app = FastAPI(title="EOS WebUI", version="1.0")
+app = FastAPI(title="EOS WebUI", version="1.0", docs_url=None, redoc_url=None)
 
 
 # ── Signal bus subscriber wiring ─────────────────────────────────────────────
@@ -964,6 +964,18 @@ async def get_docs():
         {"ok": False, "error": "Docs not found"},
         status_code=404
     )
+
+
+@app.get("/docs/content/{page}")
+async def get_docs_content(page: str):
+    """Serve a documentation content fragment."""
+    import re
+    if not re.match(r'^[a-z0-9-]+$', page):
+        return JSONResponse({"ok": False, "error": "Invalid page"}, status_code=400)
+    html_path = Path(__file__).parent / "docs" / f"{page}.html"
+    if html_path.is_file():
+        return FileResponse(html_path, media_type="text/html")
+    return JSONResponse({"ok": False, "error": "Page not found"}, status_code=404)
 
 
 @app.get("/favicon.ico")
