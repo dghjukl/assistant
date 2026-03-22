@@ -1,0 +1,103 @@
+<div class="page-header">
+  <div class="page-eyebrow">Capabilities</div>
+  <h1 class="page-title">Voice</h1>
+  <p class="page-lead">EOS supports voice input (speech-to-text) and voice output (text-to-speech), both running locally with no cloud API.</p>
+</div>
+
+<div class="doc-section" id="requirements">
+  <div class="section-eyebrow">Capabilities</div>
+  <h2 class="section-title">Requirements</h2>
+  <p class="doc-p">Voice requires two model files to be present on disk. Both are downloaded automatically by <code>Setup-Full.ps1</code>.</p>
+
+  <h3 class="sub-title" id="requirements-stt">STT Model</h3>
+  <div class="file-path">models\stt\ggml-small.en-q8_0.bin</div>
+
+  <h3 class="sub-title" id="requirements-tts">TTS Models</h3>
+  <div class="file-path">models\tts\en_US-amy-medium.onnx</div>
+  <div class="file-path">models\tts\en_US-amy-medium.onnx.json</div>
+
+  <div class="callout important">
+    <div class="callout-icon"></div>
+    <div class="callout-body">
+      <div class="callout-title">No Configuration Needed</div>
+      Voice requires no configuration beyond having these files in place. If they are present and EOS started cleanly, voice just works.
+    </div>
+  </div>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="stt">
+  <div class="section-eyebrow">Capabilities</div>
+  <h2 class="section-title">Voice Input (STT)</h2>
+  <p class="doc-p">When STT is active, a microphone button appears in the chat interface. Hold the button to speak, then release to send your voice as a message. EOS transcribes the audio locally using Whisper (<code>ggml-small</code>).</p>
+  <p class="doc-p">No audio ever leaves your machine. The entire transcription pipeline runs on your local hardware.</p>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="tts">
+  <div class="section-eyebrow">Capabilities</div>
+  <h2 class="section-title">Voice Output (TTS)</h2>
+  <p class="doc-p">When the TTS model is present, EOS speaks all responses aloud. The voice is Amy (en_US, medium quality), a Piper TTS model that runs entirely on CPU.</p>
+  <p class="doc-p">There is no on/off toggle in the chat UI — voice output is always active when the model file is present. To disable TTS, remove or rename the <code>.onnx</code> file. EOS will detect its absence on next start and silently skip TTS.</p>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="status">
+  <div class="section-eyebrow">Capabilities</div>
+  <h2 class="section-title">Checking Voice Status</h2>
+  <p class="doc-p">Run <code>status-eos.bat</code> from the EOS directory. The output includes a line for each voice component:</p>
+  <ul class="doc-list">
+    <li><code>STT: active</code> or <code>STT: unavailable</code></li>
+    <li><code>TTS: active</code> or <code>TTS: unavailable</code></li>
+  </ul>
+  <p class="doc-p">You can also check the <strong>Admin Panel → Overview</strong> tab. The STT and TTS rows appear in the server cards section with their current status badges.</p>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="troubleshooting">
+  <div class="section-eyebrow">Capabilities</div>
+  <h2 class="section-title">Troubleshooting</h2>
+
+  <div class="table-wrap">
+    <table class="doc-table">
+      <thead>
+        <tr>
+          <th>Symptom</th>
+          <th>Likely Cause &amp; Fix</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Mic button not appearing in chat</td>
+          <td>STT model is missing or failed to load. Run <code>status-eos.bat</code> and check the STT line. Verify the model file is at the exact path shown above.</td>
+        </tr>
+        <tr>
+          <td>TTS is silent</td>
+          <td>Check that your system audio is not muted and that no other application is exclusively holding the audio output device. Restart EOS after freeing the device.</td>
+        </tr>
+        <tr>
+          <td>Transcription is inaccurate</td>
+          <td>Speak clearly and close to the microphone. The <code>ggml-small</code> Whisper model has known limitations with strong accents and background noise. A larger model would improve accuracy but requires more RAM.</td>
+        </tr>
+        <tr>
+          <td>TTS is very slow</td>
+          <td>Piper TTS runs on CPU. Synthesis speed depends on your processor. On slower machines there will be a noticeable pause before speech starts. This is expected behavior, not an error.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout trouble">
+    <div class="callout-icon"></div>
+    <div class="callout-body">
+      <div class="callout-title">STT Unavailable</div>
+      If STT is unavailable, double-check that the model file path matches exactly:
+      <div class="file-path">models\stt\ggml-small.en-q8_0.bin</div>
+      The filename is case-sensitive on some systems. Ensure there are no extra characters or whitespace in the filename.
+    </div>
+  </div>
+</div>

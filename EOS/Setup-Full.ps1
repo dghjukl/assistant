@@ -206,89 +206,102 @@ Write-OK "All directories ready"
 
 # -- 4. Download llama.cpp server binaries ------------------------------------
 Write-Step "Downloading llama.cpp server binaries"
-Write-Host "    (Fetching latest release from github.com/ggml-org/llama.cpp ...)" -ForegroundColor Gray
 
-try {
-    $headers  = @{ "User-Agent" = "EOS-Installer/1.0"; "Accept" = "application/vnd.github.v3+json" }
-    $apiUrl   = "https://api.github.com/repos/ggml-org/llama.cpp/releases/latest"
-    $release  = Invoke-RestMethod -Uri $apiUrl -Headers $headers
-    $relTag   = $release.tag_name
-    Write-Host "    Latest release: $relTag" -ForegroundColor Gray
+$cpuExe    = Join-Path $Root "llama-CPU\llama-server.exe"
+$gpuExe    = Join-Path $Root "llama-b8149-bin-win-cuda-13.1-x64\llama-server.exe"
+$cpuNeeded = -not (Test-Path $cpuExe)
+$gpuNeeded = $hasGPU -and -not (Test-Path $gpuExe)
 
-    $tmpZip = "$env:TEMP\llama_cpu.zip"
-    $tmpDir = "$env:TEMP\llama_extract"
+if (-not $cpuNeeded -and -not $gpuNeeded) {
+    Write-Skip "llama.cpp binaries - already installed"
+} else {
+    Write-Host "    (Fetching latest release from github.com/ggml-org/llama.cpp ...)" -ForegroundColor Gray
+    try {
+        $headers  = @{ "User-Agent" = "EOS-Installer/1.0"; "Accept" = "application/vnd.github.v3+json" }
+        $apiUrl   = "https://api.github.com/repos/ggml-org/llama.cpp/releases/latest"
+        $release  = Invoke-RestMethod -Uri $apiUrl -Headers $headers
+        $relTag   = $release.tag_name
+        Write-Host "    Latest release: $relTag" -ForegroundColor Gray
 
-    # -- CPU build (always installed) -----------------------------------------
-    $cpuAsset = $release.assets |
-        Where-Object { $_.name -match "bin-win-avx2-x64\.zip$" } |
-        Select-Object -First 1
+        $tmpZip = "$env:TEMP\llama_cpu.zip"
+        $tmpDir = "$env:TEMP\llama_extract"
 
-    if (-not $cpuAsset) {
-        # Fallback: any non-CUDA Windows build
-        $cpuAsset = $release.assets |
-            Where-Object { $_.name -match "win.*x64.*\.zip" -and $_.name -notmatch "cuda" } |
-            Select-Object -First 1
-    }
+        # -- CPU build --------------------------------------------------------
+        if ($cpuNeeded) {
+            $cpuAsset = $release.assets |
+                Where-Object { $_.name -match "bin-win-avx2-x64\.zip$" } |
+                Select-Object -First 1
 
-    if ($cpuAsset) {
-        Download-File $cpuAsset.browser_download_url $tmpZip "llama.cpp CPU build ($($cpuAsset.name))" 50
-
-        if (Test-Path $tmpDir) { Remove-Item $tmpDir -Recurse -Force }
-        Expand-To $tmpZip $tmpDir
-
-        $serverExe = Get-ChildItem $tmpDir -Filter "llama-server.exe" -Recurse |
-                     Select-Object -First 1
-        if ($serverExe) {
-            $cpuDest = Join-Path $Root "llama-CPU"
-            New-Item -ItemType Directory -Force -Path $cpuDest | Out-Null
-            Get-ChildItem $serverExe.DirectoryName |
-                Copy-Item -Destination $cpuDest -Force
-            Write-OK "llama-server (CPU) -> llama-CPU\"
-        }
-
-        Remove-Item $tmpZip  -Force -ErrorAction SilentlyContinue
-        Remove-Item $tmpDir  -Recurse -Force -ErrorAction SilentlyContinue
-    } else {
-        Write-Problem "Could not find CPU build in latest release - check https://github.com/ggml-org/llama.cpp/releases"
-    }
-
-    # -- GPU (CUDA) build -----------------------------------------------------
-    if ($hasGPU) {
-        $cudaAsset = $release.assets |
-            Where-Object { $_.name -match "bin-win-cuda.*x64.*\.zip$" } |
-            Sort-Object { $_.name } | Select-Object -Last 1
-
-        if ($cudaAsset) {
-            $tmpZip2 = "$env:TEMP\llama_gpu.zip"
-            Download-File $cudaAsset.browser_download_url $tmpZip2 "llama.cpp CUDA build ($($cudaAsset.name))" 200
-
-            if (Test-Path $tmpDir) { Remove-Item $tmpDir -Recurse -Force }
-            Expand-To $tmpZip2 $tmpDir
-
-            $serverExe2 = Get-ChildItem $tmpDir -Filter "llama-server.exe" -Recurse |
-                          Select-Object -First 1
-            if ($serverExe2) {
-                # Place in the folder name the config expects
-                $gpuDest = Join-Path $Root "llama-b8149-bin-win-cuda-13.1-x64"
-                New-Item -ItemType Directory -Force -Path $gpuDest | Out-Null
-                Get-ChildItem $serverExe2.DirectoryName |
-                    Copy-Item -Destination $gpuDest -Force
-                Write-OK "llama-server (GPU/CUDA) -> llama-b8149-bin-win-cuda-13.1-x64\"
+            if (-not $cpuAsset) {
+                $cpuAsset = $release.assets |
+                    Where-Object { $_.name -match "win.*x64.*\.zip" -and $_.name -notmatch "cuda" } |
+                    Select-Object -First 1
             }
 
-            Remove-Item $tmpZip2 -Force -ErrorAction SilentlyContinue
-            Remove-Item $tmpDir  -Recurse -Force -ErrorAction SilentlyContinue
-        } else {
-            Write-Warn "No CUDA build found in latest release. GPU acceleration will fall back to CPU binary."
-        }
-    }
+            if ($cpuAsset) {
+                Download-File $cpuAsset.browser_download_url $tmpZip "llama.cpp CPU build ($($cpuAsset.name))" 50
 
-} catch {
-    Write-Problem "Could not fetch llama.cpp release: $_"
-    Write-Host "    Download manually from: https://github.com/ggml-org/llama.cpp/releases" -ForegroundColor Gray
-    Write-Host "    Place llama-server.exe in: llama-CPU\" -ForegroundColor Gray
-    if ($hasGPU) {
-        Write-Host "    And in: llama-b8149-bin-win-cuda-13.1-x64\" -ForegroundColor Gray
+                if (Test-Path $tmpDir) { Remove-Item $tmpDir -Recurse -Force }
+                Expand-To $tmpZip $tmpDir
+
+                $serverExe = Get-ChildItem $tmpDir -Filter "llama-server.exe" -Recurse |
+                             Select-Object -First 1
+                if ($serverExe) {
+                    $cpuDest = Join-Path $Root "llama-CPU"
+                    New-Item -ItemType Directory -Force -Path $cpuDest | Out-Null
+                    Get-ChildItem $serverExe.DirectoryName |
+                        Copy-Item -Destination $cpuDest -Force
+                    Write-OK "llama-server (CPU) -> llama-CPU\"
+                }
+
+                Remove-Item $tmpZip -Force -ErrorAction SilentlyContinue
+                Remove-Item $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
+            } else {
+                Write-Problem "Could not find CPU build in latest release - check https://github.com/ggml-org/llama.cpp/releases"
+            }
+        } else {
+            Write-Skip "llama.cpp CPU build - already installed"
+        }
+
+        # -- GPU (CUDA) build -------------------------------------------------
+        if ($gpuNeeded) {
+            $cudaAsset = $release.assets |
+                Where-Object { $_.name -match "bin-win-cuda.*x64.*\.zip$" } |
+                Sort-Object { $_.name } | Select-Object -Last 1
+
+            if ($cudaAsset) {
+                $tmpZip2 = "$env:TEMP\llama_gpu.zip"
+                Download-File $cudaAsset.browser_download_url $tmpZip2 "llama.cpp CUDA build ($($cudaAsset.name))" 200
+
+                if (Test-Path $tmpDir) { Remove-Item $tmpDir -Recurse -Force }
+                Expand-To $tmpZip2 $tmpDir
+
+                $serverExe2 = Get-ChildItem $tmpDir -Filter "llama-server.exe" -Recurse |
+                              Select-Object -First 1
+                if ($serverExe2) {
+                    $gpuDest = Join-Path $Root "llama-b8149-bin-win-cuda-13.1-x64"
+                    New-Item -ItemType Directory -Force -Path $gpuDest | Out-Null
+                    Get-ChildItem $serverExe2.DirectoryName |
+                        Copy-Item -Destination $gpuDest -Force
+                    Write-OK "llama-server (GPU/CUDA) -> llama-b8149-bin-win-cuda-13.1-x64\"
+                }
+
+                Remove-Item $tmpZip2 -Force -ErrorAction SilentlyContinue
+                Remove-Item $tmpDir  -Recurse -Force -ErrorAction SilentlyContinue
+            } else {
+                Write-Warn "No CUDA build found in latest release. GPU acceleration will fall back to CPU binary."
+            }
+        } elseif ($hasGPU) {
+            Write-Skip "llama.cpp GPU/CUDA build - already installed"
+        }
+
+    } catch {
+        Write-Problem "Could not fetch llama.cpp release: $_"
+        Write-Host "    Download manually from: https://github.com/ggml-org/llama.cpp/releases" -ForegroundColor Gray
+        Write-Host "    Place llama-server.exe in: llama-CPU\" -ForegroundColor Gray
+        if ($hasGPU) {
+            Write-Host "    And in: llama-b8149-bin-win-cuda-13.1-x64\" -ForegroundColor Gray
+        }
     }
 }
 
@@ -296,38 +309,42 @@ try {
 # -- 5. Download Piper TTS engine ---------------------------------------------
 Write-Step "Downloading Piper TTS engine"
 
-try {
-    $headers  = @{ "User-Agent" = "EOS-Installer/1.0"; "Accept" = "application/vnd.github.v3+json" }
-    $piperApi = "https://api.github.com/repos/rhasspy/piper/releases/latest"
-    $piperRel = Invoke-RestMethod -Uri $piperApi -Headers $headers
+if (Test-Path (Join-Path $Root "Piper\piper\piper.exe")) {
+    Write-Skip "Piper TTS engine - already installed"
+} else {
+    try {
+        $headers  = @{ "User-Agent" = "EOS-Installer/1.0"; "Accept" = "application/vnd.github.v3+json" }
+        $piperApi = "https://api.github.com/repos/rhasspy/piper/releases/latest"
+        $piperRel = Invoke-RestMethod -Uri $piperApi -Headers $headers
 
-    $piperAsset = $piperRel.assets |
-        Where-Object { $_.name -match "piper_windows_amd64\.zip$" } |
-        Select-Object -First 1
+        $piperAsset = $piperRel.assets |
+            Where-Object { $_.name -match "piper_windows_amd64\.zip$" } |
+            Select-Object -First 1
 
-    if ($piperAsset) {
-        $piperZip = "$env:TEMP\piper_win.zip"
-        $piperOut = Join-Path $Root "Piper"
+        if ($piperAsset) {
+            $piperZip = "$env:TEMP\piper_win.zip"
+            $piperOut = Join-Path $Root "Piper"
 
-        Download-File $piperAsset.browser_download_url $piperZip "Piper TTS engine" 10
+            Download-File $piperAsset.browser_download_url $piperZip "Piper TTS engine" 10
 
-        New-Item -ItemType Directory -Force -Path $piperOut | Out-Null
-        Expand-To $piperZip $piperOut
+            New-Item -ItemType Directory -Force -Path $piperOut | Out-Null
+            Expand-To $piperZip $piperOut
 
-        if (Test-Path (Join-Path $Root "Piper\piper\piper.exe")) {
-            Write-OK "Piper TTS -> Piper\piper\piper.exe"
+            if (Test-Path (Join-Path $Root "Piper\piper\piper.exe")) {
+                Write-OK "Piper TTS -> Piper\piper\piper.exe"
+            } else {
+                Write-Warn "Piper extracted but piper.exe location may differ - check Piper\ folder"
+            }
+
+            Remove-Item $piperZip -Force -ErrorAction SilentlyContinue
         } else {
-            Write-Warn "Piper extracted but piper.exe location may differ - check Piper\ folder"
+            Write-Problem "Could not find Windows Piper release"
+            Write-Host "    Download from: https://github.com/rhasspy/piper/releases" -ForegroundColor Gray
+            Write-Host "    Extract so that Piper\piper\piper.exe exists" -ForegroundColor Gray
         }
-
-        Remove-Item $piperZip -Force -ErrorAction SilentlyContinue
-    } else {
-        Write-Problem "Could not find Windows Piper release"
-        Write-Host "    Download from: https://github.com/rhasspy/piper/releases" -ForegroundColor Gray
-        Write-Host "    Extract so that Piper\piper\piper.exe exists" -ForegroundColor Gray
+    } catch {
+        Write-Problem "Could not fetch Piper release: $_"
     }
-} catch {
-    Write-Problem "Could not fetch Piper release: $_"
 }
 
 
@@ -407,7 +424,7 @@ if (Test-Path $reqFile) {
     Write-Host "    Running: pip install -r requirements.txt" -ForegroundColor Gray
     try {
         python -m pip install --upgrade pip --quiet
-        python -m pip install -r $reqFile
+        python -m pip install -r $reqFile --no-warn-script-location
         Write-OK "Python packages installed"
     } catch {
         Write-Problem "pip install encountered an error: $_"
@@ -418,14 +435,13 @@ if (Test-Path $reqFile) {
 }
 
 
-# -- 7b. Pre-download embedding model -----------------------------------------
-Write-Step "Pre-downloading embedding model (all-MiniLM-L6-v2, ~90 MB)"
-Write-Host "    This is required for memory retrieval. Downloading once so EOS never hangs on first run." -ForegroundColor Gray
-try {
-    python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2', device='cpu')" 2>&1 | Out-Null
-    Write-OK "Embedding model cached"
-} catch {
-    Write-Warn "Could not download embedding model now. Memory retrieval will be unavailable until it downloads."
+# -- 7b. Verify bundled embedding model ---------------------------------------
+Write-Step "Checking bundled embedding model (all-MiniLM-L6-v2)"
+$embedPath = Join-Path $Root "models\embedding\all-MiniLM-L6-v2"
+if (Test-Path $embedPath) {
+    Write-OK "Embedding model found at models\embedding\all-MiniLM-L6-v2"
+} else {
+    Write-Warn "Embedding model not found at models\embedding\all-MiniLM-L6-v2 — memory retrieval will be disabled until it is placed there."
 }
 
 

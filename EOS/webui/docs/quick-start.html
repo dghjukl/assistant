@@ -1,0 +1,261 @@
+<div class="page-header">
+  <div class="page-eyebrow">Getting Started</div>
+  <h1 class="page-title">Quick Start</h1>
+  <p class="page-lead">The shortest path from zero to a running EOS system. Follow these steps in order.</p>
+</div>
+
+<div class="callout important">
+  <div class="callout-icon">&#9432;</div>
+  <div class="callout-title">What you'll do</div>
+  <div class="callout-body">
+    <strong>Install Python</strong> &rarr; <strong>Run Setup</strong> &rarr; <strong>Verify</strong> &rarr; <strong>Start Backends</strong> &rarr; <strong>Open Browser</strong>
+    <br><br>
+    Estimated time: under an hour for the full install, depending on your internet connection.
+  </div>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="prerequisites">
+  <div class="section-eyebrow">Before You Begin</div>
+  <h2 class="section-title">Prerequisites</h2>
+  <p class="section-lead">EOS requires Python 3.11. If you already have it installed with PATH configured, skip ahead to Step 1.</p>
+
+  <ol class="step-list">
+    <li class="step-card">
+      <div class="step-num green">1</div>
+      <div class="step-body">
+        <div class="step-title">Download Python 3.11</div>
+        <div class="step-desc">Go to <code>python.org/downloads</code> and download the Python 3.11 installer. During installation, check <strong>"Add Python to PATH"</strong> before clicking Install. This checkbox is on the first screen — do not miss it.</div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num green">2</div>
+      <div class="step-body">
+        <div class="step-title">Verify Python is available</div>
+        <div class="step-desc">Open a Command Prompt and run:
+          <div class="code-wrap"><pre>python --version</pre></div>
+          You should see <code>Python 3.11.x</code>. If you see an error or a different version, reinstall Python and ensure "Add Python to PATH" is checked.
+        </div>
+      </div>
+    </li>
+  </ol>
+
+  <div class="callout warning">
+    <div class="callout-icon">&#9888;</div>
+    <div class="callout-title">Do not skip "Add Python to PATH"</div>
+    <div class="callout-body">If you skip "Add Python to PATH" during install, nothing will work downstream. Re-run the Python installer, choose Modify, and check that box before continuing.</div>
+  </div>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="run-setup">
+  <div class="section-eyebrow">Step 1</div>
+  <h2 class="section-title">Run Setup</h2>
+  <p class="section-lead">The setup script handles everything: pip packages, binaries, and model downloads.</p>
+
+  <ol class="step-list">
+    <li class="step-card">
+      <div class="step-num green">1</div>
+      <div class="step-body">
+        <div class="step-title">Right-click Setup-Full.ps1 and choose "Run with PowerShell"</div>
+        <div class="step-desc">If Windows shows a security prompt about execution policy, click <strong>Open</strong> or type <strong>Y</strong> when prompted. The script will start and show progress for each component it installs.</div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num amber">2</div>
+      <div class="step-body">
+        <div class="step-title">Wait for the download to complete (~13 GB)</div>
+        <div class="step-desc">Setup-Full.ps1 downloads approximately 13 GB of models and binaries. This only needs to run once. Leave the window open and let it finish — do not close it mid-download.</div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num purple">3</div>
+      <div class="step-body">
+        <div class="step-title">Alternative: Setup-Lite.ps1</div>
+        <div class="step-desc"><code>Setup-Lite.ps1</code> (~3 GB) installs supporting files only. The primary model must be added manually afterwards. Use this if you want to control which large models are downloaded, or if you are on a limited connection.</div>
+      </div>
+    </li>
+  </ol>
+
+  <div class="callout tip">
+    <div class="callout-icon">&#128161;</div>
+    <div class="callout-title">Safe to re-run</div>
+    <div class="callout-body">Setup checks for already-installed components and skips them. If a download was interrupted or something failed, just re-run the same script — it will pick up where it left off.</div>
+  </div>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="verify">
+  <div class="section-eyebrow">Step 2</div>
+  <h2 class="section-title">Verify</h2>
+  <p class="section-lead">Run the verification script before starting EOS. It catches problems early so you are not debugging a running system.</p>
+
+  <div class="code-wrap"><pre>python verify.py</pre></div>
+
+  <p class="doc-p">What you should see: all checks listed as <strong>PASS</strong> in green. The script checks pip packages, llama binaries, model files, port availability, and <code>config.json</code>.</p>
+
+  <ul class="doc-list">
+    <li><strong>Red errors</strong> — fix these before continuing. EOS will not start correctly with unresolved errors.</li>
+    <li><strong>Yellow warnings</strong> — non-fatal. Optional capabilities may be unavailable but EOS will run.</li>
+  </ul>
+
+  <div class="callout trouble">
+    <div class="callout-icon">&#128295;</div>
+    <div class="callout-title">Missing model file?</div>
+    <div class="callout-body">If <code>verify.py</code> reports a missing model file, re-run <code>Setup-Full.ps1</code>. It will skip files that already downloaded correctly and only re-fetch what is missing or incomplete.</div>
+  </div>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="start-backends">
+  <div class="section-eyebrow">Step 3</div>
+  <h2 class="section-title">Start Backends</h2>
+  <p class="section-lead">EOS needs at least one model server running before it starts. Use the launcher for the easiest experience.</p>
+
+  <h3 class="sub-title" id="recommended-launcher">Recommended: GUI Launcher</h3>
+  <p class="doc-p">Double-click <code>Launch EOS.bat</code> to open the GUI launcher. Select your desired profile and click Start. The launcher manages all backend windows for you.</p>
+
+  <h3 class="sub-title" id="manual-launcher">Manual: Script Launchers</h3>
+  <p class="doc-p">For the standard recommended stack, run:</p>
+  <div class="code-wrap"><pre>start-standard.bat</pre></div>
+  <p class="doc-p">This opens three console windows:</p>
+
+  <div class="table-wrap">
+    <table class="doc-table">
+      <thead>
+        <tr>
+          <th>Window</th>
+          <th>Port</th>
+          <th>Role</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Main model</td>
+          <td><code>8080</code></td>
+          <td>Primary language model — handles all chat</td>
+        </tr>
+        <tr>
+          <td>Tool helper</td>
+          <td><code>8082</code></td>
+          <td>Handles tool calls and function routing</td>
+        </tr>
+        <tr>
+          <td>Thinking helper</td>
+          <td><code>8083</code></td>
+          <td>Extended reasoning and step-by-step analysis</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="doc-p">Wait for each window to print its ready message before continuing. The exact text varies by model, but look for a line indicating the server is listening on its port.</p>
+
+  <div class="callout tip">
+    <div class="callout-icon">&#128161;</div>
+    <div class="callout-title">Capability map output</div>
+    <div class="callout-body">When EOS starts it will print a capability map showing which services were discovered and their status. All three backends showing <span class="badge active">active</span> means everything is ready.</div>
+  </div>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="open-eos">
+  <div class="section-eyebrow">Step 4</div>
+  <h2 class="section-title">Open EOS</h2>
+  <p class="section-lead">With backends running, start the EOS interface and open your browser.</p>
+
+  <ol class="step-list">
+    <li class="step-card">
+      <div class="step-num green">1</div>
+      <div class="step-body">
+        <div class="step-title">Run start-eos.bat</div>
+        <div class="step-desc">Double-click <code>start-eos.bat</code> or run it from a terminal. Wait for the console to print <code>Starting WebUI at http://127.0.0.1:7860/</code>.</div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num green">2</div>
+      <div class="step-body">
+        <div class="step-title">Open the chat interface</div>
+        <div class="step-desc">Navigate to:
+          <div class="file-path">http://127.0.0.1:7860/</div>
+          The chat interface loads in your browser. You can start talking to EOS immediately.
+        </div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num purple">3</div>
+      <div class="step-body">
+        <div class="step-title">Optional: Open the Admin Panel</div>
+        <div class="step-desc">The operator control panel is at:
+          <div class="file-path">http://127.0.0.1:7860/admin</div>
+          From here you can monitor service status, adjust settings, and view diagnostics.
+        </div>
+      </div>
+    </li>
+  </ol>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="optional-capabilities">
+  <div class="section-eyebrow">Optional</div>
+  <h2 class="section-title">Optional Capabilities</h2>
+  <p class="section-lead">None of these are required to run EOS. Enable them when you need them.</p>
+
+  <div class="table-wrap">
+    <table class="doc-table">
+      <thead>
+        <tr>
+          <th>Capability</th>
+          <th>How to enable</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Discord Bot</td>
+          <td>Add your bot token to <code>AI personal files\Discord.txt</code></td>
+        </tr>
+        <tr>
+          <td>Google Calendar / Gmail / Drive</td>
+          <td>Place your OAuth JSON credentials in <code>AI personal files\</code></td>
+        </tr>
+        <tr>
+          <td>Computer Use</td>
+          <td>Enable in the Admin Panel under Capabilities</td>
+        </tr>
+        <tr>
+          <td>Vision</td>
+          <td>Run <code>start-vision-gpu.bat</code> (NVIDIA GPU required)</td>
+        </tr>
+        <tr>
+          <td>Voice (STT / TTS)</td>
+          <td>Already active if Setup-Full.ps1 completed — no extra steps</td>
+        </tr>
+        <tr>
+          <td>Worldview</td>
+          <td>Drop documents into <code>data\worldview\sources\</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<hr class="doc-rule">
+
+<div class="callout trouble">
+  <div class="callout-icon">&#128295;</div>
+  <div class="callout-title">If something fails</div>
+  <div class="callout-body">
+    <ul class="doc-list">
+      <li>Re-run <code>Setup-Full.ps1</code> — it is safe to re-run and will skip files that are already correct.</li>
+      <li>Re-run <code>python verify.py</code> — check for red errors and resolve them before restarting.</li>
+      <li>Run <code>status-eos.bat</code> to see which services are currently active, degraded, or unavailable.</li>
+      <li>Check the <a onclick="nav('troubleshooting')" style="cursor:pointer;text-decoration:underline">Troubleshooting</a> page for common error messages and fixes.</li>
+    </ul>
+  </div>
+</div>

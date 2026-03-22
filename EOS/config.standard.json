@@ -106,7 +106,7 @@
   },
 
   "retrieval": {
-    "embed_model": "all-MiniLM-L6-v2",
+    "embed_model": "models/embedding/all-MiniLM-L6-v2",
     "chroma_path": "data/memory_store",
     "collection": "entity_memory",
     "top_k": 5

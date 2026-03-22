@@ -31,6 +31,9 @@ data/worldview/sources/
 # Keep the README
 !data/worldview/README.md
 
+# ── Embedding model (bundled separately, not in git) ──────────────────────────
+models/embedding/
+
 # ── Model binaries ────────────────────────────────────────────────────────────
 models/primary/*.gguf
 models/vision/*.gguf

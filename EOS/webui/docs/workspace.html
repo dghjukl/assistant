@@ -1,0 +1,146 @@
+<div class="page-header">
+  <div class="page-eyebrow">Capabilities</div>
+  <h1 class="page-title">Workspace</h1>
+  <p class="page-lead">EOS has a persistent private workspace that survives across sessions and reboots. Think of it as EOS's local disk.</p>
+</div>
+
+<div class="doc-section" id="what">
+  <div class="section-eyebrow">Overview</div>
+  <h2 class="section-title">What the Workspace Is</h2>
+  <p class="doc-p">The workspace lives at <span class="file-path">data\workspace\</span>. EOS can read, write, and — if permitted — delete files and run shell commands there. This is where EOS does its work: writing code, taking notes, managing projects.</p>
+  <p class="doc-p">Nothing in the workspace is shared externally unless you explicitly ask EOS to do so. Files accumulate across sessions; EOS remembers what it has written and can return to prior work without you needing to re-explain context.</p>
+</div>
+
+<div class="doc-rule"></div>
+
+<div class="doc-section" id="structure">
+  <div class="section-eyebrow">Layout</div>
+  <h2 class="section-title">Directory Structure</h2>
+  <div class="dir-tree">data/workspace/
+├── context/<span class="dir-comment">     files here appear in EOS's system prompt every turn</span>
+├── projects/<span class="dir-comment">    ongoing work — code, documents, research</span>
+├── notes/<span class="dir-comment">       EOS's personal notes across sessions</span>
+└── scratch/<span class="dir-comment">     temporary working files</span></div>
+
+  <h3 class="sub-title" id="structure-context">context/</h3>
+  <p class="doc-p">Anything placed in <span class="file-path">context\</span> is referenced in EOS's system prompt on every turn. Use this for documents you want EOS to always have in view — project briefs, coding standards, background material. EOS does not need to be told about these files; it sees them automatically.</p>
+
+  <h3 class="sub-title" id="structure-projects">projects/</h3>
+  <p class="doc-p">Long-running work lives here. EOS organises active work into subdirectories — one per project. Code, research notes, drafts, and plans accumulate here across sessions so EOS can pick up where it left off.</p>
+
+  <h3 class="sub-title" id="structure-notes">notes/</h3>
+  <p class="doc-p">EOS's personal notes — observations, reminders to itself, things it wants to remember between conversations. These are written by EOS, not by you, though you can read and edit them freely.</p>
+
+  <h3 class="sub-title" id="structure-scratch">scratch/</h3>
+  <p class="doc-p">Temporary working files: intermediate outputs, drafts under construction, data being processed. EOS treats this as disposable space. You can clear it at any time without affecting projects or notes.</p>
+</div>
+
+<div class="doc-rule"></div>
+
+<div class="doc-section" id="sharing">
+  <div class="section-eyebrow">Giving EOS Files</div>
+  <h2 class="section-title">Sharing Files with EOS</h2>
+  <p class="doc-p">The simplest way to give EOS a file is to drop it into <span class="file-path">data\workspace\context\</span>. EOS sees files in that folder referenced in its system prompt automatically — you do not need to mention them or paste their contents into the chat.</p>
+  <p class="doc-p">This is ideal for:</p>
+  <ul class="doc-list">
+    <li>Project briefs and requirements</li>
+    <li>Reference documents and specifications</li>
+    <li>Background material EOS should always have</li>
+    <li>Coding standards or style guides</li>
+  </ul>
+  <p class="doc-p">For one-off files that are only relevant to a single conversation, you can paste content directly into the chat instead.</p>
+
+  <div class="callout tip">
+    <div class="callout-icon">💡</div>
+    <div class="callout-title">The easiest persistent context</div>
+    <div class="callout-body">The <span class="file-path">context/</span> folder is the simplest way to give EOS persistent background information. Files placed here are seen every turn without you having to mention them.</div>
+  </div>
+</div>
+
+<div class="doc-rule"></div>
+
+<div class="doc-section" id="permissions">
+  <div class="section-eyebrow">Access Control</div>
+  <h2 class="section-title">Workspace Permissions</h2>
+  <div class="table-wrap">
+    <table class="doc-table">
+      <thead>
+        <tr>
+          <th>Operation</th>
+          <th>Default</th>
+          <th>How to change</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Read files</td>
+          <td><span class="badge active">Always allowed</span></td>
+          <td>Cannot be disabled</td>
+        </tr>
+        <tr>
+          <td>Write files</td>
+          <td><span class="badge active">Always allowed</span></td>
+          <td>Cannot be disabled</td>
+        </tr>
+        <tr>
+          <td>Delete files</td>
+          <td><span class="badge unavail">Off</span></td>
+          <td>Enable <strong>Allow Delete</strong> in Capabilities, or set in <span class="file-path">config.json</span></td>
+        </tr>
+        <tr>
+          <td>Execute shell commands</td>
+          <td><span class="badge unavail">Off</span></td>
+          <td>Enable <strong>Allow Exec</strong> in Capabilities, or set in <span class="file-path">config.json</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="doc-p">To change delete or exec permissions, go to <strong>Admin Panel → Control &amp; Permissions → Capabilities → Workspace</strong>, or edit <span class="file-path">config.json</span>:</p>
+  <div class="code-wrap"><pre>"workspace_tools": {
+  "enabled": true,
+  "allow_delete": false,
+  "allow_exec": false
+}</pre></div>
+
+  <div class="callout warning">
+    <div class="callout-icon">⚠️</div>
+    <div class="callout-title">Shell execution</div>
+    <div class="callout-body"><code>allow_exec</code> enables EOS to run shell commands in the workspace. Only enable this if you have a specific need for it — it grants significantly broader capability than read/write access alone.</div>
+  </div>
+</div>
+
+<div class="doc-rule"></div>
+
+<div class="doc-section" id="troubleshooting">
+  <div class="section-eyebrow">Help</div>
+  <h2 class="section-title">Troubleshooting</h2>
+  <div class="table-wrap">
+    <table class="doc-table">
+      <thead>
+        <tr>
+          <th>Symptom</th>
+          <th>Fix</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>EOS can't see a file you added</td>
+          <td>Make sure the file is in <span class="file-path">context\</span>, not the workspace root. Only files in <code>context/</code> are injected into the system prompt automatically.</td>
+        </tr>
+        <tr>
+          <td>EOS can't write files</td>
+          <td>Check that <code>"enabled": true</code> is set under <code>"workspace_tools"</code> in <span class="file-path">config.json</span>.</td>
+        </tr>
+        <tr>
+          <td>Delete operation failing</td>
+          <td>Allow Delete must be enabled in Capabilities or <code>"allow_delete": true</code> set in <span class="file-path">config.json</span>.</td>
+        </tr>
+        <tr>
+          <td>Shell exec failing</td>
+          <td>Allow Exec must be enabled in Capabilities or <code>"allow_exec": true</code> set in <span class="file-path">config.json</span>.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

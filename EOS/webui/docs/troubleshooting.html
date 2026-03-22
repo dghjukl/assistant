@@ -1,0 +1,285 @@
+<div class="page-header">
+  <div class="page-eyebrow">Support</div>
+  <h1 class="page-title">Troubleshooting</h1>
+  <p class="page-lead">Common problems organized by symptom, with direct fixes.</p>
+</div>
+
+<div class="callout important">
+  <div class="callout-icon">&#9432;</div>
+  <div class="callout-title">Start here first</div>
+  <div class="callout-body">Most problems are solved by: <strong>(1)</strong> re-running <code>Setup-Full.ps1</code>, <strong>(2)</strong> running <code>python verify.py</code> and reading the output carefully, <strong>(3)</strong> checking <code>status-eos.bat</code>. Try these before digging into the sections below.</div>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="wont-start">
+  <div class="section-eyebrow">Troubleshooting</div>
+  <h2 class="section-title">EOS Won't Start</h2>
+  <p class="section-lead">Problems that prevent EOS from starting at all.</p>
+
+  <div class="table-wrap">
+    <table class="doc-table">
+      <thead>
+        <tr>
+          <th>Symptom</th>
+          <th>Fix</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Python not recognized</strong><br><small>Error: 'python' is not recognized as a command</small></td>
+          <td>Reinstall Python 3.11 from <code>python.org</code>. On the first installer screen, check <strong>"Add Python to PATH"</strong> before clicking Install. Then open a new terminal and retry.</td>
+        </tr>
+        <tr>
+          <td><strong>Missing module error</strong><br><small>ModuleNotFoundError: No module named '…'</small></td>
+          <td>Run <code>pip install -r requirements.txt --no-warn-script-location</code> from the EOS directory. If the error persists, check that you are using the correct Python environment.</td>
+        </tr>
+        <tr>
+          <td><strong>config.json not found</strong></td>
+          <td>Make sure you are running <code>start-eos.bat</code> or <code>python eos.py</code> from inside the EOS directory. Do not run it from a different working directory.</td>
+        </tr>
+        <tr>
+          <td><strong>Port already in use</strong><br><small>OSError: [Errno 98] Address already in use</small></td>
+          <td>Another instance of EOS or a llama-server process is already running on that port. Close all EOS windows and check Task Manager for lingering <code>llama-server.exe</code> or <code>python</code> processes, then retry.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="models">
+  <div class="section-eyebrow">Troubleshooting</div>
+  <h2 class="section-title">Models Not Loading</h2>
+  <p class="section-lead">The model server windows open but the model does not load, or a server is missing entirely.</p>
+
+  <div class="table-wrap">
+    <table class="doc-table">
+      <thead>
+        <tr>
+          <th>Symptom</th>
+          <th>Fix</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>No model file found</strong></td>
+          <td>Re-run <code>Setup-Full.ps1</code>. It will check each model file and re-download anything missing or incomplete.</td>
+        </tr>
+        <tr>
+          <td><strong>llama-server not found</strong></td>
+          <td>Re-run <code>Setup-Full.ps1</code> to reinstall the llama.cpp binaries. The binaries are placed in the <code>bin\</code> folder — if that folder is missing or empty, setup did not complete.</td>
+        </tr>
+        <tr>
+          <td><strong>Model loads but server doesn't respond</strong></td>
+          <td>Wait longer. Large models (7B+) can take 1–3 minutes to fully load before the server is ready to accept requests. Watch the server console window for a line confirming it is listening.</td>
+        </tr>
+        <tr>
+          <td><strong>CUDA out of memory</strong><br><small>CUDA error: out of memory</small></td>
+          <td>Switch to the CPU launcher (<code>start-*-cpu.bat</code>) for that server, or use a smaller quantization of the model. Reduce <code>n_gpu_layers</code> in <code>config.json</code> to offload fewer layers to the GPU.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-icon">&#128161;</div>
+    <div class="callout-title">Use verify.py to identify missing files</div>
+    <div class="callout-body">Run <code>python verify.py</code> before starting backends. It checks every expected model file and binary and reports exactly what is missing — saves time compared to watching server windows for error messages.</div>
+  </div>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="voice">
+  <div class="section-eyebrow">Troubleshooting</div>
+  <h2 class="section-title">Voice Not Working</h2>
+  <p class="section-lead">Voice input (STT) or voice output (TTS) is missing or not functioning correctly.</p>
+
+  <div class="table-wrap">
+    <table class="doc-table">
+      <thead>
+        <tr>
+          <th>Symptom</th>
+          <th>Fix</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Microphone button missing from the UI</strong></td>
+          <td>The STT model was not found. Check that <span class="file-path">models\stt\ggml-small.en-q8_0.bin</span> exists. If it is missing, re-run <code>Setup-Full.ps1</code>.</td>
+        </tr>
+        <tr>
+          <td><strong>TTS is silent</strong></td>
+          <td>Check your system audio output device and volume. Verify that no other application has exclusive control of the audio output device. Restart EOS after changing audio settings.</td>
+        </tr>
+        <tr>
+          <td><strong>Transcription is inaccurate</strong></td>
+          <td>Speak clearly and close to the microphone. The Whisper small model has limitations — it works well for clear speech in quiet environments but struggles with heavy accents, fast speech, or background noise.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-icon">&#128161;</div>
+    <div class="callout-title">Check STT and TTS status quickly</div>
+    <div class="callout-body">Run <code>status-eos.bat</code>. It shows <code>STT: active</code> or <code>STT: unavailable</code> and the same for TTS. If either shows unavailable, the model file is missing or failed to load.</div>
+  </div>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="integrations">
+  <div class="section-eyebrow">Troubleshooting</div>
+  <h2 class="section-title">Integration Problems</h2>
+  <p class="section-lead">Discord or Google integrations are not connecting or not responding as expected.</p>
+
+  <div class="table-wrap">
+    <table class="doc-table">
+      <thead>
+        <tr>
+          <th>Symptom</th>
+          <th>Fix</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Discord bot offline</strong></td>
+          <td>Check the bot token in <span class="file-path">AI personal files\Discord.txt</span>. The file should contain only the token — no extra spaces, blank lines, or quotation marks. Copy the token directly from the Discord Developer Portal.</td>
+        </tr>
+        <tr>
+          <td><strong>Discord bot online but not responding to messages</strong></td>
+          <td>In the Discord Developer Portal, go to your application → Bot → Privileged Gateway Intents and enable <strong>Message Content Intent</strong>. Without this, the bot cannot read message content.</td>
+        </tr>
+        <tr>
+          <td><strong>Google not connecting</strong></td>
+          <td>Delete <span class="file-path">data\google_token.json</span> and restart EOS. A browser window will open for you to re-authorize the Google connection. This is the fix for expired or corrupted OAuth tokens.</td>
+        </tr>
+        <tr>
+          <td><strong>Google Calendar not showing events</strong></td>
+          <td>Confirm <code>calendar_enabled: true</code> is set in <code>config.json</code> under the <code>google</code> block. If it is false, Calendar data is never fetched regardless of the OAuth connection state.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="memory">
+  <div class="section-eyebrow">Troubleshooting</div>
+  <h2 class="section-title">Memory and Context Issues</h2>
+  <p class="section-lead">EOS is not remembering things, not applying the worldview profile, or not seeing workspace files.</p>
+
+  <div class="table-wrap">
+    <table class="doc-table">
+      <thead>
+        <tr>
+          <th>Symptom</th>
+          <th>Fix</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>EOS doesn't remember past conversations</strong></td>
+          <td>Check that <span class="file-path">data\memory_store\</span> exists and is not empty. If it is missing, ChromaDB was not initialized — re-run <code>python verify.py</code> and check for memory-related errors. The Memory tab in the admin panel shows stored memory count.</td>
+        </tr>
+        <tr>
+          <td><strong>Worldview profile not applying</strong></td>
+          <td>Verify that <span class="file-path">data\worldview\profile.md</span> exists and contains content. If it is empty or missing, the worldview extraction has not run. Add source documents to <span class="file-path">data\worldview\sources\</span> and trigger an extraction.</td>
+        </tr>
+        <tr>
+          <td><strong>Workspace files not seen by EOS</strong></td>
+          <td>Files must be placed in <span class="file-path">data\workspace\context\</span> to be automatically injected into context. Files placed in the workspace root or other subdirectories are not automatically visible — move them into the <code>context\</code> subfolder.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="performance">
+  <div class="section-eyebrow">Troubleshooting</div>
+  <h2 class="section-title">Performance Issues</h2>
+  <p class="section-lead">EOS is slow, uses excessive memory, or hangs during certain operations.</p>
+
+  <div class="table-wrap">
+    <table class="doc-table">
+      <thead>
+        <tr>
+          <th>Symptom</th>
+          <th>Fix</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Chat is very slow (many seconds per token)</strong></td>
+          <td>The main model is running on CPU. GPU inference is strongly recommended for acceptable speed. Use a <code>start-*-gpu.bat</code> launcher and confirm the server console shows GPU layers loaded. Check that CUDA drivers are up to date.</td>
+        </tr>
+        <tr>
+          <td><strong>TTS is very slow</strong></td>
+          <td>Piper TTS runs on CPU — this is expected behavior. TTS speed scales with the length of the response. There is no GPU-accelerated path for Piper in the current build.</td>
+        </tr>
+        <tr>
+          <td><strong>High memory usage</strong></td>
+          <td>Reduce the number of simultaneously running backends. Each loaded model occupies RAM (and VRAM on GPU). Stop backends you are not actively using and restart them when needed.</td>
+        </tr>
+        <tr>
+          <td><strong>EOS hangs on tool calls</strong></td>
+          <td>Check that the tool helper server is running on port 8082. Run <code>status-eos.bat</code> — if Tool helper shows <span class="badge unavail">unavailable</span>, start it with <code>start-tools-gpu.bat</code> or <code>start-tools-cpu.bat</code>.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="last-resort">
+  <div class="section-eyebrow">Troubleshooting</div>
+  <h2 class="section-title">When All Else Fails</h2>
+  <p class="section-lead">A reliable reset sequence that resolves the majority of persistent problems.</p>
+
+  <ol class="step-list">
+    <li class="step-card">
+      <div class="step-num amber">1</div>
+      <div class="step-body">
+        <div class="step-title">Close all EOS windows</div>
+        <div class="step-desc">Close every EOS console and browser tab. Check Task Manager for any remaining <code>llama-server.exe</code> or <code>python</code> processes related to EOS and end them before continuing.</div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num amber">2</div>
+      <div class="step-body">
+        <div class="step-title">Run python verify.py and fix all red errors</div>
+        <div class="step-desc">
+          <div class="code-wrap"><pre>python verify.py</pre></div>
+          Read the output carefully. Red errors must be resolved before EOS will start correctly. Yellow warnings are non-fatal and can be addressed later.
+        </div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num amber">3</div>
+      <div class="step-body">
+        <div class="step-title">Re-run Setup-Full.ps1</div>
+        <div class="step-desc">Right-click <code>Setup-Full.ps1</code> and choose <strong>Run with PowerShell</strong>. It is safe to re-run — it checks each component and skips anything already correctly installed. Only missing or broken components are re-downloaded or reinstalled.</div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num green">4</div>
+      <div class="step-body">
+        <div class="step-title">Start minimal first, then add optional backends</div>
+        <div class="step-desc">Run <code>start-minimal.bat</code> to bring up only the core backends (main model + tool helper), then run <code>start-eos.bat</code>. Confirm the core system works in the browser before launching optional backends like thinking, vision, or creativity. This isolates whether a problem is in the core or in an optional component.</div>
+      </div>
+    </li>
+  </ol>
+
+  <div class="callout trouble">
+    <div class="callout-icon">&#128295;</div>
+    <div class="callout-title">Still stuck?</div>
+    <div class="callout-body">Generate a diagnostic bundle from <strong>Admin Panel → Export</strong> and check the <a onclick="nav('cognition')">Cognition &amp; Diagnostics</a> page for additional diagnostic commands.</div>
+  </div>
+</div>

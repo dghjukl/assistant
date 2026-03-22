@@ -1,0 +1,239 @@
+<div class="page-header">
+  <div class="page-eyebrow">Quick Start</div>
+  <h1 class="page-title">Install &amp; Setup</h1>
+  <p class="page-lead">Everything the setup scripts do, what gets installed where, and how to recover from a failed install.</p>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="setup-scripts">
+  <div class="section-eyebrow">Overview</div>
+  <h2 class="section-title">Setup Scripts</h2>
+  <p class="section-lead">Two scripts are provided. Both are safe to re-run at any time.</p>
+
+  <div class="table-wrap">
+    <table class="doc-table">
+      <thead>
+        <tr>
+          <th>Script</th>
+          <th>Download size</th>
+          <th>What it includes</th>
+          <th>When to use</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>Setup-Full.ps1</code></td>
+          <td>~13 GB</td>
+          <td>All models including primary Qwen3-8B, all binaries, TTS engine, embedding model</td>
+          <td>Recommended — everything you need in one run</td>
+        </tr>
+        <tr>
+          <td><code>Setup-Lite.ps1</code></td>
+          <td>~3 GB</td>
+          <td>Supporting files, pip packages, binaries, TTS — no primary model</td>
+          <td>Use when you want to supply the primary model manually, or have a limited connection</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="doc-p">If you use <code>Setup-Lite.ps1</code>, you must manually place the primary model file (Qwen3-8B GGUF) into the correct <code>models\</code> subdirectory before starting EOS. Run <code>python verify.py</code> afterwards to confirm the path is correct.</p>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="what-installs">
+  <div class="section-eyebrow">What Gets Installed</div>
+  <h2 class="section-title">What Setup Installs</h2>
+  <p class="section-lead">Setup runs each step in order. Every step checks whether the component is already installed before doing anything — so re-runs are fast.</p>
+
+  <ol class="step-list">
+    <li class="step-card">
+      <div class="step-num green">1</div>
+      <div class="step-body">
+        <div class="step-title">Check Python version</div>
+        <div class="step-desc">Confirms Python 3.10 or higher is on PATH. Exits with a clear error if Python is missing or too old.</div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num green">2</div>
+      <div class="step-body">
+        <div class="step-title">Install pip packages</div>
+        <div class="step-desc">Runs <code>pip install -r requirements.txt</code>. Installs all Python dependencies including Gradio, sentence-transformers, sounddevice, and integration libraries. Skipped if packages are already at the correct version.</div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num green">3</div>
+      <div class="step-body">
+        <div class="step-title">Download llama.cpp binaries</div>
+        <div class="step-desc">Downloads both CPU and GPU builds of the llama.cpp server binary. Both are kept so EOS can select the correct one at startup based on whether a compatible GPU is detected.</div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num green">4</div>
+      <div class="step-body">
+        <div class="step-title">Download Piper TTS engine</div>
+        <div class="step-desc">Downloads the Piper text-to-speech binary and the default voice model. Piper runs locally — no cloud TTS call is ever made.</div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num green">5</div>
+      <div class="step-body">
+        <div class="step-title">Download model files</div>
+        <div class="step-desc"><em>(Full only)</em> Downloads the primary Qwen3-8B GGUF, the tool-helper model, and the thinking-helper model into the appropriate <code>models\</code> subdirectories. Each file is checked for correct size before downloading — partially downloaded files are re-fetched.</div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num green">6</div>
+      <div class="step-body">
+        <div class="step-title">Verify embedding model</div>
+        <div class="step-desc">Checks that the sentence-transformer embedding model is cached and usable. Downloads it via the sentence-transformers library if not already present.</div>
+      </div>
+    </li>
+  </ol>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="running-setup">
+  <div class="section-eyebrow">Running the Script</div>
+  <h2 class="section-title">Running Setup</h2>
+  <p class="section-lead">Setup runs in PowerShell. No admin rights are required under normal circumstances.</p>
+
+  <ol class="step-list">
+    <li class="step-card">
+      <div class="step-num green">1</div>
+      <div class="step-body">
+        <div class="step-title">Right-click the .ps1 file and choose "Run with PowerShell"</div>
+        <div class="step-desc">Windows may show a security dialog. Click <strong>Open</strong> or confirm with <strong>Y</strong>. The script window will open and begin printing progress.</div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num amber">2</div>
+      <div class="step-body">
+        <div class="step-title">If execution policy blocks the script</div>
+        <div class="step-desc">Open PowerShell as Administrator and run:
+          <div class="code-wrap"><pre>Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser</pre></div>
+          Then close that window and right-click the script again to run it normally.
+        </div>
+      </div>
+    </li>
+  </ol>
+
+  <div class="callout warning">
+    <div class="callout-icon">&#9888;</div>
+    <div class="callout-title">Disk space required</div>
+    <div class="callout-body">Setup-Full.ps1 requires approximately <strong>20 GB of free disk space</strong> on the drive where EOS is installed. Ensure you have enough space before starting. The script will fail mid-download if it runs out of space, leaving partial files that must be cleaned up before re-running.</div>
+  </div>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="after-setup">
+  <div class="section-eyebrow">Next Step</div>
+  <h2 class="section-title">After Setup — Run Verify</h2>
+  <p class="section-lead">Always run the verification script after setup completes to confirm everything is in order before starting EOS.</p>
+
+  <div class="code-wrap"><pre>python verify.py</pre></div>
+
+  <p class="doc-p">The script checks the following and prints a result for each:</p>
+
+  <div class="table-wrap">
+    <table class="doc-table">
+      <thead>
+        <tr>
+          <th>Check</th>
+          <th>What it tests</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>pip packages</td>
+          <td>All required Python packages importable at correct versions</td>
+        </tr>
+        <tr>
+          <td>llama binaries</td>
+          <td>CPU and GPU server binaries present and executable</td>
+        </tr>
+        <tr>
+          <td>model files</td>
+          <td>All expected GGUF files present with correct file sizes</td>
+        </tr>
+        <tr>
+          <td>port availability</td>
+          <td>Ports 8080, 8082, 8083, 7860 are free (not in use by another process)</td>
+        </tr>
+        <tr>
+          <td>config.json</td>
+          <td>Configuration file exists, is valid JSON, and has required keys</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="doc-p"><strong>Red errors</strong> must be resolved before starting EOS. <strong>Yellow warnings</strong> are non-fatal — optional capabilities may be limited but core operation is unaffected.</p>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="rerun">
+  <div class="section-eyebrow">Recovery</div>
+  <h2 class="section-title">Re-running Setup</h2>
+  <p class="section-lead">Setup is fully idempotent. Re-running it is always safe and is the recommended recovery path for most install problems.</p>
+
+  <p class="doc-p">For every file it would download, setup checks whether that file already exists and has the expected size. If it does, the download is skipped. This means re-runs are fast — only missing or incomplete files are fetched.</p>
+
+  <div class="callout tip">
+    <div class="callout-icon">&#128161;</div>
+    <div class="callout-title">Interrupted download?</div>
+    <div class="callout-body">If a download was cut off (power loss, network drop, or you closed the window), just re-run the same setup script. It will detect the incomplete file and re-download only that file.</div>
+  </div>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="troubleshoot-install">
+  <div class="section-eyebrow">Troubleshooting</div>
+  <h2 class="section-title">If Something Fails</h2>
+  <p class="section-lead">Common setup errors and how to fix them.</p>
+
+  <div class="table-wrap">
+    <table class="doc-table">
+      <thead>
+        <tr>
+          <th>Error</th>
+          <th>Cause</th>
+          <th>Fix</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>'python' is not recognized</code></td>
+          <td>Python not on PATH</td>
+          <td>Re-run the Python 3.11 installer and check "Add Python to PATH"</td>
+        </tr>
+        <tr>
+          <td>Execution policy error</td>
+          <td>PowerShell script execution blocked</td>
+          <td>Run <code>Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser</code> in an admin PowerShell window</td>
+        </tr>
+        <tr>
+          <td>Disk full / write error</td>
+          <td>Less than ~20 GB free on target drive</td>
+          <td>Free up disk space and re-run setup</td>
+        </tr>
+        <tr>
+          <td>Download failed / connection error</td>
+          <td>Network interruption during model download</td>
+          <td>Re-run the same setup script — it will resume incomplete downloads</td>
+        </tr>
+        <tr>
+          <td><code>verify.py</code> reports missing model</td>
+          <td>Model file absent or wrong size</td>
+          <td>Re-run <code>Setup-Full.ps1</code> to re-fetch the missing file</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

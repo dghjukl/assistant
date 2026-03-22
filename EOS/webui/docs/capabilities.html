@@ -1,0 +1,180 @@
+<div class="page-header">
+  <div class="page-eyebrow">Capabilities</div>
+  <h1 class="page-title">Capabilities &amp; Autonomy</h1>
+  <p class="page-lead">EOS has four autonomy dimensions that gate what it can perceive, think, do, and initiate. All are live-adjustable from the admin panel.</p>
+</div>
+
+<div class="doc-section" id="location">
+  <div class="section-eyebrow">Capabilities</div>
+  <h2 class="section-title">Where to Find This</h2>
+  <p class="doc-p">Navigate to <strong>Admin Panel → Control &amp; Permissions → Capabilities</strong>. Changes are immediate — no restart required. Settings reset to <code>config.json</code> values when EOS restarts. To make a change permanent, edit <code>config.json</code> directly.</p>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="autonomy">
+  <div class="section-eyebrow">Capabilities</div>
+  <h2 class="section-title">The Four Autonomy Dimensions</h2>
+  <p class="doc-p">Each dimension controls a distinct class of behavior. They can be toggled independently.</p>
+
+  <div class="dim-grid">
+    <div class="dim-card">
+      <div class="dim-name">Perception</div>
+      <div class="dim-what">Observing the environment — screen capture, sensor data, and passive input streams. Disabling this stops EOS from watching the environment between turns.</div>
+    </div>
+    <div class="dim-card">
+      <div class="dim-name">Cognition</div>
+      <div class="dim-what">Background thinking, reflection loops, and idle cognition cycles. Disabling this stops EOS from reasoning between turns but does not affect responses to your messages.</div>
+    </div>
+    <div class="dim-card">
+      <div class="dim-name">Action</div>
+      <div class="dim-what">Tool use and external integrations. Disabling this makes EOS text-only — it can still converse but cannot call tools, write files, or reach external services.</div>
+    </div>
+    <div class="dim-card">
+      <div class="dim-name">Initiative</div>
+      <div class="dim-what">Proactive, unsolicited actions — EOS reaching out or acting without being asked. Disabling this makes EOS fully reactive; it only acts in direct response to your messages.</div>
+    </div>
+  </div>
+
+  <div class="callout important">
+    <div class="callout-icon"></div>
+    <div class="callout-body">
+      <div class="callout-title">Recommended Settings</div>
+      For general use, all four on is fine. For a more passive assistant, turn off Action and Initiative. Cognition can be left on — it only affects background thinking, not actions.
+    </div>
+  </div>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="computer-use-caps">
+  <div class="section-eyebrow">Capabilities</div>
+  <h2 class="section-title">Computer Use</h2>
+  <p class="doc-p">Computer Use has its own enabled toggle and a separate Default Mode setting. The enabled toggle must be on for any computer use to occur. The mode determines how much autonomy EOS has when it is active.</p>
+
+  <div class="mode-grid">
+    <div class="mode-card off">
+      <div class="mode-name">Off</div>
+      <div class="mode-desc">No computer use regardless of the enabled flag. EOS cannot interact with the desktop or launch applications.</div>
+    </div>
+    <div class="mode-card on">
+      <div class="mode-name">Command Only</div>
+      <div class="mode-desc">Approved applications only. EOS acts on explicit user requests and pauses for confirmation before each action. Safe for general use.</div>
+    </div>
+    <div class="mode-card warn">
+      <div class="mode-name">Supervised Session</div>
+      <div class="mode-desc">Approved applications with bounded continuation while you watch. EOS can take a short sequence of actions before pausing for review. Use when you want to delegate a task but stay in the loop.</div>
+    </div>
+  </div>
+
+  <p class="doc-p"><a onclick="nav('computer-use')">See the full Computer Use guide</a> for the application allowlist, the HALT button, and confirmation queue details.</p>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="workspace-caps">
+  <div class="section-eyebrow">Capabilities</div>
+  <h2 class="section-title">Workspace Permissions</h2>
+  <p class="doc-p">Two additional toggles control what EOS can do inside the workspace directory. Both default to off.</p>
+  <ul class="doc-list">
+    <li><strong>Allow Delete</strong> — whether EOS can permanently delete files in the workspace. Off by default.</li>
+    <li><strong>Allow Exec</strong> — whether EOS can run shell commands. Off by default.</li>
+  </ul>
+  <div class="callout warning">
+    <div class="callout-icon"></div>
+    <div class="callout-body">
+      <div class="callout-title">Shell Execution</div>
+      Allow Exec enables shell command execution inside the workspace. Only enable if you explicitly need it. With Allow Exec on, EOS can run arbitrary commands in response to instructions.
+    </div>
+  </div>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="creativity-caps">
+  <div class="section-eyebrow">Capabilities</div>
+  <h2 class="section-title">Creativity</h2>
+  <p class="doc-p">The creativity subsystem injects lateral reframes and novel angles into EOS's thinking. Three controls govern it:</p>
+  <ul class="doc-list">
+    <li><strong>Enabled</strong> — master toggle for the creativity subsystem. Off means no creative reframes at all.</li>
+    <li><strong>Frequency</strong> — how often creative reframes inject: Off, Low, Medium, or High.</li>
+    <li><strong>Autonomous Idle</strong> — whether the creativity subsystem runs during idle cognition cycles when no conversation is active.</li>
+  </ul>
+  <div class="callout tip">
+    <div class="callout-icon"></div>
+    <div class="callout-body">
+      <div class="callout-title">Frequency Tip</div>
+      Start with Medium frequency. Low is subtle and easy to miss. High can feel intrusive — EOS will frequently reframe or offer unexpected angles even on straightforward requests.
+    </div>
+  </div>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="google-caps">
+  <div class="section-eyebrow">Capabilities</div>
+  <h2 class="section-title">Google</h2>
+  <p class="doc-p">When Google Workspace is connected, Calendar, Gmail read, and Drive access are always enabled. Only outbound email sending requires an extra permission toggle:</p>
+  <ul class="doc-list">
+    <li><strong>Gmail Send</strong> — off by default. Enable only if you want EOS to send emails on your behalf. Marked as a sensitive permission.</li>
+  </ul>
+  <p class="doc-p">If Google is not connected or the credential file is missing, all Google capabilities are unavailable regardless of these settings. See the <a onclick="nav('integrations')">Integrations</a> page for setup details.</p>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="permanent">
+  <div class="section-eyebrow">Capabilities</div>
+  <h2 class="section-title">Making Changes Permanent</h2>
+  <p class="doc-p">Admin panel changes reset on restart. To persist them, edit <code>config.json</code>. The relevant blocks are:</p>
+
+  <h3 class="sub-title" id="permanent-autonomy">Autonomy Defaults</h3>
+  <div class="code-wrap">
+    <pre>"autonomy_defaults": {
+  "perception": true,
+  "cognition": true,
+  "action": true,
+  "initiative": true
+}</pre>
+  </div>
+
+  <h3 class="sub-title" id="permanent-computer-use">Computer Use</h3>
+  <div class="code-wrap">
+    <pre>"computer_use": {
+  "enabled": false,
+  "default_mode": "command_only"
+}</pre>
+  </div>
+
+  <h3 class="sub-title" id="permanent-workspace">Workspace Tools</h3>
+  <div class="code-wrap">
+    <pre>"workspace_tools": {
+  "allow_delete": false,
+  "allow_exec": false
+}</pre>
+  </div>
+
+  <h3 class="sub-title" id="permanent-creativity">Creativity</h3>
+  <div class="code-wrap">
+    <pre>"creativity": {
+  "enabled": true,
+  "frequency": "medium",
+  "autonomous_idle": false
+}</pre>
+  </div>
+
+  <h3 class="sub-title" id="permanent-google">Google</h3>
+  <div class="code-wrap">
+    <pre>"google": {
+  "gmail_send_enabled": false
+}</pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-icon"></div>
+    <div class="callout-body">
+      <div class="callout-title">Workflow Tip</div>
+      The admin panel is great for experimenting. Once you find settings you like, copy them to <code>config.json</code> so they survive restarts.
+    </div>
+  </div>
+</div>

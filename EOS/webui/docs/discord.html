@@ -1,0 +1,178 @@
+<div class="page-header">
+  <div class="page-eyebrow">Capabilities</div>
+  <h1 class="page-title">Discord</h1>
+  <p class="page-lead">Connect EOS to your Discord server as a bot. It responds to mentions by default and supports a handful of slash commands.</p>
+</div>
+
+<div class="doc-section" id="what">
+  <div class="section-eyebrow">Capabilities</div>
+  <h2 class="section-title">What it Does</h2>
+  <div class="card-grid">
+    <div class="cap-card">
+      <div class="cap-card-icon">💬</div>
+      <div class="cap-card-title">Responds to Mentions</div>
+      <div class="cap-card-desc">Tag <strong>@BotName</strong> in any channel EOS can read and it will reply in that channel, just like a conversation in the chat UI.</div>
+    </div>
+    <div class="cap-card">
+      <div class="cap-card-icon">⚡</div>
+      <div class="cap-card-title">Slash Commands</div>
+      <div class="cap-card-desc">Use <code>!initiative</code> to toggle autonomous initiative on or off, and <code>!status</code> to display a live capability map directly in Discord.</div>
+    </div>
+    <div class="cap-card">
+      <div class="cap-card-icon">🗨️</div>
+      <div class="cap-card-title">Text Conversations</div>
+      <div class="cap-card-desc">Full EOS conversation capability through Discord messages — the same memory, tools, and reasoning available in the chat UI.</div>
+    </div>
+  </div>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="setup">
+  <div class="section-eyebrow">Capabilities</div>
+  <h2 class="section-title">Setup</h2>
+
+  <ol class="step-list">
+    <li class="step-card">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Create a Discord Bot</div>
+        <div class="step-desc">Go to the <strong>Discord Developer Portal</strong> (discord.com/developers/applications), create a new application, then open the <strong>Bot</strong> tab and create a bot user. Copy the bot token — you will need it in the next step.</div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Save the Token</div>
+        <div class="step-desc">Create or open the file <code>AI personal files\Discord.txt</code> and paste the bot token as a single line with no extra whitespace. EOS reads credentials from this file at startup.</div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">Invite the Bot to Your Server</div>
+        <div class="step-desc">In the Developer Portal, use the OAuth2 URL Generator to create an invite link. Grant the bot <strong>Send Messages</strong> and <strong>Read Message History</strong> permissions. In the <strong>Bot</strong> tab, enable the <strong>Message Content Intent</strong> — without this, the bot cannot read message text.</div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <div class="step-title">Enable Discord in Config</div>
+        <div class="step-desc">Confirm that <code>config.json</code> contains <code>"discord": &#123;"enabled": true&#125;</code>. If the block is missing, add it. See the Configuration section below for the full block.</div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num">5</div>
+      <div class="step-body">
+        <div class="step-title">Restart EOS</div>
+        <div class="step-desc">The Discord bot starts automatically when EOS boots and the enabled flag is true. After restarting, your bot should appear online in Discord within a few seconds.</div>
+      </div>
+    </li>
+  </ol>
+
+  <div class="callout ai-prompt">
+    <div class="callout-icon"></div>
+    <div class="callout-body">
+      <div class="callout-title">Need help with the Developer Portal?</div>
+      <div class="prompt-text">I want to set up a Discord bot for a local application. Walk me through the Discord Developer Portal — creating the application, getting the bot token, enabling Message Content Intent, and inviting the bot to my server with the right permissions.</div>
+      <button onclick="copyPrompt(this)">Copy Prompt</button>
+    </div>
+  </div>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="config">
+  <div class="section-eyebrow">Capabilities</div>
+  <h2 class="section-title">Configuration</h2>
+  <p class="doc-p">The full Discord block in <code>config.json</code>:</p>
+  <div class="code-wrap">
+    <pre>"discord": {
+  "enabled": true,
+  "credential_file": "AI personal files/Discord.txt",
+  "respond_only_to_mentions": true,
+  "ignore_bots": true
+}</pre>
+  </div>
+
+  <div class="table-wrap">
+    <table class="doc-table">
+      <thead>
+        <tr>
+          <th>Field</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>enabled</code></td>
+          <td>Master toggle. Set to <code>false</code> to disable the Discord bot entirely without removing the config block.</td>
+        </tr>
+        <tr>
+          <td><code>credential_file</code></td>
+          <td>Path to the file containing the bot token. Relative to the EOS root directory. Default: <code>AI personal files/Discord.txt</code>.</td>
+        </tr>
+        <tr>
+          <td><code>respond_only_to_mentions</code></td>
+          <td>When <code>true</code>, EOS only responds when directly mentioned with <strong>@BotName</strong>. Set to <code>false</code> to respond to all messages in channels it can read — use with caution in busy servers.</td>
+        </tr>
+        <tr>
+          <td><code>ignore_bots</code></td>
+          <td>When <code>true</code>, EOS ignores messages from other bots. Recommended to leave on to avoid feedback loops.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="status">
+  <div class="section-eyebrow">Capabilities</div>
+  <h2 class="section-title">Checking Status</h2>
+  <p class="doc-p">Open the <strong>Admin Panel → Integrations</strong> tab. The Discord row shows:</p>
+  <ul class="doc-list">
+    <li>Whether the credential file was found</li>
+    <li>Whether the bot is currently connected to Discord</li>
+    <li>Any connection errors with detail</li>
+  </ul>
+  <div class="callout tip">
+    <div class="callout-icon"></div>
+    <div class="callout-body">
+      <div class="callout-title">First Stop for Bot Issues</div>
+      If the bot is not responding, check the Integrations tab before anything else. A missing credential file and a bad token produce different errors — the tab distinguishes between them.
+    </div>
+  </div>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="troubleshooting">
+  <div class="section-eyebrow">Capabilities</div>
+  <h2 class="section-title">Troubleshooting</h2>
+
+  <div class="table-wrap">
+    <table class="doc-table">
+      <thead>
+        <tr>
+          <th>Symptom</th>
+          <th>Likely Cause &amp; Fix</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Bot not appearing online in Discord</td>
+          <td>The token in <code>Discord.txt</code> is incorrect or has extra whitespace. Open the file, verify the token is a single line with no spaces or line breaks, and restart EOS.</td>
+        </tr>
+        <tr>
+          <td>Bot is online but not responding to mentions</td>
+          <td><strong>Message Content Intent</strong> is not enabled in the Discord Developer Portal. Go to your application's Bot tab and enable it. This is required for the bot to read message text.</td>
+        </tr>
+        <tr>
+          <td>Bot responding to every message, not just mentions</td>
+          <td>Set <code>"respond_only_to_mentions": true</code> in the <code>discord</code> block in <code>config.json</code> and restart EOS.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

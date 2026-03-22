@@ -1,0 +1,167 @@
+<div class="page-header">
+  <div class="page-eyebrow">Capabilities</div>
+  <h1 class="page-title">Cognition &amp; Diagnostics</h1>
+  <p class="page-lead">See exactly what EOS was thinking during each conversation turn, and diagnose the system state.</p>
+</div>
+
+<div class="doc-section" id="cognition-panel">
+  <div class="section-eyebrow">Cognition</div>
+  <h2 class="section-title">The Cognition Panel</h2>
+  <p class="section-lead">Located at <strong>Admin Panel → Cognition</strong> tab. Shows what EOS was actually doing during each turn — the full internal trace, not just the output.</p>
+
+  <div class="table-wrap">
+    <table class="doc-table">
+      <thead>
+        <tr>
+          <th>Sub-tab</th>
+          <th>What it shows</th>
+          <th>Available for</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Turn Trace</strong></td>
+          <td>Every conversation turn: model used, tools invoked, retrieval results, escalations, and timing for each step.</td>
+          <td>Every turn</td>
+        </tr>
+        <tr>
+          <td><strong>Memory Influence</strong></td>
+          <td>Which memory items were retrieved from vector memory and injected into the context for each turn.</td>
+          <td>Every turn</td>
+        </tr>
+        <tr>
+          <td><strong>Reflection Events</strong></td>
+          <td>Outputs from background reflection loops — conclusions EOS reached and improvement suggestions it generated.</td>
+          <td>Background events</td>
+        </tr>
+        <tr>
+          <td><strong>State Changes</strong></td>
+          <td>Persistent identity state before and after each turn, plus any new memory entries added during the turn.</td>
+          <td>Every turn</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-icon">&#128161;</div>
+    <div class="callout-title">Click to expand any turn</div>
+    <div class="callout-body">Click any turn row to expand a full detail view. This is the best way to understand why EOS responded a certain way — you can see every retrieval, tool call, and model decision that contributed to the output.</div>
+  </div>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="status">
+  <div class="section-eyebrow">Diagnostics</div>
+  <h2 class="section-title">Status Check</h2>
+  <p class="section-lead">Two ways to check the current system state without opening the admin panel.</p>
+
+  <div class="table-wrap">
+    <table class="doc-table">
+      <thead>
+        <tr>
+          <th>Method</th>
+          <th>Command</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Batch script</td>
+          <td><code>status-eos.bat</code></td>
+        </tr>
+        <tr>
+          <td>Python CLI</td>
+          <td><code>python eos.py --status</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="doc-p">Both produce the same output: each service listed as <span class="badge active">active</span>, <span class="badge degraded">degraded</span>, or <span class="badge unavail">unavailable</span>, followed by the effective capability map derived from what was discovered.</p>
+
+  <h3 class="sub-title" id="status-example">Example Output</h3>
+
+  <div class="code-wrap"><pre>Services
+  Main model       active        (port 8080)
+  Tool helper      active        (port 8082)
+  Thinking helper  unavailable   (fallback: main)
+  Vision           unavailable
+  STT              active
+  TTS              active
+
+Effective Capabilities
+  chat             available
+  tools            available
+  reasoning        degraded      (using main model fallback)
+  vision           unavailable
+  voice            available</pre></div>
+
+  <p class="doc-p">In the example above, the thinking helper is not running so reasoning is degraded — EOS will fall back to the main model for reasoning tasks. Everything else is fully functional. Voice is available because both STT and TTS are active.</p>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="diagnostics">
+  <div class="section-eyebrow">Diagnostics</div>
+  <h2 class="section-title">Diagnostic Commands</h2>
+  <p class="section-lead">These commands are for targeted diagnosis when something is not behaving as expected.</p>
+
+  <h3 class="sub-title" id="diag-status">Check capability map without starting the WebUI</h3>
+  <p class="doc-p">Use this to quickly probe service availability from a terminal without bringing up the full interface. Safe to run at any time.</p>
+  <div class="code-wrap"><pre>python eos.py --status</pre></div>
+
+  <h3 class="sub-title" id="diag-backend">Start a single backend server explicitly</h3>
+  <p class="doc-p">Use this when you want to bring up one backend manually — for example to test a specific GPU/CPU configuration, or when a launcher script is not available. Replace <code>main</code> with the server name, and adjust <code>--accel</code> and <code>--config</code> as needed.</p>
+  <div class="code-wrap"><pre>python -m runtime.server_launcher main --accel gpu --config config.json</pre></div>
+
+  <h3 class="sub-title" id="diag-syntax">Validate Python syntax across the codebase</h3>
+  <p class="doc-p">Use this after editing source files, or when an import error is hard to trace. Compiles every file and reports any syntax errors found, without running any code.</p>
+  <div class="code-wrap"><pre>python -m compileall eos.py runtime services webui interfaces core tools verify.py</pre></div>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="export">
+  <div class="section-eyebrow">Diagnostics</div>
+  <h2 class="section-title">Exporting a Diagnostic Bundle</h2>
+  <p class="section-lead">Navigate to <strong>Admin Panel → Export</strong> tab and click <strong>Generate Diagnostic Bundle</strong>.</p>
+
+  <p class="doc-p">The bundle collects the following into a single JSON file:</p>
+  <ul class="doc-list">
+    <li>Current runtime state snapshot</li>
+    <li>Status of all inference servers</li>
+    <li>Recent log entries from the live log stream</li>
+    <li>A snapshot of the loaded <code>config.json</code></li>
+  </ul>
+
+  <p class="doc-p">The file is saved to the <code>exports/</code> folder inside your EOS directory and simultaneously offered as a browser download. Use this when filing a bug report or diagnosing a persistent issue that is difficult to reproduce interactively.</p>
+
+  <div class="callout tip">
+    <div class="callout-icon">&#128161;</div>
+    <div class="callout-title">For bug reports</div>
+    <div class="callout-body">Always attach a diagnostic bundle when reporting an issue. It gives full system context — service states, config, and recent log activity — without requiring manual reproduction steps.</div>
+  </div>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="memory">
+  <div class="section-eyebrow">Diagnostics</div>
+  <h2 class="section-title">Memory Panel</h2>
+  <p class="section-lead">Navigate to <strong>Admin Panel → Memory</strong> tab to inspect the vector memory system.</p>
+
+  <p class="doc-p">The Memory tab shows:</p>
+  <ul class="doc-list">
+    <li><strong>Vector memory stats</strong> — total stored memories and ChromaDB collection size</li>
+    <li><strong>Memory log</strong> — a rolling log of recent store and retrieve operations, with timestamps and content summaries</li>
+  </ul>
+
+  <p class="doc-p">Use the Memory panel to verify that memories are being created after conversations and retrieved correctly at the start of new turns. If the stored count is not growing over time, memory writes may be failing — check the Live Logs tab for related errors.</p>
+
+  <div class="callout important">
+    <div class="callout-icon">&#9432;</div>
+    <div class="callout-title">Storage location</div>
+    <div class="callout-body">ChromaDB stores embeddings in <code class="file-path">data\memory_store\</code>. This folder grows over time as more memories are stored. It is safe to leave it in place — ChromaDB manages its own internal compaction. Do not delete this folder unless you intend to wipe all of EOS's long-term memory.</div>
+  </div>
+</div>

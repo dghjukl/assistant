@@ -1,0 +1,207 @@
+<div class="page-header">
+  <div class="page-eyebrow">Quick Start</div>
+  <h1 class="page-title">Using EOS</h1>
+  <p class="page-lead">How to start, stop, and interact with EOS day-to-day.</p>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="starting">
+  <div class="section-eyebrow">Startup</div>
+  <h2 class="section-title">Starting EOS</h2>
+  <p class="section-lead">EOS starts in two steps: first bring up the backend model servers, then start the EOS interface. Always in that order.</p>
+
+  <h3 class="sub-title" id="step1-backends">Step 1 — Start a backend launcher</h3>
+  <p class="doc-p">Choose the profile that matches what you need. More backends mean more capability but use more RAM and VRAM.</p>
+
+  <div class="table-wrap">
+    <table class="doc-table">
+      <thead>
+        <tr>
+          <th>Profile</th>
+          <th>Script</th>
+          <th>What starts</th>
+          <th>Use when</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Minimal</td>
+          <td><code>start-minimal.bat</code></td>
+          <td>Main model + tool helper</td>
+          <td>Low RAM, basic tasks only</td>
+        </tr>
+        <tr>
+          <td>Standard</td>
+          <td><code>start-standard.bat</code></td>
+          <td>Main + tool helper + thinking helper</td>
+          <td>Recommended for everyday use</td>
+        </tr>
+        <tr>
+          <td>Full</td>
+          <td><code>start-full.bat</code></td>
+          <td>Standard + creativity model</td>
+          <td>Creative writing, brainstorming</td>
+        </tr>
+        <tr>
+          <td>Add Vision</td>
+          <td>Your bundle + <code>start-vision-gpu.bat</code></td>
+          <td>Any profile above + vision server</td>
+          <td>Image understanding (GPU required)</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="doc-p">Or use the GUI launcher: double-click <code>Launch EOS.bat</code>, select a profile, and click Start. The launcher manages all backend windows for you and shows live status for each server.</p>
+
+  <h3 class="sub-title" id="step2-eos">Step 2 — Start the EOS interface</h3>
+  <p class="doc-p">Once each backend window has printed its ready message, run:</p>
+  <div class="code-wrap"><pre>start-eos.bat</pre></div>
+  <p class="doc-p">Wait for the console to print:</p>
+  <div class="code-wrap"><pre>Starting WebUI at http://127.0.0.1:7860/</pre></div>
+  <p class="doc-p">Then open your browser to that address. EOS is ready.</p>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="chat">
+  <div class="section-eyebrow">Interface</div>
+  <h2 class="section-title">The Chat Interface</h2>
+  <p class="section-lead">The main interface lives at <code>http://127.0.0.1:7860/</code>. It is a standard chat UI with a few EOS-specific features.</p>
+
+  <h3 class="sub-title" id="text-chat">Text chat</h3>
+  <p class="doc-p">Type your message in the input box and press <code>Enter</code> or click Send. EOS will respond in the chat window. There is no session limit — conversations can be as long as you need.</p>
+
+  <div class="callout important">
+    <div class="callout-icon">&#9432;</div>
+    <div class="callout-title">Persistent memory</div>
+    <div class="callout-body">EOS does not reset between sessions. It remembers previous conversations, your preferences, and context from past interactions. Closing the browser or restarting EOS does not wipe memory — everything is persisted to disk.</div>
+  </div>
+
+  <h3 class="sub-title" id="voice-input">Voice input (STT)</h3>
+  <p class="doc-p">When speech-to-text is active, a microphone button appears in the input area. Hold the button to speak, then release to transcribe and send. Voice input requires the STT service to be running — if the microphone button is absent, STT is not active.</p>
+
+  <h3 class="sub-title" id="voice-output">Voice output (TTS)</h3>
+  <p class="doc-p">When text-to-speech is active, EOS speaks its responses automatically using the Piper TTS engine. Audio plays through your default output device. TTS can be toggled in the Admin Panel without restarting EOS.</p>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="stopping">
+  <div class="section-eyebrow">Shutdown</div>
+  <h2 class="section-title">Stopping EOS</h2>
+  <p class="section-lead">EOS can be stopped at any time without data loss. All memory and state are written to disk continuously.</p>
+
+  <ol class="step-list">
+    <li class="step-card">
+      <div class="step-num green">1</div>
+      <div class="step-body">
+        <div class="step-title">Stop the EOS interface</div>
+        <div class="step-desc">Press <code>Ctrl+C</code> in the <code>start-eos.bat</code> console window, or simply close that window. The WebUI will become unavailable immediately.</div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num green">2</div>
+      <div class="step-body">
+        <div class="step-title">Stop the backend servers</div>
+        <div class="step-desc">Close the backend launcher windows (or click Stop in the GUI launcher). Model servers shut down and release RAM and VRAM. You can leave them running between EOS restarts if you prefer faster startup next time.</div>
+      </div>
+    </li>
+  </ol>
+
+  <div class="callout tip">
+    <div class="callout-icon">&#128161;</div>
+    <div class="callout-title">Nothing is lost on shutdown</div>
+    <div class="callout-body">Memory, conversation history, and all state are persisted to disk. The next time you start EOS it will resume exactly where it left off.</div>
+  </div>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="status">
+  <div class="section-eyebrow">Diagnostics</div>
+  <h2 class="section-title">Checking System Status</h2>
+  <p class="section-lead">Two ways to see what is running and what is not.</p>
+
+  <h3 class="sub-title" id="status-script">Script</h3>
+  <div class="code-wrap"><pre>status-eos.bat</pre></div>
+  <p class="doc-p">Or from a terminal:</p>
+  <div class="code-wrap"><pre>python eos.py --status</pre></div>
+  <p class="doc-p">Both commands probe each configured endpoint and print the current capability map — which services are active, which are degraded, and which are unavailable.</p>
+
+  <h3 class="sub-title" id="status-meanings">Status meanings</h3>
+
+  <div class="mode-grid">
+    <div class="mode-card on">
+      <div class="mode-name"><span class="badge active">active</span></div>
+      <div class="mode-desc">Service is running and responding normally. Full capability available.</div>
+    </div>
+    <div class="mode-card warn">
+      <div class="mode-name"><span class="badge degraded">degraded</span></div>
+      <div class="mode-desc">Service is reachable but running in a reduced mode, or a fallback is in use. Capability is partial.</div>
+    </div>
+    <div class="mode-card off">
+      <div class="mode-name"><span class="badge unavail">unavailable</span></div>
+      <div class="mode-desc">Service is not running or not reachable. That capability is cleanly disabled — no errors, just absent.</div>
+    </div>
+  </div>
+
+  <h3 class="sub-title" id="admin-status">Admin Panel</h3>
+  <p class="doc-p">The Admin Panel at <code>http://127.0.0.1:7860/admin</code> shows a live view of the capability map with the same status indicators, plus per-service response time and error counts.</p>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="degradation">
+  <div class="section-eyebrow">Resilience</div>
+  <h2 class="section-title">Capability Degradation</h2>
+  <p class="section-lead">EOS is designed to keep working when backends are missing. The table below shows what happens when each optional service is absent.</p>
+
+  <div class="table-wrap">
+    <table class="doc-table">
+      <thead>
+        <tr>
+          <th>Missing service</th>
+          <th>Effect on EOS</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Tool helper (port 8082)</td>
+          <td>Tool calls fall back to the main model. Slightly slower and less reliable for complex multi-step tool use.</td>
+        </tr>
+        <tr>
+          <td>Thinking helper (port 8083)</td>
+          <td>Extended reasoning falls back to the main model. Step-by-step analysis still works, just without a dedicated reasoning pass.</td>
+        </tr>
+        <tr>
+          <td>Vision server</td>
+          <td>Vision capability is cleanly unavailable. EOS will tell you it cannot process images. All other functions unaffected.</td>
+        </tr>
+        <tr>
+          <td>STT service</td>
+          <td>Voice input unavailable. Microphone button does not appear. Text chat is fully unaffected.</td>
+        </tr>
+        <tr>
+          <td>TTS service</td>
+          <td>Voice output unavailable. Responses appear as text only. Text chat is fully unaffected.</td>
+        </tr>
+        <tr>
+          <td>Discord credentials</td>
+          <td>Discord integration silently skipped on startup. No error — bot simply does not connect.</td>
+        </tr>
+        <tr>
+          <td>Google OAuth credentials</td>
+          <td>Calendar, Gmail, and Drive integrations silently skipped. All other capabilities unaffected.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-icon">&#128161;</div>
+    <div class="callout-title">Run the minimum for your task</div>
+    <div class="callout-body">You do not need all backends running at the same time. For a quick question, <code>start-minimal.bat</code> (main + tools) is enough. Add thinking or vision only when you need them. This saves RAM and lets backends start faster.</div>
+  </div>
+</div>

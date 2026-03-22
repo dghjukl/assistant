@@ -1,0 +1,182 @@
+<div class="page-header">
+  <div class="page-eyebrow">Capabilities</div>
+  <h1 class="page-title">Google Workspace</h1>
+  <p class="page-lead">EOS can read your Google Calendar, search Gmail, and browse Google Drive. When enabled, it can also send email on your behalf.</p>
+</div>
+
+<div class="doc-section" id="what">
+  <div class="section-eyebrow">Overview</div>
+  <h2 class="section-title">What it Does</h2>
+  <div class="card-grid">
+    <div class="cap-card">
+      <div class="cap-card-icon">📅</div>
+      <div class="cap-card-title">Google Calendar</div>
+      <div class="cap-card-desc">Read upcoming events and answer questions about your schedule.</div>
+    </div>
+    <div class="cap-card">
+      <div class="cap-card-icon">✉️</div>
+      <div class="cap-card-title">Gmail</div>
+      <div class="cap-card-desc">Search your inbox, read threads, and answer questions about emails.</div>
+    </div>
+    <div class="cap-card">
+      <div class="cap-card-icon">📁</div>
+      <div class="cap-card-title">Google Drive</div>
+      <div class="cap-card-desc">List and read files, find documents by name or content.</div>
+    </div>
+    <div class="cap-card">
+      <div class="cap-card-icon">📤</div>
+      <div class="cap-card-title">Send Email</div>
+      <div class="cap-card-desc">Compose and send via Gmail — disabled by default, requires explicit enable.</div>
+    </div>
+  </div>
+</div>
+
+<div class="doc-rule"></div>
+
+<div class="doc-section" id="setup">
+  <div class="section-eyebrow">Configuration</div>
+  <h2 class="section-title">Setup</h2>
+  <ol class="step-list">
+    <li class="step-card">
+      <div class="step-num green">1</div>
+      <div class="step-body">
+        <div class="step-title">Create a Google Cloud project</div>
+        <div class="step-desc">Create a new project in the Google Cloud Console and enable the Calendar, Gmail, and Drive APIs.</div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num green">2</div>
+      <div class="step-body">
+        <div class="step-title">Configure the OAuth consent screen</div>
+        <div class="step-desc">Set the application type to Desktop App and the user type to External (personal use). You do not need to publish the app — leave it in testing mode and add your Google account as a test user.</div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num green">3</div>
+      <div class="step-body">
+        <div class="step-title">Download the client secret JSON</div>
+        <div class="step-desc">In Google Cloud Console, go to APIs &amp; Services → Credentials, create an OAuth 2.0 Client ID for a Desktop application, and download the JSON file.</div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num green">4</div>
+      <div class="step-body">
+        <div class="step-title">Place the file in AI personal files</div>
+        <div class="step-desc">Copy the downloaded file into your <span class="file-path">AI personal files\</span> folder. The filename must match the pattern <code>client_secret_*.json</code> — do not rename it to anything else.</div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num green">5</div>
+      <div class="step-body">
+        <div class="step-title">Enable Google in config.json</div>
+        <div class="step-desc">Add or update the following in <span class="file-path">config.json</span>:</div>
+        <div class="code-wrap"><pre>"google": {
+  "enabled": true
+}</pre></div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num green">6</div>
+      <div class="step-body">
+        <div class="step-title">Restart EOS</div>
+        <div class="step-desc">On first run after enabling, EOS will open a browser window to complete OAuth authorization. Keep the browser window accessible.</div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num green">7</div>
+      <div class="step-body">
+        <div class="step-title">Authorize in your browser</div>
+        <div class="step-desc">Follow the prompts to grant EOS access to your Google account. EOS saves the resulting token to <span class="file-path">data\google_token.json</span> — future starts will not require re-authorization unless the token expires.</div>
+      </div>
+    </li>
+  </ol>
+
+  <div class="callout ai-prompt">
+    <div class="callout-icon">✦</div>
+    <div class="callout-title">Setup prompt</div>
+    <div class="callout-body">
+      <p class="prompt-text">Walk me through creating a Google Cloud project, enabling the Gmail, Calendar, and Drive APIs, configuring the OAuth consent screen for a desktop app for personal use, and downloading the OAuth 2.0 client secret JSON file.</p>
+      <button class="prompt-copy" onclick="copyPrompt(this)">Copy prompt</button>
+    </div>
+  </div>
+</div>
+
+<div class="doc-rule"></div>
+
+<div class="doc-section" id="status">
+  <div class="section-eyebrow">Verification</div>
+  <h2 class="section-title">Checking Integration Status</h2>
+  <p class="doc-p">Open the Admin Panel and navigate to the <strong>Integrations</strong> tab. The Google section shows:</p>
+  <ul class="doc-list">
+    <li>Credential file found (yes / no)</li>
+    <li>OAuth token valid (yes / no)</li>
+    <li>Which services are enabled</li>
+    <li>Live data previews: upcoming calendar events, inbox preview, and recent Drive files</li>
+  </ul>
+  <p class="doc-p">If any service shows as unavailable, the status panel will indicate whether the issue is a missing credential file, an expired token, or a disabled service flag.</p>
+
+  <div class="callout tip">
+    <div class="callout-icon">💡</div>
+    <div class="callout-title">Token expired?</div>
+    <div class="callout-body">Delete <span class="file-path">data\google_token.json</span> and restart EOS. It will open a new browser authorization window and save a fresh token.</div>
+  </div>
+</div>
+
+<div class="doc-rule"></div>
+
+<div class="doc-section" id="gmail-send">
+  <div class="section-eyebrow">Optional Feature</div>
+  <h2 class="section-title">Enabling Gmail Send</h2>
+  <p class="doc-p">Gmail Send is off by default. EOS can read and search your email without it — you only need to enable this if you want EOS to send messages on your behalf.</p>
+
+  <h3 class="sub-title" id="gmail-send-runtime">Enable at runtime</h3>
+  <p class="doc-p">Admin Panel → Control &amp; Permissions → Capabilities → Google → Gmail Send. This takes effect immediately and does not require a restart.</p>
+
+  <h3 class="sub-title" id="gmail-send-permanent">Make it permanent</h3>
+  <p class="doc-p">To keep Gmail Send enabled across restarts, add the following to <span class="file-path">config.json</span>:</p>
+  <div class="code-wrap"><pre>"google": {
+  "enabled": true,
+  "gmail_send_enabled": true
+}</pre></div>
+
+  <div class="callout warning">
+    <div class="callout-icon">⚠️</div>
+    <div class="callout-title">Understand what you're enabling</div>
+    <div class="callout-body">With Gmail Send enabled, EOS can send email on your behalf. It will always tell you what it's sending and why, but only enable this if you've established trust with your EOS instance.</div>
+  </div>
+</div>
+
+<div class="doc-rule"></div>
+
+<div class="doc-section" id="troubleshooting">
+  <div class="section-eyebrow">Help</div>
+  <h2 class="section-title">Troubleshooting</h2>
+  <div class="table-wrap">
+    <table class="doc-table">
+      <thead>
+        <tr>
+          <th>Symptom</th>
+          <th>Fix</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>No credential file found</td>
+          <td>Check that the file is in <span class="file-path">AI personal files\</span> and the filename matches <code>client_secret_*.json</code>.</td>
+        </tr>
+        <tr>
+          <td>OAuth browser window not opening</td>
+          <td>Confirm <code>"enabled": true</code> is set under <code>"google"</code> in <span class="file-path">config.json</span>.</td>
+        </tr>
+        <tr>
+          <td>Token expired / auth errors</td>
+          <td>Delete <span class="file-path">data\google_token.json</span> and restart EOS to re-authorize.</td>
+        </tr>
+        <tr>
+          <td>Calendar events not showing</td>
+          <td>Check that <code>"calendar_enabled": true</code> is set in <span class="file-path">config.json</span> under the Google block.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

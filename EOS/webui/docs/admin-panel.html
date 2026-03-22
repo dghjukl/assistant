@@ -1,0 +1,182 @@
+<div class="page-header">
+  <div class="page-eyebrow">Reference</div>
+  <h1 class="page-title">Admin Panel</h1>
+  <p class="page-lead">The operator's control surface for monitoring, tuning, and managing EOS at runtime.</p>
+</div>
+
+<div class="callout important">
+  <div class="callout-icon"></div>
+  <div class="callout-body">
+    <div class="callout-title">Live Changes & Persistence</div>
+    All changes made in the admin panel are live immediately. Most reset to <code>config.json</code> values on restart. To make a change permanent, edit <code>config.json</code>.
+  </div>
+</div>
+
+<div class="doc-section" id="access">
+  <div class="section-eyebrow">Reference</div>
+  <h2 class="section-title">Accessing the Admin Panel</h2>
+  <p class="doc-p">The admin panel is available at:</p>
+  <div class="file-path">http://127.0.0.1:7860/admin</div>
+  <p class="doc-p">You can also reach it from the chat interface top bar — look for the <strong>Admin</strong> link in the upper-right corner of the EOS chat UI. The panel opens in the same browser tab.</p>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="tabs">
+  <div class="section-eyebrow">Reference</div>
+  <h2 class="section-title">Tab Overview</h2>
+  <p class="doc-p">The admin panel is organized into twelve tabs. Each covers a distinct part of the system.</p>
+  <div class="table-wrap">
+    <table class="doc-table">
+      <thead>
+        <tr>
+          <th>Tab</th>
+          <th>What It Shows</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Overview</strong></td>
+          <td>Server health dashboard, session ID, turn count, and inference server status for all running services.</td>
+        </tr>
+        <tr>
+          <td><strong>Tools</strong></td>
+          <td>All loaded tools with the ability to enable or disable individual tools at runtime.</td>
+        </tr>
+        <tr>
+          <td><strong>Control &amp; Permissions</strong></td>
+          <td>Capability toggles, runtime permission classes, toolpack management, and the permission audit log.</td>
+        </tr>
+        <tr>
+          <td><strong>Tool Registry Diagnostics</strong></td>
+          <td>Raw tool registry state and shadow database state for low-level debugging.</td>
+        </tr>
+        <tr>
+          <td><strong>Live Logs</strong></td>
+          <td>Real-time system log stream, color-coded by level.</td>
+        </tr>
+        <tr>
+          <td><strong>Main Model</strong></td>
+          <td>Per-server inference log for the main language model, with hardware badge (GPU/CPU).</td>
+        </tr>
+        <tr>
+          <td><strong>Tool Svr.</strong></td>
+          <td>Per-server inference log for the tool-calling model, with hardware badge.</td>
+        </tr>
+        <tr>
+          <td><strong>Memory</strong></td>
+          <td>Vector memory statistics, retrieval log, and memory event history.</td>
+        </tr>
+        <tr>
+          <td><strong>Cognition</strong></td>
+          <td>Turn traces, memory influence events, reflection events, and internal state changes.</td>
+        </tr>
+        <tr>
+          <td><strong>Computer Use</strong></td>
+          <td>Mode switching controls, the HALT button, application allowlist, and pending confirmation queue.</td>
+        </tr>
+        <tr>
+          <td><strong>Integrations</strong></td>
+          <td>Google Workspace connection status and live data for all external integrations.</td>
+        </tr>
+        <tr>
+          <td><strong>Config</strong></td>
+          <td>Read-only view of the currently loaded <code>config.json</code>.</td>
+        </tr>
+        <tr>
+          <td><strong>Export</strong></td>
+          <td>Generate a full diagnostic bundle for bug reports or persistent-issue diagnosis.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="overview">
+  <div class="section-eyebrow">Reference</div>
+  <h2 class="section-title">Overview Tab</h2>
+  <p class="doc-p">The Overview tab is the server health dashboard. It shows each inference server with its current status, hardware, model, and port.</p>
+
+  <h3 class="sub-title" id="overview-servers">Inference Server Cards</h3>
+  <p class="doc-p">Each server appears as a card showing:</p>
+  <ul class="doc-list">
+    <li>Status badge: <span class="badge active">active</span>, <span class="badge degraded">degraded</span>, or <span class="badge unavail">unavailable</span></li>
+    <li>Hardware badge indicating GPU or CPU inference</li>
+    <li>Model name currently loaded on that server</li>
+    <li>Port number the server is listening on</li>
+  </ul>
+
+  <h3 class="sub-title" id="overview-session">Session Info</h3>
+  <p class="doc-p">Below the server cards, the session block shows:</p>
+  <ul class="doc-list">
+    <li><strong>Entity name</strong> — EOS's configured identity name</li>
+    <li><strong>Session ID</strong> — unique identifier for the current runtime session</li>
+    <li><strong>Turn count</strong> — number of conversation turns completed this session</li>
+  </ul>
+
+  <h3 class="sub-title" id="overview-triage">When Something Seems Wrong</h3>
+  <p class="doc-p">The Overview tab should be your first stop when behavior is unexpected. Check whether all servers show <span class="badge active">active</span>. A <span class="badge degraded">degraded</span> or <span class="badge unavail">unavailable</span> status means the corresponding server did not load correctly — the model may be missing, the port may be in use, or hardware resources may be insufficient. The server cards show enough context to identify which server failed and on which hardware.</p>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="control">
+  <div class="section-eyebrow">Reference</div>
+  <h2 class="section-title">Control &amp; Permissions Tab</h2>
+  <p class="doc-p">This tab is the primary control surface for adjusting what EOS is allowed to do at runtime. Changes take effect immediately.</p>
+
+  <h3 class="sub-title" id="control-capabilities">Capabilities</h3>
+  <p class="doc-p">Live toggles for all capability groups — Perception, Cognition, Action, and Initiative. Toggling a group off removes that class of behavior immediately. See the <a onclick="nav('capabilities')">Capabilities &amp; Autonomy</a> page for what each group controls.</p>
+
+  <h3 class="sub-title" id="control-permissions">Runtime Permission Classes</h3>
+  <p class="doc-p">Allow or block tool permission classes immediately. These are the security controls that gate whether EOS can use tools in sensitive categories such as file system access, network calls, or shell execution. Blocking a class here takes effect without a restart and does not require editing <code>config.json</code>.</p>
+
+  <h3 class="sub-title" id="control-toolpacks">Toolpack Management</h3>
+  <p class="doc-p">Enable or disable individual tools or entire toolpacks at runtime. Use this to temporarily pull a tool out of rotation without restarting EOS. Disabled tools remain loaded in memory but will not be offered to or invoked by the model.</p>
+
+  <h3 class="sub-title" id="control-audit">Audit Log</h3>
+  <p class="doc-p">The bottom of the tab shows a timestamped audit log of recent permission changes — who changed what and when. Useful for reviewing what was adjusted during a session.</p>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="logs">
+  <div class="section-eyebrow">Reference</div>
+  <h2 class="section-title">Live Logs Tab</h2>
+  <p class="doc-p">The Live Logs tab streams the system log in real time, color-coded by severity level. It is the fastest way to see what EOS is doing moment-to-moment.</p>
+  <p class="doc-p">The log stream includes:</p>
+  <ul class="doc-list">
+    <li>Tool invocations and their results</li>
+    <li>Memory retrieval events</li>
+    <li>External service calls (Google, Discord, etc.)</li>
+    <li>Errors and warnings with stack context</li>
+  </ul>
+  <div class="callout tip">
+    <div class="callout-icon"></div>
+    <div class="callout-body">
+      <div class="callout-title">Debugging Tip</div>
+      Keep the Live Logs tab open in a second browser tab while testing integrations. You can watch what EOS is doing in real time without interrupting the chat session in your first tab.
+    </div>
+  </div>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="export">
+  <div class="section-eyebrow">Reference</div>
+  <h2 class="section-title">Export Tab</h2>
+  <p class="doc-p">The Export tab generates a full diagnostic bundle as a JSON file. Use this when filing a bug report or diagnosing a persistent issue that is hard to reproduce.</p>
+
+  <h3 class="sub-title" id="export-contents">What the Bundle Contains</h3>
+  <ul class="doc-list">
+    <li>Current runtime state snapshot</li>
+    <li>Status of all inference servers</li>
+    <li>Recent log entries from the live log stream</li>
+    <li>A snapshot of the loaded <code>config.json</code></li>
+  </ul>
+
+  <h3 class="sub-title" id="export-saving">Where It Saves</h3>
+  <p class="doc-p">The bundle is saved to the <code>exports/</code> folder inside your EOS directory and is simultaneously offered as a browser download. Both copies are identical — keep whichever is convenient.</p>
+</div>

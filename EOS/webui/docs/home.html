@@ -1,0 +1,165 @@
+<div class="page-header">
+  <div class="page-eyebrow">Entity Operating System</div>
+  <h1 class="page-title">EOS Documentation</h1>
+  <p class="page-lead">Everything you need to run, configure, and extend EOS — your local AI companion.</p>
+</div>
+
+<div class="guide-grid">
+  <div class="cap-card" style="--card-accent:#3b82f6" onclick="nav('quick-start')">
+    <div class="cap-card-icon" style="color:#3b82f6">&#128640;</div>
+    <div class="cap-card-title">Quick Start</div>
+    <div class="cap-card-desc">Get from zero to a running system in under an hour.</div>
+  </div>
+  <div class="cap-card" style="--card-accent:#22c55e" onclick="nav('using-eos')">
+    <div class="cap-card-icon" style="color:#22c55e">&#128218;</div>
+    <div class="cap-card-title">User Guide</div>
+    <div class="cap-card-desc">Day-to-day operation, voice, integrations, workspace, and worldview.</div>
+  </div>
+  <div class="cap-card" style="--card-accent:#a855f7" onclick="nav('admin')">
+    <div class="cap-card-icon" style="color:#a855f7">&#128295;</div>
+    <div class="cap-card-title">Admin Panel</div>
+    <div class="cap-card-desc">Monitor, control, and tune EOS from the operator panel.</div>
+  </div>
+  <div class="cap-card" style="--card-accent:#f59e0b" onclick="nav('power-user')">
+    <div class="cap-card-icon" style="color:#f59e0b">&#9889;</div>
+    <div class="cap-card-title">Power User Guide</div>
+    <div class="cap-card-desc">Config deep-dive, CLI, launcher architecture, and diagnostics.</div>
+  </div>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="what-is-eos">
+  <div class="section-eyebrow">Overview</div>
+  <h2 class="section-title">What is EOS?</h2>
+  <p class="section-lead">A local AI companion built to run entirely on your machine — no cloud required.</p>
+
+  <div class="card-grid">
+    <div class="cap-card">
+      <div class="cap-card-icon">&#127968;</div>
+      <div class="cap-card-title">Fully Local</div>
+      <div class="cap-card-desc">Runs entirely on your machine. No cloud API key required. Nothing leaves your machine — ever.</div>
+    </div>
+    <div class="cap-card">
+      <div class="cap-card-icon">&#129504;</div>
+      <div class="cap-card-title">Persistent Identity</div>
+      <div class="cap-card-desc">Maintains a consistent persona and long-term memory across every session.</div>
+    </div>
+    <div class="cap-card">
+      <div class="cap-card-icon">&#128274;</div>
+      <div class="cap-card-title">Private by Design</div>
+      <div class="cap-card-desc">Your conversations, files, and data stay on your hardware. Zero telemetry.</div>
+    </div>
+    <div class="cap-card">
+      <div class="cap-card-icon">&#128187;</div>
+      <div class="cap-card-title">Windows Native</div>
+      <div class="cap-card-desc">Designed and optimised for Windows 10 and Windows 11. Runs without WSL or Docker.</div>
+    </div>
+  </div>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="how-it-works">
+  <div class="section-eyebrow">Architecture</div>
+  <h2 class="section-title">How It Works</h2>
+  <p class="section-lead">EOS is a coordinator. It discovers what is running and builds a capability map on startup — missing helpers degrade gracefully with no hard failures.</p>
+
+  <ol class="step-list">
+    <li class="step-card">
+      <div class="step-num green">1</div>
+      <div class="step-body">
+        <div class="step-title">Start backend model servers</div>
+        <div class="step-desc">Use a launcher script (e.g. <code>Launch EOS.bat</code> or <code>start-standard.bat</code>) to bring up the model servers. Each opens its own console window.</div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num green">2</div>
+      <div class="step-body">
+        <div class="step-title">Start EOS</div>
+        <div class="step-desc">Run <code>start-eos.bat</code>. EOS initialises its memory system, loads configuration, and begins listening.</div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num green">3</div>
+      <div class="step-body">
+        <div class="step-title">EOS discovers services and builds a capability map</div>
+        <div class="step-desc">On startup EOS probes each configured endpoint. The result is a live capability map — you can see it printed in the console and in the Admin Panel.</div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num amber">4</div>
+      <div class="step-body">
+        <div class="step-title">Missing helpers degrade gracefully</div>
+        <div class="step-desc">If a backend is not running, that capability is marked unavailable or degraded. EOS keeps working at reduced capability — no crash, no hard failure.</div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num green">5</div>
+      <div class="step-body">
+        <div class="step-title">Open the interface in your browser</div>
+        <div class="step-desc">Navigate to <code>http://127.0.0.1:7860/</code>. The chat interface is ready. The Admin Panel is at <code>http://127.0.0.1:7860/admin</code>.</div>
+      </div>
+    </li>
+  </ol>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="requirements">
+  <div class="section-eyebrow">Before You Begin</div>
+  <h2 class="section-title">System Requirements</h2>
+  <p class="section-lead">EOS is designed to run on modest consumer hardware. A GPU is recommended but not required.</p>
+
+  <div class="table-wrap">
+    <table class="doc-table">
+      <thead>
+        <tr>
+          <th>Component</th>
+          <th>Minimum</th>
+          <th>Recommended</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Operating System</td>
+          <td>Windows 10 64-bit</td>
+          <td>Windows 11</td>
+        </tr>
+        <tr>
+          <td>Python</td>
+          <td>3.10</td>
+          <td>3.11</td>
+        </tr>
+        <tr>
+          <td>RAM</td>
+          <td>16 GB</td>
+          <td>32 GB</td>
+        </tr>
+        <tr>
+          <td>GPU</td>
+          <td>Not required (CPU inference)</td>
+          <td>NVIDIA with 8 GB+ VRAM</td>
+        </tr>
+        <tr>
+          <td>Disk Space</td>
+          <td>20 GB free</td>
+          <td>30 GB free</td>
+        </tr>
+        <tr>
+          <td>CUDA</td>
+          <td>Not required</td>
+          <td>CUDA 13.1 compatible driver</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<hr class="doc-rule">
+
+<div class="callout tip">
+  <div class="callout-icon">&#128161;</div>
+  <div class="callout-title">New to EOS?</div>
+  <div class="callout-body">Start with <a onclick="nav('quick-start')" style="cursor:pointer;text-decoration:underline">Quick Start</a> — it takes you from zero to a running system step by step.</div>
+</div>

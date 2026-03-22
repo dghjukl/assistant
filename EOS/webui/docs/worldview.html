@@ -1,0 +1,105 @@
+<div class="page-header">
+  <div class="page-eyebrow">Capabilities</div>
+  <h1 class="page-title">Worldview</h1>
+  <p class="page-lead">Give EOS a curated understanding of who you are — your values, reasoning style, and priorities — without waiting for it to learn everything from conversation.</p>
+</div>
+
+<div class="doc-section" id="what">
+  <div class="section-eyebrow">Overview</div>
+  <h2 class="section-title">What it Does</h2>
+  <p class="doc-p">You deposit source documents — essays, notes, reflections, anything you've written — and ask EOS to extract a structured profile from them. That profile is injected into every conversation as a compact orientation signal.</p>
+  <p class="doc-p">EOS uses the profile for interpretive calibration: it shapes how EOS reads your intent, not what it says back to you. The profile does not change EOS's outputs directly — it changes how EOS understands the inputs you give it.</p>
+
+  <div class="callout important">
+    <div class="callout-icon">!</div>
+    <div class="callout-title">Interpretation, not output</div>
+    <div class="callout-body">The worldview profile influences interpretation, not output. EOS won't quote it back at you or reference it explicitly unless asked.</div>
+  </div>
+</div>
+
+<div class="doc-rule"></div>
+
+<div class="doc-section" id="how-to-use">
+  <div class="section-eyebrow">Usage</div>
+  <h2 class="section-title">How to Use It</h2>
+  <ol class="step-list">
+    <li class="step-card">
+      <div class="step-num purple">1</div>
+      <div class="step-body">
+        <div class="step-title">Add source documents</div>
+        <div class="step-desc">Place your source documents in <span class="file-path">data\worldview\sources\</span>. Plain text and Markdown work best, but any readable format is accepted. These can be essays, journal entries, notes on your values, descriptions of how you think — anything that gives EOS signal about who you are.</div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num purple">2</div>
+      <div class="step-body">
+        <div class="step-title">Ask EOS to run extraction</div>
+        <div class="step-desc">Tell EOS: <em>"Update the worldview profile"</em> or <em>"I've added new materials to worldview/sources — process them."</em> EOS will not run extraction automatically — you must ask.</div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num purple">3</div>
+      <div class="step-body">
+        <div class="step-title">EOS produces an updated profile</div>
+        <div class="step-desc">EOS reads the new documents alongside the existing profile (if any) and writes an updated <span class="file-path">data\worldview\profile.md</span>. It integrates new signal without discarding prior understanding — the profile is cumulative.</div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num purple">4</div>
+      <div class="step-body">
+        <div class="step-title">Profile takes effect immediately</div>
+        <div class="step-desc">The updated profile is used from the next conversation turn. No restart required.</div>
+      </div>
+    </li>
+  </ol>
+
+  <div class="callout tip">
+    <div class="callout-icon">💡</div>
+    <div class="callout-title">Incremental updates</div>
+    <div class="callout-body">You can add documents to <span class="file-path">sources\</span> incrementally. Run extraction again each time you add significant new material — EOS will fold it into the existing profile rather than starting over.</div>
+  </div>
+</div>
+
+<div class="doc-rule"></div>
+
+<div class="doc-section" id="rules">
+  <div class="section-eyebrow">How It Behaves</div>
+  <h2 class="section-title">Behavioral Rules</h2>
+  <p class="doc-p">The worldview system follows four fixed rules:</p>
+  <ul class="doc-list">
+    <li>Dropping a file into <span class="file-path">sources\</span> is a silent event — EOS will not acknowledge it unless you ask.</li>
+    <li>EOS never quotes the profile back at you. It uses the profile to shape interpretation, not to narrate what it knows about you.</li>
+    <li>Your actual expressed view in conversation always overrides the profile. What you say now takes precedence over what the profile inferred from prior writing.</li>
+    <li>Where the profile is uncertain, EOS treats it as uncertain — it asks rather than assumes.</li>
+  </ul>
+</div>
+
+<div class="doc-rule"></div>
+
+<div class="doc-section" id="when">
+  <div class="section-eyebrow">Maintenance</div>
+  <h2 class="section-title">When to Run Extraction</h2>
+  <p class="doc-p">Run extraction whenever you add new source documents or want to refresh EOS's model of you. There is no automatic extraction — it only runs when you explicitly ask.</p>
+  <p class="doc-p">A reasonable cadence: run after adding significant new material (a substantial essay, a set of related notes). There is no benefit to running it after every small addition — wait until you have something meaningful to incorporate.</p>
+
+  <div class="callout tip">
+    <div class="callout-icon">💡</div>
+    <div class="callout-title">Quality over quantity</div>
+    <div class="callout-body">A few well-written essays about your values and reasoning style are more useful than many short notes. Depth gives EOS better signal than volume.</div>
+  </div>
+</div>
+
+<div class="doc-rule"></div>
+
+<div class="doc-section" id="profile">
+  <div class="section-eyebrow">The Output File</div>
+  <h2 class="section-title">The Profile File</h2>
+  <p class="doc-p">The extracted profile is stored at <span class="file-path">data\worldview\profile.md</span>. You can read it at any time to see what EOS extracted and how it has characterised your worldview. It is a plain Markdown file — you can edit it directly if you want to correct or remove anything.</p>
+  <p class="doc-p">EOS tracks which source files have already been processed in <span class="file-path">data\worldview\extraction_log.json</span>. This lets it incorporate only new material on subsequent runs rather than re-reading everything.</p>
+
+  <h3 class="sub-title" id="profile-troubleshooting">If the profile seems wrong</h3>
+  <ul class="doc-list">
+    <li>To correct a specific section: tell EOS directly in conversation — <em>"The profile overstates X"</em> or <em>"Remove the section about Y."</em> EOS can edit the profile file on your instruction.</li>
+    <li>To start over: delete <span class="file-path">data\worldview\profile.md</span> and <span class="file-path">extraction_log.json</span>, then ask EOS to run extraction again from your source documents.</li>
+  </ul>
+</div>

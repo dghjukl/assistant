@@ -1,0 +1,154 @@
+<div class="page-header">
+  <div class="page-eyebrow">Capabilities</div>
+  <h1 class="page-title">Computer Use</h1>
+  <p class="page-lead">EOS can launch and interact with approved desktop applications. This is a layered, opt-in system — you control which apps are allowed and what EOS can do in them.</p>
+</div>
+
+<div class="callout important">
+  <div class="callout-icon">!</div>
+  <div class="callout-title">Off by default</div>
+  <div class="callout-body">Computer Use is off by default. Nothing happens until you explicitly enable it and set a mode.</div>
+</div>
+
+<div class="doc-rule"></div>
+
+<div class="doc-section" id="modes">
+  <div class="section-eyebrow">Modes</div>
+  <h2 class="section-title">Operating Modes</h2>
+  <p class="doc-p">Computer Use has three modes. The active mode determines what EOS is allowed to do even when the capability is enabled.</p>
+  <div class="mode-grid">
+    <div class="mode-card off">
+      <div class="mode-name">Off</div>
+      <div class="mode-desc">No computer use, regardless of any other setting. EOS will not launch or interact with any application.</div>
+    </div>
+    <div class="mode-card on">
+      <div class="mode-name">Command Only</div>
+      <div class="mode-desc">Approved apps only. EOS takes single actions in direct response to explicit user-requested tasks. Nothing runs autonomously.</div>
+    </div>
+    <div class="mode-card warn">
+      <div class="mode-name">Supervised Session</div>
+      <div class="mode-desc">Approved apps with bounded continuation. EOS can take multiple steps toward a goal while you're watching, but stays within the scope you define.</div>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-icon">💡</div>
+    <div class="callout-title">Recommended starting point</div>
+    <div class="callout-body">Start with Command Only. It gives you a clear feel for what EOS does before you consider allowing multi-step sessions.</div>
+  </div>
+</div>
+
+<div class="doc-rule"></div>
+
+<div class="doc-section" id="enabling">
+  <div class="section-eyebrow">Configuration</div>
+  <h2 class="section-title">Enabling Computer Use</h2>
+  <ol class="step-list">
+    <li class="step-card">
+      <div class="step-num green">1</div>
+      <div class="step-body">
+        <div class="step-title">Toggle on in the Admin Panel</div>
+        <div class="step-desc">Admin Panel → Control &amp; Permissions → Capabilities → Computer Use → toggle <strong>Enabled</strong> on.</div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num green">2</div>
+      <div class="step-body">
+        <div class="step-title">Set the default mode</div>
+        <div class="step-desc">Set <strong>Default Mode</strong> to Command Only or Supervised Session in the Admin Panel. Alternatively, edit <span class="file-path">config.json</span> directly:</div>
+        <div class="code-wrap"><pre>"computer_use": {
+  "enabled": true,
+  "default_mode": "command_only"
+}</pre></div>
+        <p style="margin-top:0.5rem;font-size:0.875rem;color:var(--text-muted)">Use <code>"supervised_session"</code> for the Supervised Session mode.</p>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num green">3</div>
+      <div class="step-body">
+        <div class="step-title">Change mode at any time</div>
+        <div class="step-desc">The active mode can be changed from the Admin Panel at any time without restarting EOS.</div>
+      </div>
+    </li>
+  </ol>
+</div>
+
+<div class="doc-rule"></div>
+
+<div class="doc-section" id="approving">
+  <div class="section-eyebrow">App Allowlist</div>
+  <h2 class="section-title">Approving Applications</h2>
+  <p class="doc-p">EOS will only interact with applications that appear on the allowlist. The allowlist lives at:</p>
+  <div class="dir-tree">data\computer_use\approved_shortcuts\<span class="dir-comment">  ← one .json file per approved app</span></div>
+  <p class="doc-p">Three examples come pre-loaded: <strong>Notepad</strong>, <strong>VS Code</strong>, and <strong>Browser</strong>. You can use these as reference when adding new applications.</p>
+
+  <h3 class="sub-title" id="approving-add">Adding an app</h3>
+  <ul class="doc-list">
+    <li>Create a <code>.json</code> file in <span class="file-path">data\computer_use\approved_shortcuts\</span> using the schema described in the README in that folder.</li>
+    <li>Ensure a matching policy entry exists in <span class="file-path">data\computer_use\app_policy.json</span>.</li>
+    <li>In the Admin Panel, click <strong>Computer Use → Reload from disk</strong> to pick up the new file without restarting.</li>
+  </ul>
+
+  <h3 class="sub-title" id="approving-revoke">Revoking an app</h3>
+  <p class="doc-p">Delete the app's <code>.json</code> file from <span class="file-path">approved_shortcuts\</span>. The revocation takes effect immediately on the next policy check — no reload required.</p>
+</div>
+
+<div class="doc-rule"></div>
+
+<div class="doc-section" id="halt">
+  <div class="section-eyebrow">Emergency Stop</div>
+  <h2 class="section-title">The HALT Button</h2>
+  <p class="doc-p">The Admin Panel's <strong>Computer Use</strong> tab has a red <strong>HALT</strong> button. Pressing it immediately stops all active computer-use activity and sets the mode to Off.</p>
+  <p class="doc-p">Use HALT if EOS does something unexpected or you want an immediate, unconditional stop. You can re-enable and set a mode again from the Admin Panel after investigating.</p>
+
+  <div class="callout important">
+    <div class="callout-icon">!</div>
+    <div class="callout-title">Emergency stop</div>
+    <div class="callout-body">The HALT button is your emergency stop. It works immediately regardless of what EOS is doing.</div>
+  </div>
+</div>
+
+<div class="doc-rule"></div>
+
+<div class="doc-section" id="confirming">
+  <div class="section-eyebrow">Safety Layer</div>
+  <h2 class="section-title">Confirming Actions</h2>
+  <p class="doc-p">Some actions require your confirmation before EOS proceeds. These are actions marked <code>soft_confirm</code> or <code>hard_confirm</code> in the app policy.</p>
+  <p class="doc-p">When a confirmable action is about to run, a confirmation dialog appears in the <strong>Computer Use</strong> tab of the Admin Panel. EOS pauses and waits for your response — it will not proceed until you click <strong>Confirm</strong> or <strong>Deny</strong>.</p>
+  <p class="doc-p"><strong>Hard confirm</strong> actions require explicit acknowledgment — a soft click-through is not sufficient. The dialog will make the nature of the action clear before you respond.</p>
+</div>
+
+<div class="doc-rule"></div>
+
+<div class="doc-section" id="troubleshooting">
+  <div class="section-eyebrow">Help</div>
+  <h2 class="section-title">Troubleshooting</h2>
+  <div class="table-wrap">
+    <table class="doc-table">
+      <thead>
+        <tr>
+          <th>Symptom</th>
+          <th>Fix</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Computer Use not doing anything</td>
+          <td>Check that the <strong>Enabled</strong> toggle is on in the Admin Panel and that the mode is not set to Off.</td>
+        </tr>
+        <tr>
+          <td>App not launching</td>
+          <td>Check that the app has a <code>.json</code> file in <span class="file-path">data\computer_use\approved_shortcuts\</span>.</td>
+        </tr>
+        <tr>
+          <td>Action blocked</td>
+          <td>Check <span class="file-path">data\computer_use\app_policy.json</span> and confirm the action is listed for that app.</td>
+        </tr>
+        <tr>
+          <td>HALT not responding</td>
+          <td>Close the EOS window entirely as a last resort. This will terminate all EOS processes.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
