@@ -2174,16 +2174,6 @@ async def admin_get_config():
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
 
-@app.get("/admin/logs")
-async def admin_get_logs(limit: int = 100):
-    """Get log ring."""
-    try:
-        logs = list(_log_ring)[-limit:]
-        return JSONResponse({"ok": True, "data": logs})
-    except Exception as exc:
-        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
-
-
 @app.get("/admin/subsystems")
 async def admin_subsystems():
     """Get subsystem health status."""
@@ -2839,11 +2829,20 @@ async def admin_investigation_diagnostics():
 async def admin_force_tool(body: ForceToolRequest):
     """Force-run a tool directly."""
     try:
-        # Stub: return placeholder
-        return JSONResponse({
-            "ok": True,
-            "data": {"tool": body.tool_name, "result": "[Tool execution stub]"}
-        })
+        from runtime.orchestrator import _tool_executor as _exec
+        if _exec is None:
+            return JSONResponse({"ok": False, "error": "Tool executor not initialized"}, status_code=503)
+        result = _exec.execute(body.tool_name, body.params, caller_trust="OPERATOR_ONLY")
+        payload = {
+            "tool": body.tool_name,
+            "success": result.success,
+            "result": result.output,
+            "error": result.error,
+            "pending_confirmation_id": result.pending_confirmation_id,
+            "audit_id": result.audit_id,
+        }
+        status_code = 200 if result.success or result.pending_confirmation_id else 400
+        return JSONResponse({"ok": result.success, "data": payload}, status_code=status_code)
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
@@ -3174,20 +3173,100 @@ def _google_base_url(request: Request) -> str:
     return f"{scheme}://{host}"
 
 
+def _google_cfg() -> dict[str, Any]:
+    return _cfg.get("google", {}) if isinstance(_cfg, dict) else {}
+
+
+def _google_service_enabled(service: str) -> bool:
+    gcfg = _google_cfg()
+    if not gcfg.get("enabled", False):
+        return False
+    flag_map = {
+        "calendar": "calendar_enabled",
+        "gmail": "gmail_enabled",
+        "drive": "drive_enabled",
+        "gmail_send": "gmail_send_enabled",
+    }
+    flag = flag_map.get(service)
+    return bool(gcfg.get(flag, False)) if flag else False
+
+
+def _google_service_disabled(service: str) -> JSONResponse:
+    return JSONResponse(
+        {
+            "ok": False,
+            "error": f"Google {service} integration is disabled in config",
+            "disabled": True,
+        },
+        status_code=503,
+    )
+
+
+def _google_calendar_event_dict(event: dict[str, Any]) -> dict[str, Any]:
+    start = event.get("start", {})
+    end = event.get("end", {})
+    return {
+        "id": event.get("id", ""),
+        "summary": event.get("summary", "(no title)"),
+        "description": event.get("description", ""),
+        "location": event.get("location", ""),
+        "status": event.get("status", ""),
+        "start": start.get("dateTime", start.get("date", "")),
+        "end": end.get("dateTime", end.get("date", "")),
+        "html_link": event.get("htmlLink", ""),
+    }
+
+
 @app.get("/api/google_workspace/status")
 async def google_status():
     """Return Google Workspace status: whether authorized, account info, scopes."""
     try:
-        from core.google_oauth import configure as oauth_cfg, is_authorized, get_account_info
+        from core.google_oauth import (
+            configure as oauth_cfg,
+            is_authorized,
+            get_account_info,
+            get_credentials,
+            _client_secret_path,
+            _token_path,
+        )
         oauth_cfg(_cfg)
+        gcfg = _google_cfg()
         authorized = is_authorized()
-        account    = get_account_info() if authorized else {}
+        account = get_account_info() if authorized else {}
+        client_secret_exists = _client_secret_path() is not None
+        token_exists = _token_path().is_file()
+        token_valid = get_credentials() is not None
+        services_enabled = {
+            "calendar": _google_service_enabled("calendar"),
+            "gmail": _google_service_enabled("gmail"),
+            "drive": _google_service_enabled("drive"),
+        }
+        if not gcfg.get("enabled", False):
+            overall_status = "disabled"
+        elif not client_secret_exists:
+            overall_status = "unavailable"
+        elif token_valid:
+            overall_status = "connected"
+        elif token_exists:
+            overall_status = "needs_reauth"
+        else:
+            overall_status = "needs_auth"
         return JSONResponse({
             "ok": True,
             "data": {
-                "enabled":    _cfg.get("google", {}).get("enabled", False),
+                "enabled": gcfg.get("enabled", False),
                 "authorized": authorized,
-                "account":    account,
+                "account": account,
+                "integration_enabled": gcfg.get("enabled", False),
+                "overall_status": overall_status,
+                "client_secret_exists": client_secret_exists,
+                "token_exists": token_exists,
+                "token_valid": token_valid,
+                "services_enabled": services_enabled,
+                "gmail_send_enabled": bool(gcfg.get("gmail_send_enabled", False)),
+                "calendar_create_enabled": bool(services_enabled["calendar"]),
+                "drive_download_enabled": bool(services_enabled["drive"]),
+                "last_auth_error": None,
             }
         })
     except Exception as exc:
@@ -3204,6 +3283,8 @@ async def google_authorize(request: Request):
     the flow automatically.
     """
     try:
+        if not _google_cfg().get("enabled", False):
+            return _google_service_disabled("workspace")
         from core.google_oauth import configure as oauth_cfg, build_authorize_url
         oauth_cfg(_cfg)
         redirect_uri = _google_base_url(request) + "/api/google_workspace/callback"
@@ -3268,6 +3349,8 @@ async def google_oauth_callback(request: Request, code: str = "", state: str = "
 async def google_revoke():
     """Revoke Google OAuth access and delete the local token."""
     try:
+        if not _google_cfg().get("enabled", False):
+            return _google_service_disabled("workspace")
         from core.google_oauth import configure as oauth_cfg, revoke
         oauth_cfg(_cfg)
         result = revoke()
@@ -3283,6 +3366,8 @@ async def google_revoke():
 async def google_account():
     """Return the authenticated Google account's profile (email, name, picture)."""
     try:
+        if not _google_cfg().get("enabled", False):
+            return _google_service_disabled("workspace")
         from core.google_oauth import configure as oauth_cfg, is_authorized, get_account_info
         oauth_cfg(_cfg)
         if not is_authorized():
@@ -3299,8 +3384,23 @@ async def google_account():
 async def google_calendar_today():
     """Return today's Google Calendar events."""
     try:
-        from tools.calendar import list_events
-        events = await list_events(1, _cfg)
+        if not _google_service_enabled("calendar"):
+            return _google_service_disabled("calendar")
+        from datetime import datetime, timedelta, timezone
+        from core.google_oauth import configure as oauth_cfg, build_service
+        oauth_cfg(_cfg)
+        svc = build_service("calendar", "v3", scopes=["https://www.googleapis.com/auth/calendar.readonly"])
+        now = datetime.now(timezone.utc)
+        end = now + timedelta(days=1)
+        res = svc.events().list(
+            calendarId="primary",
+            timeMin=now.isoformat().replace("+00:00", "Z"),
+            timeMax=end.isoformat().replace("+00:00", "Z"),
+            maxResults=20,
+            singleEvents=True,
+            orderBy="startTime",
+        ).execute()
+        events = [_google_calendar_event_dict(event) for event in res.get("items", [])]
         return JSONResponse({"ok": True, "data": {"events": events}})
     except PermissionError as exc:
         return JSONResponse({"ok": False, "error": str(exc), "needs_auth": True}, status_code=401)
@@ -3313,8 +3413,23 @@ async def google_calendar_today():
 async def google_calendar_upcoming(days: int = 7):
     """Return upcoming Google Calendar events."""
     try:
-        from tools.calendar import list_events
-        events = await list_events(days, _cfg)
+        if not _google_service_enabled("calendar"):
+            return _google_service_disabled("calendar")
+        from datetime import datetime, timedelta, timezone
+        from core.google_oauth import configure as oauth_cfg, build_service
+        oauth_cfg(_cfg)
+        svc = build_service("calendar", "v3", scopes=["https://www.googleapis.com/auth/calendar.readonly"])
+        now = datetime.now(timezone.utc)
+        end = now + timedelta(days=days)
+        res = svc.events().list(
+            calendarId="primary",
+            timeMin=now.isoformat().replace("+00:00", "Z"),
+            timeMax=end.isoformat().replace("+00:00", "Z"),
+            maxResults=50,
+            singleEvents=True,
+            orderBy="startTime",
+        ).execute()
+        events = [_google_calendar_event_dict(event) for event in res.get("items", [])]
         return JSONResponse({"ok": True, "data": {"events": events}})
     except PermissionError as exc:
         return JSONResponse({"ok": False, "error": str(exc), "needs_auth": True}, status_code=401)
@@ -3324,16 +3439,22 @@ async def google_calendar_upcoming(days: int = 7):
 
 
 @app.get("/api/google_workspace/gmail/inbox")
-async def google_gmail_inbox(max_results: int = 10):
+async def google_gmail_inbox(max_results: int = 10, query: str = ""):
     """Return recent Gmail inbox messages (subject, from, date)."""
     try:
+        if not _google_service_enabled("gmail"):
+            return _google_service_disabled("gmail")
         from core.google_oauth import configure as oauth_cfg, build_service
         oauth_cfg(_cfg)
         svc = build_service("gmail", "v1",
                             scopes=["https://www.googleapis.com/auth/gmail.readonly"])
-        response = svc.users().messages().list(
-            userId="me", labelIds=["INBOX"], maxResults=max_results
-        ).execute()
+        query = query.strip()
+        list_kwargs: dict[str, Any] = {"userId": "me", "maxResults": max_results}
+        if query:
+            list_kwargs["q"] = query
+        else:
+            list_kwargs["labelIds"] = ["INBOX"]
+        response = svc.users().messages().list(**list_kwargs).execute()
         messages = []
         for msg_ref in response.get("messages", []):
             msg = svc.users().messages().get(
@@ -3348,7 +3469,7 @@ async def google_gmail_inbox(max_results: int = 10):
                 "date":    headers.get("Date", ""),
                 "snippet": msg.get("snippet", ""),
             })
-        return JSONResponse({"ok": True, "data": {"messages": messages}})
+        return JSONResponse({"ok": True, "data": {"messages": messages, "query": query}})
     except PermissionError as exc:
         return JSONResponse({"ok": False, "error": str(exc), "needs_auth": True}, status_code=401)
     except Exception as exc:
@@ -3360,6 +3481,8 @@ async def google_gmail_inbox(max_results: int = 10):
 async def google_drive_recent(max_results: int = 10):
     """Return recently modified Google Drive files."""
     try:
+        if not _google_service_enabled("drive"):
+            return _google_service_disabled("drive")
         from core.google_oauth import configure as oauth_cfg, build_service
         oauth_cfg(_cfg)
         svc = build_service("drive", "v3",
@@ -3379,11 +3502,14 @@ async def google_drive_recent(max_results: int = 10):
 
 
 @app.get("/api/google_workspace/drive/search")
-async def google_drive_search(query: str = "", max_results: int = 10):
+async def google_drive_search(query: str = "", q: str = "", max_results: int = 10):
     """Search Google Drive files by name/content."""
+    query = (query or q).strip()
     if not query:
         return JSONResponse({"ok": False, "error": "query parameter required"}, status_code=400)
     try:
+        if not _google_service_enabled("drive"):
+            return _google_service_disabled("drive")
         from core.google_oauth import configure as oauth_cfg, build_service
         oauth_cfg(_cfg)
         svc = build_service("drive", "v3",

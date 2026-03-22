@@ -52,6 +52,12 @@ def register(registry: Any, config: Dict[str, Any]) -> None:
     gw_cfg = config.get("google", {}) if isinstance(config, dict) else {}
     enabled = bool(gw_cfg.get("enabled", False))
 
+    def _service_disabled(service: str) -> str:
+        return _jdump({
+            "error": f"Google {service} integration is disabled",
+            "hint": f"Set google.{service}_enabled=true in config.json and restart EOS.",
+        })
+
     # ── Placeholder path: Google not enabled or libraries missing ─────────────
 
     try:
@@ -130,6 +136,8 @@ def register(registry: Any, config: Dict[str, Any]) -> None:
     # ── Live path: Google enabled and libraries present ───────────────────────
 
     def _list_calendar_events(params: Dict[str, Any]) -> str:
+        if not gw_cfg.get("calendar_enabled", False):
+            return _service_disabled("calendar")
         days = int(params.get("days", 7))
         try:
             from core.google_oauth import configure as oauth_cfg, build_service
@@ -160,6 +168,8 @@ def register(registry: Any, config: Dict[str, Any]) -> None:
             return _jdump({"error": str(exc)})
 
     def _search_gmail(params: Dict[str, Any]) -> str:
+        if not gw_cfg.get("gmail_enabled", False):
+            return _service_disabled("gmail")
         query = str(params.get("query", ""))
         max_results = int(params.get("max_results", 10))
         if not query:
@@ -196,6 +206,8 @@ def register(registry: Any, config: Dict[str, Any]) -> None:
             return _jdump({"error": str(exc)})
 
     def _list_drive_files(params: Dict[str, Any]) -> str:
+        if not gw_cfg.get("drive_enabled", False):
+            return _service_disabled("drive")
         max_results = int(params.get("max_results", 10))
         try:
             from core.google_oauth import configure as oauth_cfg, build_service
@@ -214,6 +226,8 @@ def register(registry: Any, config: Dict[str, Any]) -> None:
             return _jdump({"error": str(exc)})
 
     def _search_drive(params: Dict[str, Any]) -> str:
+        if not gw_cfg.get("drive_enabled", False):
+            return _service_disabled("drive")
         query = str(params.get("query", ""))
         max_results = int(params.get("max_results", 10))
         if not query:

@@ -24,6 +24,7 @@ import logging
 import sqlite3
 import time
 from collections.abc import Callable
+from pathlib import Path
 from typing import Dict, List
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,9 @@ MigrationFn = Callable[[sqlite3.Connection], None]
 
 def _entity_m001_add_interaction_metadata(conn: sqlite3.Connection) -> None:
     """Ensure interaction_log.metadata column exists (added in v1)."""
+    tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    if "interaction_log" not in tables:
+        return
     cols = {row[1] for row in conn.execute("PRAGMA table_info(interaction_log)")}
     if "metadata" not in cols:
         conn.execute("ALTER TABLE interaction_log ADD COLUMN metadata TEXT")
@@ -54,6 +58,9 @@ def _entity_m002_add_entity_meta_table(conn: sqlite3.Connection) -> None:
 
 def _entity_m003_add_autonomy_updated_at(conn: sqlite3.Connection) -> None:
     """Ensure autonomy_profile.updated_at column exists."""
+    tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    if "autonomy_profile" not in tables:
+        return
     cols = {row[1] for row in conn.execute("PRAGMA table_info(autonomy_profile)")}
     if "updated_at" not in cols:
         conn.execute(
@@ -63,6 +70,9 @@ def _entity_m003_add_autonomy_updated_at(conn: sqlite3.Connection) -> None:
 
 def _entity_m004_interaction_log_indexes(conn: sqlite3.Connection) -> None:
     """Add performance indexes to interaction_log."""
+    tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    if "interaction_log" not in tables:
+        return
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_interaction_ts "
         "ON interaction_log (timestamp)"
@@ -78,6 +88,9 @@ def _entity_m004_interaction_log_indexes(conn: sqlite3.Connection) -> None:
 
 def _audit_m001_add_actor_index(conn: sqlite3.Connection) -> None:
     """Add actor index to admin_actions for faster per-actor queries."""
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(admin_actions)")}
+    if "actor" not in cols:
+        return
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_admin_actions_actor "
         "ON admin_actions (actor)"
@@ -86,6 +99,9 @@ def _audit_m001_add_actor_index(conn: sqlite3.Connection) -> None:
 
 def _audit_m002_add_pack_index(conn: sqlite3.Connection) -> None:
     """Add pack index to tool_executions for pack-level aggregation."""
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(tool_executions)")}
+    if "pack" not in cols:
+        return
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_tool_exec_pack "
         "ON tool_executions (pack)"
@@ -95,6 +111,8 @@ def _audit_m002_add_pack_index(conn: sqlite3.Connection) -> None:
 def _audit_m003_add_origin_to_admin_actions(conn: sqlite3.Connection) -> None:
     """Add origin_tier and client_ip columns to admin_actions."""
     cols = {row[1] for row in conn.execute("PRAGMA table_info(admin_actions)")}
+    if not cols:
+        return
     if "origin_tier" not in cols:
         conn.execute("ALTER TABLE admin_actions ADD COLUMN origin_tier TEXT")
     if "client_ip" not in cols:
@@ -108,6 +126,8 @@ def _audit_m003_add_origin_to_admin_actions(conn: sqlite3.Connection) -> None:
 def _audit_m004_add_origin_to_tool_executions(conn: sqlite3.Connection) -> None:
     """Add origin_tier and client_ip columns to tool_executions."""
     cols = {row[1] for row in conn.execute("PRAGMA table_info(tool_executions)")}
+    if not cols:
+        return
     if "origin_tier" not in cols:
         conn.execute("ALTER TABLE tool_executions ADD COLUMN origin_tier TEXT")
     if "client_ip" not in cols:
@@ -156,7 +176,16 @@ def _ensure_migrations_table(conn: sqlite3.Connection) -> None:
         )
 
 
-def apply_migrations(conn: sqlite3.Connection, db_name: str) -> int:
+def _infer_db_name(conn_or_path: sqlite3.Connection | str | Path) -> str:
+    if isinstance(conn_or_path, sqlite3.Connection):
+        return "entity_state"
+    stem = Path(conn_or_path).stem.lower()
+    if "audit" in stem:
+        return "audit"
+    return "entity_state"
+
+
+def apply_migrations(conn: sqlite3.Connection | str | Path, db_name: str | None = None) -> int:
     """Apply all pending migrations for *db_name* to the open connection.
 
     Parameters
@@ -172,6 +201,14 @@ def apply_migrations(conn: sqlite3.Connection, db_name: str) -> int:
     int
         Number of migrations newly applied.
     """
+    if not isinstance(conn, sqlite3.Connection):
+        db_path = Path(conn)
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        with sqlite3.connect(str(db_path)) as db_conn:
+            return apply_migrations(db_conn, db_name or _infer_db_name(db_path))
+
+    db_name = db_name or _infer_db_name(conn)
+
     _ensure_migrations_table(conn)
     conn.commit()
 

@@ -68,6 +68,7 @@ The Creativity subsystem and ThinkingFaculty may not override this decision.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
 import uuid as _uuid_mod
@@ -108,6 +109,66 @@ def wire_executor(registry: Any, audit_store: Any = None) -> None:
     _tool_executor = ToolExecutor(registry=registry, audit_store=audit_store)
     tool_count = len(registry.all_tools()) if registry and hasattr(registry, "all_tools") else 0
     logger.info("[orchestrator] ToolExecutor wired with %d registered tool(s).", tool_count)
+
+
+def _registry_tool_schema() -> dict[str, dict[str, Any]]:
+    """Return the enabled live tool schema for extraction prompts."""
+    if _tool_executor is None or getattr(_tool_executor, "registry", None) is None:
+        return {}
+    schema: dict[str, dict[str, Any]] = {}
+    for spec in _tool_executor.registry.all_enabled():
+        schema[spec.name] = spec.parameters or {"type": "object", "properties": {}, "required": []}
+    return schema
+
+
+def _format_tool_output(result: Any) -> str:
+    if isinstance(result, str):
+        return result
+    try:
+        return json.dumps(result, indent=2, ensure_ascii=False, default=str)
+    except Exception:
+        return str(result)
+
+
+async def _run_registry_tool_intent(
+    user_input: str,
+    topology: RuntimeTopology,
+) -> str | None:
+    """Extract and execute a tool call via the live ToolRegistry/ToolExecutor."""
+    if _tool_executor is None or getattr(_tool_executor, "registry", None) is None:
+        return None
+
+    tool_schema = _registry_tool_schema()
+    if not tool_schema:
+        return None
+
+    from tools.dispatcher import extract_tool_call
+
+    call = await extract_tool_call(user_input, topology, available_tools=tool_schema)
+    if not call or not call.get("tool"):
+        return None
+
+    tool_name = str(call.get("tool") or "").strip()
+    if not tool_name:
+        return None
+
+    params = call.get("args", {})
+    if not isinstance(params, dict):
+        params = {}
+
+    result = _tool_executor.execute(
+        tool_name,
+        params,
+        caller_trust="VERIFIED_USER",
+    )
+    if result.pending_confirmation_id:
+        return (
+            f"[Tool '{tool_name}' is pending operator confirmation. "
+            f"confirmation_id={result.pending_confirmation_id}]"
+        )
+    if not result.success:
+        return f"[Tool '{tool_name}' failed: {result.error}]"
+    return _format_tool_output(result.output)
 
 
 # ── Epistemic mode ─────────────────────────────────────────────────────────────
@@ -518,18 +579,19 @@ async def process_turn(
 
         # ── TOOL_OR_EXTERNAL ─────────────────────────────────────────────────
         elif mode == EpistemicMode.TOOL_OR_EXTERNAL:
-            # Phase 1: Get tool intent from Qwen3
-            tool_intent_prompt = (
-                f"The user said: '{user_input}'\n"
-                "In one sentence, what tool action should be taken to help?"
-            )
-            tool_intent = await call_qwen3(
-                topology, tool_intent_prompt, cfg, use_think=False
-            )
+            tool_result = await _run_registry_tool_intent(user_input, topology)
 
-            # Phase 2: Extract and execute tool
-            from tools.dispatcher import run_tool_intent
-            tool_result = await run_tool_intent(tool_intent, topology, cfg)
+            if tool_result is None:
+                # Compatibility fallback while the legacy dispatcher still exists.
+                tool_intent_prompt = (
+                    f"The user said: '{user_input}'\n"
+                    "In one sentence, what tool action should be taken to help?"
+                )
+                tool_intent = await call_qwen3(
+                    topology, tool_intent_prompt, cfg, use_think=False
+                )
+                from tools.dispatcher import run_tool_intent
+                tool_result = await run_tool_intent(tool_intent, topology, cfg)
 
             if tool_result:
                 followup = (

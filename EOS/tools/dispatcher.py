@@ -64,6 +64,11 @@ TOOL_REGISTRY: dict[str, dict] = {
         "description": "save something important to long-term memory",
         "args":        {"text": "str"},
     },
+    "list_events": {
+        "permission":  "action",
+        "description": "list upcoming calendar events",
+        "args":        {"days_ahead": "int?"},
+    },
     "write_file": {
         "permission":  "action",
         "description": "write or create a file at a given path",
@@ -154,6 +159,7 @@ def get_tool_status(topology: "RuntimeTopology | None" = None) -> list[dict]:
 async def extract_tool_call(
     tool_intent: str,
     topology: "RuntimeTopology",
+    available_tools: dict[str, dict] | None = None,
 ) -> dict | None:
     """
     Send Qwen3's natural language tool intent to the Tool Server.
@@ -170,10 +176,12 @@ async def extract_tool_call(
         logger.debug("Tool server unavailable — skipping extraction")
         return None
 
+    schema_doc = json.dumps(available_tools or TOOL_SCHEMA, indent=2)
+
     system = (
         "You are a tool-call extractor. Given a natural language description of an action, "
         "output a JSON object with 'tool' (tool name) and 'args' (argument dict).\n"
-        f"Available tools and their argument schemas:\n{SCHEMA_DOC}\n"
+        f"Available tools and their argument schemas:\n{schema_doc}\n"
         "If no tool applies, output: {\"tool\": null, \"args\": {}}\n"
         "Output only valid JSON. No explanation. No markdown fences."
     )
