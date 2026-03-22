@@ -5,10 +5,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── Credentials (real files — example templates ARE tracked) ─────────────────
-AI personal files/Discord.txt
-AI personal files/client_secret_*.json
-!AI personal files/Discord.example.txt
-!AI personal files/client_secret.example.json
+AI personal files/
 
 # ── Runtime auth tokens ───────────────────────────────────────────────────────
 data/google_token.json
