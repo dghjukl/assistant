@@ -1,0 +1,25 @@
+YOUR_DISCORD_BOT_TOKEN_HERE
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  How to get your Discord bot token:
+#
+#  1. Go to https://discord.com/developers/applications
+#  2. Create a New Application (or open an existing one)
+#  3. Go to Bot → click "Reset Token" → copy the token
+#  4. Replace YOUR_DISCORD_BOT_TOKEN_HERE above with the token
+#  5. Rename this file to:  Discord.txt
+#
+#  The token looks like:
+#    MTIzNDU2Nzg5MDEyMzQ1Njc4OQ.GxxxXx.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+#
+#  Required bot permissions (OAuth2 scopes):
+#    bot — with permissions: Read Messages, Send Messages, Read Message History
+#
+#  To add the bot to your server:
+#    OAuth2 → URL Generator → scope: bot → copy the URL → open in browser
+#
+#  In config.*.json, set:
+#    "discord": { "enabled": true, "credential_file": "AI personal files/Discord.txt" }
+#
+#  Set "enabled": false in the config if you are not using Discord.
+# ─────────────────────────────────────────────────────────────────────────────

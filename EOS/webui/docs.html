@@ -1,0 +1,1673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>EOS — Documentation</title>
+<style>
+:root {
+  --bg:       #0d0f14;
+  --surface:  #161920;
+  --surface2: #1c2030;
+  --border:   #252932;
+  --accent:   #4f9cf9;
+  --green:    #22c55e;
+  --red:      #ef4444;
+  --yellow:   #eab308;
+  --purple:   #a78bfa;
+  --amber:    #f59e0b;
+  --text:     #e2e8f0;
+  --muted:    #64748b;
+  --font:     'Segoe UI', system-ui, sans-serif;
+  --mono:     'Cascadia Code', Consolas, monospace;
+  --sw:       260px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.75;display:flex;min-height:100vh;}
+
+/* ── Sidebar ── */
+.sidebar{width:var(--sw);background:var(--surface);border-right:1px solid var(--border);position:fixed;top:0;left:0;bottom:0;overflow-y:auto;display:flex;flex-direction:column;z-index:100;}
+.sb-logo{padding:16px 18px 14px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.sb-logo a{text-decoration:none;display:flex;align-items:center;gap:10px;}
+.sb-title{font-size:16px;font-weight:700;color:var(--accent);}
+.sb-sub{font-size:11px;color:var(--muted);}
+.sb-nav-links{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;}
+.sb-nav-link{flex:1;display:block;padding:7px 0;text-align:center;font-size:12px;color:var(--muted);text-decoration:none;white-space:nowrap;}
+.sb-nav-link:hover{color:var(--accent);}
+.sb-nav-link+.sb-nav-link{border-left:1px solid var(--border);}
+.sb-search{padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.sb-search input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-size:12px;outline:none;}
+.sb-search input:focus{border-color:var(--accent);}
+.sb-nav{flex:1;overflow-y:auto;padding:8px 0 24px;}
+.sb-group{padding:12px 18px 4px;font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;}
+.sb-link{display:flex;align-items:center;gap:8px;padding:5px 18px;font-size:13px;color:var(--muted);text-decoration:none;border-left:2px solid transparent;transition:all .12s;}
+.sb-link:hover{color:var(--text);background:var(--surface2);}
+.sb-link.active{color:var(--accent);border-left-color:var(--accent);background:var(--surface2);}
+.sb-link-icon{font-size:14px;width:18px;text-align:center;flex-shrink:0;}
+
+/* ── Content ── */
+.content{margin-left:var(--sw);flex:1;min-width:0;}
+.content-inner{max-width:860px;padding:48px 48px 80px;}
+
+/* ── Mobile bar ── */
+.mobile-bar{display:none;position:fixed;top:0;left:0;right:0;height:48px;background:var(--surface);border-bottom:1px solid var(--border);align-items:center;padding:0 16px;gap:12px;z-index:200;}
+.mob-logo{font-size:15px;font-weight:700;color:var(--accent);}
+.mob-menu{margin-left:auto;background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:18px;cursor:pointer;padding:4px 8px;}
+
+/* ── Home hero ── */
+.hero{margin-bottom:40px;}
+.hero-eyebrow{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+.hero-title{font-size:36px;font-weight:800;line-height:1.2;margin-bottom:12px;}
+.hero-title span{color:var(--accent);}
+.hero-lead{font-size:15px;color:var(--muted);max-width:600px;line-height:1.6;}
+
+/* ── Guide cards (home page) ── */
+.guide-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin:32px 0;}
+.guide-card{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;text-decoration:none;color:var(--text);transition:border-color .15s,transform .15s;cursor:pointer;}
+.guide-card:hover{border-color:var(--card-color,var(--accent));transform:translateY(-2px);}
+.guide-card.blue{--card-color:var(--accent);}
+.guide-card.green{--card-color:var(--green);}
+.guide-card.purple{--card-color:var(--purple);}
+.guide-card.amber{--card-color:var(--amber);}
+.gc-icon{font-size:28px;margin-bottom:12px;}
+.gc-title{font-size:17px;font-weight:700;margin-bottom:6px;}
+.gc-desc{font-size:13px;color:var(--muted);line-height:1.5;flex:1;}
+.gc-cta{margin-top:16px;font-size:12px;font-weight:600;color:var(--card-color,var(--accent));}
+
+/* ── Section divider ── */
+.doc-rule{border:none;border-top:1px solid var(--border);margin:52px 0;}
+
+/* ── Guide header banner ── */
+.guide-header{border-radius:12px;padding:24px 28px;margin-bottom:36px;border:1px solid var(--gh-color,var(--border));}
+.guide-header.blue{background:linear-gradient(135deg,#1a2540 0%,#0f1520 100%);--gh-color:#2d4a80;}
+.guide-header.green{background:linear-gradient(135deg,#0f2a1c 0%,#0a1a12 100%);--gh-color:#1a5c30;}
+.guide-header.purple{background:linear-gradient(135deg,#1e1a30 0%,#130f20 100%);--gh-color:#4a3870;}
+.guide-header.amber{background:linear-gradient(135deg,#2a1f08 0%,#1a1205 100%);--gh-color:#6b4d0a;}
+.gh-eyebrow{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--gh-color);margin-bottom:6px;}
+.guide-header.blue .gh-eyebrow{color:#6ea8f9;}
+.guide-header.green .gh-eyebrow{color:#4ade80;}
+.guide-header.purple .gh-eyebrow{color:#c4b5fd;}
+.guide-header.amber .gh-eyebrow{color:#fbbf24;}
+.gh-title{font-size:26px;font-weight:800;margin-bottom:6px;}
+.gh-desc{font-size:13px;color:var(--muted);}
+
+/* ── Section anchor ── */
+.doc-section{scroll-margin-top:24px;}
+h2.section-title{font-size:22px;font-weight:700;margin-bottom:6px;}
+.section-eyebrow{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;}
+.section-lead{color:var(--muted);margin-bottom:24px;max-width:680px;font-size:14px;}
+
+/* ── Sub-section ── */
+.sub-section{margin:24px 0;}
+.sub-title{font-size:15px;font-weight:600;margin-bottom:10px;color:var(--text);}
+
+/* ── Prose ── */
+.doc-p{margin:8px 0;color:var(--text);}
+
+/* ── Step cards ── */
+.step-list{display:flex;flex-direction:column;gap:12px;}
+.step-card{display:flex;gap:16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;}
+.step-num{width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+.step-num.green{background:var(--green);}
+.step-num.purple{background:var(--purple);}
+.step-body{flex:1;min-width:0;}
+.step-title{font-size:14px;font-weight:600;margin-bottom:4px;}
+.step-desc{font-size:13px;color:var(--muted);line-height:1.6;}
+
+/* ── Feature/capability cards ── */
+.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin:12px 0;}
+.cap-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;}
+.cap-card-icon{font-size:22px;margin-bottom:8px;}
+.cap-card-title{font-size:14px;font-weight:600;margin-bottom:4px;}
+.cap-card-desc{font-size:12px;color:var(--muted);line-height:1.5;}
+
+/* ── Mode cards ── */
+.mode-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 0;}
+.mode-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;}
+.mode-card.on{border-color:var(--green);}
+.mode-card.warn{border-color:var(--yellow);}
+.mode-card.off{border-color:var(--muted);}
+.mode-name{font-size:13px;font-weight:700;margin-bottom:4px;}
+.mode-desc{font-size:12px;color:var(--muted);}
+
+/* ── Dim cards (autonomy) ── */
+.dim-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:12px 0;}
+.dim-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;}
+.dim-name{font-size:14px;font-weight:700;margin-bottom:4px;}
+.dim-what{font-size:12px;color:var(--muted);line-height:1.5;}
+
+/* ── Callouts ── */
+.callout{display:flex;gap:14px;border-radius:10px;padding:16px 18px;margin:16px 0;border:1px solid;}
+.callout.location{background:#0a1f12;border-color:#1a4a28;}
+.callout.tip{background:#0a1525;border-color:#1a3a60;}
+.callout.warning{background:#1f1a0a;border-color:#4a3a0a;}
+.callout.ai-prompt{background:#150f28;border-color:#3a2868;}
+.callout-icon{font-size:18px;flex-shrink:0;margin-top:1px;}
+.callout-title{font-size:13px;font-weight:700;margin-bottom:4px;}
+.callout.location .callout-title{color:var(--green);}
+.callout.tip .callout-title{color:var(--accent);}
+.callout.warning .callout-title{color:var(--yellow);}
+.callout.ai-prompt .callout-title{color:var(--purple);}
+.callout-body{flex:1;font-size:13px;line-height:1.6;}
+.prompt-text{font-style:italic;color:var(--muted);margin:6px 0;}
+.prompt-copy{margin-top:8px;background:var(--purple);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;}
+.prompt-copy:hover{opacity:.85;}
+
+/* ── Code blocks ── */
+.code-wrap{position:relative;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin:8px 0;}
+.code-wrap pre{padding:14px 16px;font-family:var(--mono);font-size:12px;line-height:1.6;overflow-x:auto;white-space:pre;color:#c9d1d9;}
+.code-copy{position:absolute;top:8px;right:8px;background:var(--surface);border:1px solid var(--border);border-radius:5px;color:var(--muted);font-size:11px;padding:3px 8px;cursor:pointer;}
+.code-copy:hover{color:var(--text);}
+
+/* ── Tables ── */
+.table-wrap{overflow-x:auto;margin:10px 0;}
+.doc-table{width:100%;border-collapse:collapse;font-size:13px;}
+.doc-table th{text-align:left;padding:8px 12px;border-bottom:2px solid var(--border);color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.05em;}
+.doc-table td{padding:8px 12px;border-bottom:1px solid var(--border);}
+.doc-table tr:last-child td{border-bottom:none;}
+.doc-table code{font-family:var(--mono);font-size:11px;background:var(--surface2);padding:1px 5px;border-radius:4px;}
+
+/* ── Inline code ── */
+code{font-family:var(--mono);font-size:12px;background:var(--surface2);padding:1px 5px;border-radius:4px;}
+
+/* ── Dir tree ── */
+.dir-tree{font-family:var(--mono);font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;line-height:1.8;color:#c9d1d9;}
+.dir-tree .dir-comment{color:var(--muted);}
+
+/* ── Status badges ── */
+.badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;text-transform:uppercase;}
+.badge.active{background:#0a2a16;color:var(--green);border:1px solid var(--green);}
+.badge.degraded{background:#2a1f0a;color:var(--yellow);border:1px solid var(--yellow);}
+.badge.unavail{background:#2a0a0a;color:var(--red);border:1px solid var(--red);}
+
+/* ── Search hide ── */
+.search-hidden{display:none!important;}
+
+/* ── Responsive ── */
+@media(max-width:800px){
+  .mobile-bar{display:flex;}
+  .sidebar{transform:translateX(-100%);transition:transform .2s;}
+  .sidebar.open{transform:translateX(0);box-shadow:4px 0 20px #00000080;}
+  .content{margin-left:0;padding-top:48px;}
+  .content-inner{padding:32px 20px 60px;}
+  .guide-grid{grid-template-columns:1fr;}
+  .mode-grid{grid-template-columns:1fr;}
+  .dim-grid{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<div class="mobile-bar" id="mob-bar">
+  <span class="mob-logo">EOS</span>
+  <button class="mob-menu" onclick="toggleSidebar()">☰</button>
+</div>
+
+<nav class="sidebar" id="sidebar">
+  <div class="sb-logo">
+    <a href="#home">
+      <div><div class="sb-title">EOS</div><div class="sb-sub">Documentation</div></div>
+    </a>
+  </div>
+  <div class="sb-nav-links">
+    <a class="sb-nav-link" href="/">← Chat</a>
+    <a class="sb-nav-link" href="/admin">⚙ Admin</a>
+  </div>
+  <div class="sb-search">
+    <input type="text" id="sb-search" placeholder="Search docs…" oninput="searchDocs(this.value)"/>
+  </div>
+  <div class="sb-nav" id="sb-nav">
+
+    <div class="sb-group">Home</div>
+    <a class="sb-link" href="#home"><span class="sb-link-icon">🏠</span> Overview</a>
+
+    <div class="sb-group">🚀 Quick Start</div>
+    <a class="sb-link" href="#qs-prereqs"><span class="sb-link-icon">✔</span> Prerequisites</a>
+    <a class="sb-link" href="#qs-setup"><span class="sb-link-icon">📦</span> Run Setup</a>
+    <a class="sb-link" href="#qs-launch"><span class="sb-link-icon">▶</span> Launch EOS</a>
+    <a class="sb-link" href="#qs-optional"><span class="sb-link-icon">⚙</span> Optional Capabilities</a>
+
+    <div class="sb-group">📖 User Guide</div>
+    <a class="sb-link" href="#ug-start"><span class="sb-link-icon">▶</span> Starting EOS</a>
+    <a class="sb-link" href="#ug-interface"><span class="sb-link-icon">💬</span> The Interface</a>
+    <a class="sb-link" href="#ug-admin"><span class="sb-link-icon">🛠</span> Admin Panel</a>
+    <a class="sb-link" href="#ug-capabilities"><span class="sb-link-icon">🎛</span> Capabilities Panel</a>
+    <a class="sb-link" href="#ug-autonomy"><span class="sb-link-icon">🧠</span> Autonomy</a>
+    <a class="sb-link" href="#ug-voice"><span class="sb-link-icon">🎙</span> Voice I/O</a>
+    <a class="sb-link" href="#ug-discord"><span class="sb-link-icon">💜</span> Discord Bot</a>
+    <a class="sb-link" href="#ug-google"><span class="sb-link-icon">🔵</span> Google Workspace</a>
+    <a class="sb-link" href="#ug-computeruse"><span class="sb-link-icon">🖥</span> Computer Use</a>
+    <a class="sb-link" href="#ug-workspace"><span class="sb-link-icon">📁</span> Workspace</a>
+    <a class="sb-link" href="#ug-worldview"><span class="sb-link-icon">🌐</span> Worldview</a>
+    <a class="sb-link" href="#ug-cognition"><span class="sb-link-icon">🔬</span> Cognition Panel</a>
+
+    <div class="sb-group">⚡ Power User Guide</div>
+    <a class="sb-link" href="#pu-config"><span class="sb-link-icon">📄</span> Canonical Config</a>
+    <a class="sb-link" href="#pu-cli"><span class="sb-link-icon">⌨</span> CLI Reference</a>
+    <a class="sb-link" href="#pu-launchers"><span class="sb-link-icon">🚀</span> Launchers</a>
+    <a class="sb-link" href="#pu-ports"><span class="sb-link-icon">🔌</span> Ports</a>
+    <a class="sb-link" href="#pu-configblocks"><span class="sb-link-icon">🔧</span> Config Deep-Dive</a>
+    <a class="sb-link" href="#pu-discovery"><span class="sb-link-icon">🔍</span> Runtime Discovery</a>
+    <a class="sb-link" href="#pu-diagnostics"><span class="sb-link-icon">🩺</span> Diagnostics</a>
+    <a class="sb-link" href="#pu-datadir"><span class="sb-link-icon">🗂</span> Data Directory</a>
+
+    <div class="sb-group">📋 Reference</div>
+    <a class="sb-link" href="#ref-what"><span class="sb-link-icon">ℹ</span> What is EOS</a>
+    <a class="sb-link" href="#ref-requirements"><span class="sb-link-icon">💻</span> Requirements</a>
+    <a class="sb-link" href="#ref-degradation"><span class="sb-link-icon">⚠</span> Degradation</a>
+
+  </div>
+</nav>
+
+<div class="content">
+<div class="content-inner">
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- HOME                                                                   -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<section class="doc-section" id="home">
+  <div class="hero">
+    <div class="hero-eyebrow">Entity Operating System</div>
+    <h1 class="hero-title">EOS <span>Documentation</span></h1>
+    <p class="hero-lead">EOS is a local AI companion and assistant. Everything runs on your machine — no cloud required. Persistent identity, long-term memory, and a layered autonomy model you control.</p>
+  </div>
+
+  <div class="guide-grid">
+    <a class="guide-card blue" href="#qs-prereqs">
+      <div class="gc-icon">🚀</div>
+      <div class="gc-title">Quick Start</div>
+      <div class="gc-desc">The shortest path from zero to a running system. Follow these steps in order and you'll be chatting with EOS in under an hour.</div>
+      <div class="gc-cta">Get started →</div>
+    </a>
+    <a class="guide-card green" href="#ug-start">
+      <div class="gc-icon">📖</div>
+      <div class="gc-title">User Guide</div>
+      <div class="gc-desc">Everything you can do with EOS — voice, Discord, Google, computer use, workspace, worldview, and the admin panel explained in full.</div>
+      <div class="gc-cta">Learn everything →</div>
+    </a>
+    <a class="guide-card purple" href="#pu-config">
+      <div class="gc-icon">⚡</div>
+      <div class="gc-title">Power User Guide</div>
+      <div class="gc-desc">The canonical config in depth, CLI flags, launcher architecture, runtime discovery, autonomy system, and diagnostics.</div>
+      <div class="gc-cta">Go deep →</div>
+    </a>
+    <a class="guide-card amber" href="#ref-what">
+      <div class="gc-icon">📋</div>
+      <div class="gc-title">Reference</div>
+      <div class="gc-desc">System requirements, degradation behavior, what EOS is and how it works at a high level.</div>
+      <div class="gc-cta">Reference →</div>
+    </a>
+  </div>
+</section>
+
+<hr class="doc-rule"/>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- QUICK START                                                            -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<div class="guide-header blue">
+  <div class="gh-eyebrow">Guide 1 of 4</div>
+  <div class="gh-title">🚀 Quick Start</div>
+  <div class="gh-desc">The shortest path to a running system. Assumes no prior setup. Uses the standard backend bundle.</div>
+</div>
+
+<section class="doc-section" id="qs-prereqs">
+  <div class="section-eyebrow">Quick Start</div>
+  <h2 class="section-title">Prerequisites</h2>
+  <p class="section-lead">Python 3.11 must be installed before running anything else.</p>
+  <div class="step-list">
+    <div class="step-card">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Install Python 3.11</div>
+        <div class="step-desc">Download from <strong>python.org/downloads</strong>. During installation, check <strong>"Add Python to PATH"</strong> — this is required.</div>
+      </div>
+    </div>
+    <div class="step-card">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Confirm Python is available</div>
+        <div class="step-desc">Open a command prompt and run:</div>
+        <div class="code-wrap" style="margin-top:8px">
+          <pre>python --version</pre>
+          <button class="code-copy" onclick="copyCode(this)">Copy</button>
+        </div>
+        <div class="step-desc">If you see a version number, you're good. If you get "not recognized", re-install Python and check the PATH option.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="doc-section" id="qs-setup">
+  <div class="section-eyebrow">Quick Start</div>
+  <h2 class="section-title">Run Setup &amp; Verify</h2>
+  <p class="section-lead">Setup downloads all models and binaries. Verify confirms everything landed correctly.</p>
+  <div class="step-list">
+    <div class="step-card">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Run Setup-Full.ps1</div>
+        <div class="step-desc">Right-click <code>Setup-Full.ps1</code> → <strong>Run with PowerShell</strong>.<br>
+        If Windows asks about execution policy, click Open or type Y when prompted.<br>
+        This downloads approximately <strong>13 GB</strong> of models and binaries. It only needs to run once.</div>
+      </div>
+    </div>
+    <div class="step-card">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Verify the install</div>
+        <div class="step-desc">Open a command prompt in the EOS folder and run:</div>
+        <div class="code-wrap" style="margin-top:8px">
+          <pre>python verify.py</pre>
+          <button class="code-copy" onclick="copyCode(this)">Copy</button>
+        </div>
+        <div class="step-desc">This checks Python packages, binaries, model files, port availability, and config.json validity. Fix any errors it reports before continuing.</div>
+      </div>
+    </div>
+  </div>
+  <div class="sub-section">
+    <div class="sub-title">Setup script options</div>
+    <div class="card-grid">
+      <div class="cap-card">
+        <div class="cap-card-icon">📦</div>
+        <div class="cap-card-title">Setup-Full.ps1</div>
+        <div class="cap-card-desc">Downloads everything — all models, binaries, and Python packages. Use this if you want EOS to just work.</div>
+      </div>
+      <div class="cap-card">
+        <div class="cap-card-icon">🪶</div>
+        <div class="cap-card-title">Setup-Lite.ps1</div>
+        <div class="cap-card-desc">Downloads support assets and packages only. Use this if you want to supply your own large model files.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="doc-section" id="qs-launch">
+  <div class="section-eyebrow">Quick Start</div>
+  <h2 class="section-title">Launch EOS</h2>
+  <p class="section-lead">EOS startup is always two steps: start the backend servers, then start EOS itself.</p>
+  <div class="step-list">
+    <div class="step-card">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Start the backend servers</div>
+        <div class="step-desc">For the recommended stack, run <code>start-standard.bat</code>.<br>
+        This opens separate windows for the main model (8080), tool helper (8082), and thinking helper (8083).<br>
+        <strong>Wait for each window to print a ready message</strong> before the next step.</div>
+      </div>
+    </div>
+    <div class="step-card">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Start EOS</div>
+        <div class="step-desc">Run <code>start-eos.bat</code>. EOS discovers the running services and prints a capability summary:</div>
+        <div class="code-wrap" style="margin-top:8px">
+          <pre>Main model:       active
+Tool helper:      active
+Thinking helper:  active
+Creativity:       unavailable (fallback to main)
+Vision:           unavailable
+STT:              active
+TTS:              active
+
+chat: available  |  tools: available  |  voice: available</pre>
+        </div>
+        <div class="step-desc" style="margin-top:6px">When it prints <strong>Starting WebUI at http://127.0.0.1:7860/</strong>, EOS is ready.</div>
+      </div>
+    </div>
+    <div class="step-card">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">Open the interface</div>
+        <div class="step-desc">Navigate to <strong>http://127.0.0.1:7860/</strong> in your browser.<br>
+        The admin panel is at <strong>http://127.0.0.1:7860/admin</strong>.</div>
+      </div>
+    </div>
+  </div>
+  <div class="callout tip" style="margin-top:20px">
+    <div class="callout-icon">💡</div>
+    <div class="callout-body">
+      <div class="callout-title">Status check anytime</div>
+      Run <code>status-eos.bat</code> or <code>python eos.py --status</code> to see which services are active, degraded, or unavailable without restarting anything.
+    </div>
+  </div>
+  <div class="callout tip" style="margin-top:10px">
+    <div class="callout-icon">🛑</div>
+    <div class="callout-body">
+      <div class="callout-title">Stopping EOS</div>
+      Press <strong>Ctrl+C</strong> in the start-eos.bat window, or close it. Close any backend launcher windows to stop those model servers.
+    </div>
+  </div>
+</section>
+
+<section class="doc-section" id="qs-optional">
+  <div class="section-eyebrow">Quick Start</div>
+  <h2 class="section-title">Optional Capabilities</h2>
+  <p class="section-lead">The core system is running. None of the following are required — set them up whenever you want them.</p>
+  <div class="table-wrap">
+    <table class="doc-table">
+      <thead><tr><th>Capability</th><th>What you need</th><th>Where to learn more</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Discord bot</strong></td><td>Bot token in <code>AI personal files\Discord.txt</code></td><td><a href="#ug-discord" style="color:var(--accent)">User Guide → Discord</a></td></tr>
+        <tr><td><strong>Google Calendar / Gmail / Drive</strong></td><td>OAuth JSON in <code>AI personal files\</code></td><td><a href="#ug-google" style="color:var(--accent)">User Guide → Google</a></td></tr>
+        <tr><td><strong>Computer Use</strong></td><td>Enable in admin panel, approve apps in data folder</td><td><a href="#ug-computeruse" style="color:var(--accent)">User Guide → Computer Use</a></td></tr>
+        <tr><td><strong>Vision</strong></td><td>GPU required — run <code>start-vision-gpu.bat</code></td><td><a href="#ref-requirements" style="color:var(--accent)">Reference → Requirements</a></td></tr>
+        <tr><td><strong>Voice (STT/TTS)</strong></td><td>Already active if Setup-Full.ps1 ran successfully</td><td><a href="#ug-voice" style="color:var(--accent)">User Guide → Voice</a></td></tr>
+        <tr><td><strong>Worldview</strong></td><td>Drop documents into <code>data\worldview\sources\</code></td><td><a href="#ug-worldview" style="color:var(--accent)">User Guide → Worldview</a></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout tip" style="margin-top:16px">
+    <div class="callout-icon">🆘</div>
+    <div class="callout-body">
+      <div class="callout-title">If something fails</div>
+      Re-run <code>Setup-Full.ps1</code>, then re-run <code>python verify.py</code> and read the output carefully. Use <code>status-eos.bat</code> to see which services are active, degraded, or unavailable.
+    </div>
+  </div>
+</section>
+
+<hr class="doc-rule"/>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- USER GUIDE                                                             -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<div class="guide-header green">
+  <div class="gh-eyebrow">Guide 2 of 4</div>
+  <div class="gh-title">📖 User Guide</div>
+  <div class="gh-desc">Day-to-day operation — the interface, all optional capabilities, and how to use each one fully.</div>
+</div>
+
+<section class="doc-section" id="ug-start">
+  <div class="section-eyebrow">User Guide</div>
+  <h2 class="section-title">Starting EOS</h2>
+  <p class="section-lead">Always two steps: start the backend model servers, then start the EOS runtime.</p>
+  <div class="table-wrap">
+    <table class="doc-table">
+      <thead><tr><th>Goal</th><th>Step 1 (backends)</th><th>Step 2 (runtime)</th></tr></thead>
+      <tbody>
+        <tr><td>Minimal — main + tools only</td><td><code>start-minimal.bat</code></td><td><code>start-eos.bat</code></td></tr>
+        <tr><td>Standard — recommended</td><td><code>start-standard.bat</code></td><td><code>start-eos.bat</code></td></tr>
+        <tr><td>Full — standard + creativity</td><td><code>start-full.bat</code></td><td><code>start-eos.bat</code></td></tr>
+        <tr><td>Add vision to any stack</td><td>Your bundle + <code>start-vision-gpu.bat</code></td><td><code>start-eos.bat</code></td></tr>
+        <tr><td>Check what's running</td><td colspan="2"><code>status-eos.bat</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout tip" style="margin-top:12px">
+    <div class="callout-icon">ℹ</div>
+    <div class="callout-body">
+      <div class="callout-title">start-eos.bat never starts model servers</div>
+      It only discovers what is already running, builds a capability map, and starts the WebUI. If a model server isn't running, that capability degrades gracefully.
+    </div>
+  </div>
+</section>
+
+<section class="doc-section" id="ug-interface">
+  <div class="section-eyebrow">User Guide</div>
+  <h2 class="section-title">The Interface</h2>
+  <p class="section-lead">Two URLs — the chat interface and the admin panel.</p>
+  <div class="card-grid">
+    <div class="cap-card">
+      <div class="cap-card-icon">💬</div>
+      <div class="cap-card-title">Chat — :7860/</div>
+      <div class="cap-card-desc">Type a message and press Enter. EOS maintains persistent memory and identity across sessions — nothing resets between conversations.</div>
+    </div>
+    <div class="cap-card">
+      <div class="cap-card-icon">🛠</div>
+      <div class="cap-card-title">Admin Panel — :7860/admin</div>
+      <div class="cap-card-desc">The operator's control surface. Monitor the system, adjust capabilities live, inspect cognition traces, and manage integrations.</div>
+    </div>
+    <div class="cap-card">
+      <div class="cap-card-icon">📖</div>
+      <div class="cap-card-title">Docs — :7860/docs</div>
+      <div class="cap-card-desc">You're here. The full documentation site, served locally alongside EOS.</div>
+    </div>
+  </div>
+  <div class="sub-section">
+    <div class="sub-title">Voice in the chat interface</div>
+    <div class="card-grid">
+      <div class="cap-card">
+        <div class="cap-card-icon">🎙</div>
+        <div class="cap-card-title">Voice input (STT)</div>
+        <div class="cap-card-desc">A microphone button appears when STT is loaded. Hold it while you speak, release to transcribe and send.</div>
+      </div>
+      <div class="cap-card">
+        <div class="cap-card-icon">🔊</div>
+        <div class="cap-card-title">Voice output (TTS)</div>
+        <div class="cap-card-desc">EOS speaks responses automatically when TTS is loaded. Mute your speakers to silence it — there is no in-app toggle.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="doc-section" id="ug-admin">
+  <div class="section-eyebrow">User Guide</div>
+  <h2 class="section-title">Admin Panel</h2>
+  <p class="section-lead">Every tab in the admin panel and what it's for.</p>
+  <div class="table-wrap">
+    <table class="doc-table">
+      <thead><tr><th>Tab</th><th>What it shows / does</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Overview</strong></td><td>Server health, session ID, turn count, inference server status for all backends</td></tr>
+        <tr><td><strong>Tools</strong></td><td>All loaded tools — enable or disable individual tools</td></tr>
+        <tr><td><strong>Control &amp; Permissions</strong></td><td>Capability toggles (see below), permission classes, toolpacks, audit log</td></tr>
+        <tr><td><strong>Tool Registry Diagnostics</strong></td><td>Raw tool registry and shadow DB state</td></tr>
+        <tr><td><strong>Live Logs</strong></td><td>Real-time system log stream</td></tr>
+        <tr><td><strong>Main Model / Tool Svr. / etc.</strong></td><td>Per-server inference logs with CPU/GPU hardware badge</td></tr>
+        <tr><td><strong>Memory</strong></td><td>Vector memory stats and memory log</td></tr>
+        <tr><td><strong>Cognition</strong></td><td>Full turn traces — tools called, memory retrieved, state changes (see <a href="#ug-cognition" style="color:var(--accent)">Cognition Panel</a>)</td></tr>
+        <tr><td><strong>Computer Use</strong></td><td>Computer-use mode switching, HALT button, pending confirmations</td></tr>
+        <tr><td><strong>Integrations</strong></td><td>Google Workspace live connection status and data previews</td></tr>
+        <tr><td><strong>Config</strong></td><td>Read-only view of the loaded config.json</td></tr>
+        <tr><td><strong>Export</strong></td><td>Generate a full diagnostic bundle (JSON snapshot of all runtime state)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="doc-section" id="ug-capabilities">
+  <div class="section-eyebrow">User Guide</div>
+  <h2 class="section-title">Capabilities Panel</h2>
+  <p class="section-lead">The top of <strong>Control &amp; Permissions</strong> has live toggles for every major capability. Changes take effect immediately — no restart. They reset to config.json values on next boot. To make a change permanent, edit config.json.</p>
+  <div class="card-grid">
+    <div class="cap-card">
+      <div class="cap-card-icon">🧠</div>
+      <div class="cap-card-title">Autonomy</div>
+      <div class="cap-card-desc">Four dimensions: Perception, Cognition, Action, Initiative. Each independently toggleable. See the <a href="#ug-autonomy" style="color:var(--accent)">Autonomy section</a> for what each one controls.</div>
+    </div>
+    <div class="cap-card">
+      <div class="cap-card-icon">🖥</div>
+      <div class="cap-card-title">Computer Use</div>
+      <div class="cap-card-desc">Enable/disable the subsystem and set the operating mode: Off, Command Only, or Supervised Session.</div>
+    </div>
+    <div class="cap-card">
+      <div class="cap-card-icon">📁</div>
+      <div class="cap-card-title">Workspace</div>
+      <div class="cap-card-desc">Toggle Allow Delete and Allow Exec separately. Read and write are always on.</div>
+    </div>
+    <div class="cap-card">
+      <div class="cap-card-icon">✨</div>
+      <div class="cap-card-title">Creativity</div>
+      <div class="cap-card-desc">Enable/disable, set injection frequency (Off/Low/Medium/High), and toggle Autonomous Idle separately.</div>
+    </div>
+    <div class="cap-card">
+      <div class="cap-card-icon">📧</div>
+      <div class="cap-card-title">Google</div>
+      <div class="cap-card-desc">Gmail Send toggle (off by default, marked ⚠). Sending is the only runtime toggle — other Google settings require config.json + restart.</div>
+    </div>
+  </div>
+</section>
+
+<section class="doc-section" id="ug-autonomy">
+  <div class="section-eyebrow">User Guide</div>
+  <h2 class="section-title">Autonomy Dimensions</h2>
+  <p class="section-lead">EOS has four independently controllable dimensions that gate what it can do. Toggle each live from the Capabilities panel.</p>
+  <div class="dim-grid">
+    <div class="dim-card">
+      <div class="dim-name">👁 Perception</div>
+      <div class="dim-what">Observing the environment — screen capture, sensor data. Turn off to prevent EOS from seeing your screen even when computer use is on.</div>
+    </div>
+    <div class="dim-card">
+      <div class="dim-name">🧠 Cognition</div>
+      <div class="dim-what">Background thinking, reflection loops, and self-evaluation between turns. Turn off for a purely reactive, no-background-activity assistant.</div>
+    </div>
+    <div class="dim-card">
+      <div class="dim-name">🔧 Action</div>
+      <div class="dim-what">Using tools — file operations, web requests, Discord, Google, computer use. Turn off to make EOS text-only and unable to interact with external systems.</div>
+    </div>
+    <div class="dim-card">
+      <div class="dim-name">🎯 Initiative</div>
+      <div class="dim-what">Acting without being asked — proactive messages, autonomous idle behavior, unsolicited task execution. Turn off for a fully passive assistant that only responds when spoken to.</div>
+    </div>
+  </div>
+  <div class="callout tip" style="margin-top:16px">
+    <div class="callout-icon">💡</div>
+    <div class="callout-body">
+      <div class="callout-title">Recommended settings</div>
+      For full testing: all four on. For a safe passive assistant: turn off Action and Initiative. For read-only access (can observe but not act): Perception on, Action off, Initiative off.
+    </div>
+  </div>
+</section>
+
+<section class="doc-section" id="ug-voice">
+  <div class="section-eyebrow">User Guide</div>
+  <h2 class="section-title">Voice I/O</h2>
+  <p class="section-lead">Voice input and output are both automatic — they activate when the model files are present. No configuration needed beyond having the files in place.</p>
+  <div class="sub-section">
+    <div class="sub-title">Required model files</div>
+    <div class="table-wrap">
+      <table class="doc-table">
+        <thead><tr><th>Feature</th><th>Required file(s)</th><th>How to get it</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Voice input (STT)</td>
+            <td><code>models\stt\ggml-small.en-q8_0.bin</code></td>
+            <td><span class="badge active">Setup-Full.ps1</span></td>
+          </tr>
+          <tr>
+            <td>Voice output (TTS)</td>
+            <td><code>models\tts\en_US-amy-medium.onnx</code><br><code>models\tts\en_US-amy-medium.onnx.json</code></td>
+            <td><span class="badge active">Setup-Full.ps1</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="sub-section">
+    <div class="sub-title">Troubleshooting</div>
+    <div class="step-list">
+      <div class="step-card">
+        <div class="step-body">
+          <div class="step-title">Microphone button not appearing</div>
+          <div class="step-desc">Run <code>status-eos.bat</code> — it will show <code>STT: unavailable</code> if the model file is missing or failed to load. Re-run <code>Setup-Full.ps1</code> if the file is missing.</div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-body">
+          <div class="step-title">TTS is silent</div>
+          <div class="step-desc">Check that your system volume is not muted and that no other application is blocking the audio output device. Run <code>status-eos.bat</code> to confirm TTS shows as active.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="doc-section" id="ug-discord">
+  <div class="section-eyebrow">User Guide</div>
+  <h2 class="section-title">Discord Bot</h2>
+  <p class="section-lead">EOS joins your Discord server as a bot. By default it only responds when directly mentioned (@BotName). It supports full conversations, and slash commands including <code>!initiative</code> and <code>!status</code>.</p>
+
+  <div class="callout location">
+    <div class="callout-icon">📁</div>
+    <div class="callout-body">
+      <div class="callout-title">Where to put the credential</div>
+      Create a plain text file at: <code>AI personal files\Discord.txt</code><br><br>
+      The file contains only your bot token on the first line — nothing else. That folder already exists in the EOS directory. If you don't see it, create it.
+    </div>
+  </div>
+
+  <div class="sub-section">
+    <div class="sub-title">How to get a Discord bot token — step by step</div>
+    <div class="step-list">
+      <div class="step-card">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">Create a bot application</div>
+          <div class="step-desc">Go to <strong>discord.com/developers/applications</strong> → <strong>New Application</strong>. Give it a name — this becomes the bot's display name in Discord.</div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">Get the bot token</div>
+          <div class="step-desc">In the left sidebar click <strong>Bot</strong>. Click <strong>Reset Token</strong> and copy it immediately. <strong>You only see this once.</strong> Paste it into <code>AI personal files\Discord.txt</code> right now.</div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">Enable Message Content Intent</div>
+          <div class="step-desc">Still on the Bot tab, scroll to <strong>Privileged Gateway Intents</strong>. Enable <strong>Message Content Intent</strong>. Without this, EOS cannot read what users write.</div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <div class="step-title">Invite the bot to your server</div>
+          <div class="step-desc">Go to <strong>OAuth2 → URL Generator</strong>. Under Scopes check <strong>bot</strong>. Under Bot Permissions check <strong>Read Messages/View Channels</strong>, <strong>Send Messages</strong>, <strong>Read Message History</strong>. Copy the generated URL, open it in your browser, select your server, and click Authorize.</div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">5</div>
+        <div class="step-body">
+          <div class="step-title">Confirm your config</div>
+          <div class="step-desc">In <code>config.json</code> confirm this block is present and enabled:</div>
+          <div class="code-wrap" style="margin-top:8px">
+            <pre>"discord": {
+    "enabled": true,
+    "credential_file": "AI personal files/Discord.txt",
+    "respond_only_to_mentions": true,
+    "ignore_bots": true
+}</pre>
+            <button class="code-copy" onclick="copyCode(this)">Copy</button>
+          </div>
+          <div class="step-desc" style="margin-top:6px">Set <code>"respond_only_to_mentions": false</code> to have EOS respond to all messages in any channel it can read. Use with caution in busy servers.</div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">6</div>
+        <div class="step-body">
+          <div class="step-title">Restart EOS</div>
+          <div class="step-desc">The Discord bot starts automatically at boot once the credential file is in place and enabled is true. No additional steps needed.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout ai-prompt">
+    <div class="callout-icon">🤖</div>
+    <div class="callout-body">
+      <div class="callout-title">Need a walkthrough? Copy this prompt and paste it into any AI assistant:</div>
+      <div class="prompt-text">"Walk me through creating a Discord bot application in the Discord Developer Portal on Windows — I need to get the bot token, enable the Message Content Intent under Privileged Gateway Intents, and generate an invite URL with bot scope and read/send message permissions. Explain each step clearly."</div>
+      <button class="prompt-copy" onclick="copyPrompt(this,'Walk me through creating a Discord bot application in the Discord Developer Portal on Windows — I need to get the bot token, enable the Message Content Intent under Privileged Gateway Intents, and generate an invite URL with bot scope and read/send message permissions. Explain each step clearly.')">Copy prompt</button>
+    </div>
+  </div>
+
+  <div class="callout warning">
+    <div class="callout-icon">⚠️</div>
+    <div class="callout-body">
+      <div class="callout-title">Treat the token like a password</div>
+      Your bot token grants full control over the bot and access to every server it has joined. If it leaks, reset it immediately in the Discord Developer Portal under the Bot tab.
+    </div>
+  </div>
+</section>
+
+<section class="doc-section" id="ug-google">
+  <div class="section-eyebrow">User Guide</div>
+  <h2 class="section-title">Google Workspace</h2>
+  <p class="section-lead">EOS can read your Google Calendar, search Gmail, and browse Google Drive files. When enabled, it can also send email. Ask EOS things like <em>"what's on my calendar tomorrow"</em> or <em>"find the email about the project deadline."</em></p>
+
+  <div class="callout location">
+    <div class="callout-icon">📁</div>
+    <div class="callout-body">
+      <div class="callout-title">Where to put the credential</div>
+      Place your downloaded OAuth JSON file in: <code>AI personal files\</code><br><br>
+      The filename must match the pattern <code>client_secret_*.json</code>. The file Google gives you is already named correctly — do not rename it, just move it into that folder.
+    </div>
+  </div>
+
+  <div class="sub-section">
+    <div class="sub-title">How to get a Google OAuth credential — step by step</div>
+    <div class="step-list">
+      <div class="step-card">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">Create a Google Cloud project</div>
+          <div class="step-desc">Go to <strong>console.cloud.google.com</strong>. Click the project selector at the top → <strong>New Project</strong>. Give it any name (e.g. "EOS Integration") and click Create.</div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">Enable the APIs you want</div>
+          <div class="step-desc">Go to <strong>APIs &amp; Services → Library</strong> and enable these (search by name, click each, click Enable):</div>
+          <div class="card-grid" style="margin-top:8px">
+            <div class="cap-card"><div class="cap-card-title">Google Calendar API</div><div class="cap-card-desc">Calendar read access</div></div>
+            <div class="cap-card"><div class="cap-card-title">Gmail API</div><div class="cap-card-desc">Email read and send access</div></div>
+            <div class="cap-card"><div class="cap-card-title">Google Drive API</div><div class="cap-card-desc">Drive file access</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">Configure the OAuth consent screen</div>
+          <div class="step-desc">Go to <strong>APIs &amp; Services → OAuth consent screen</strong>:<br>
+          1. Choose <strong>External</strong> user type → Create<br>
+          2. Fill in App name, User support email, Developer contact email<br>
+          3. Click Save and Continue through Scopes<br>
+          4. On Test Users step, <strong>add your own Google account email address</strong><br>
+          5. Save and Continue → Back to Dashboard</div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <div class="step-title">Create OAuth credentials</div>
+          <div class="step-desc">Go to <strong>APIs &amp; Services → Credentials</strong> → <strong>Create Credentials → OAuth 2.0 Client IDs</strong>.<br>
+          Application type: <strong>Desktop app</strong>. Name it anything. Click Create.<br>
+          On the confirmation dialog, click <strong>Download JSON</strong>.</div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">5</div>
+        <div class="step-body">
+          <div class="step-title">Place the file</div>
+          <div class="step-desc">Move the downloaded JSON to <code>AI personal files\</code>. Leave the filename as-is.</div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">6</div>
+        <div class="step-body">
+          <div class="step-title">Confirm your config &amp; restart</div>
+          <div class="code-wrap" style="margin-top:4px">
+            <pre>"google": {
+    "enabled": true,
+    "client_secret_glob": "AI personal files/client_secret_*.json",
+    "token_path": "data/google_token.json",
+    "calendar_enabled": true,
+    "gmail_enabled": true,
+    "gmail_send_enabled": false,
+    "drive_enabled": true
+}</pre>
+            <button class="code-copy" onclick="copyCode(this)">Copy</button>
+          </div>
+          <div class="step-desc" style="margin-top:6px">On first startup with Google enabled, EOS opens a browser window asking you to sign in and grant access. After authorizing, a token is saved to <code>data\google_token.json</code> and you won't be prompted again.<br><br>
+          If authorization expires: delete <code>data\google_token.json</code> and restart EOS.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sub-section">
+    <div class="sub-title">Checking integration status</div>
+    <div class="doc-p">Open the admin panel → <strong>Integrations</strong> tab. This shows whether the credential file is found, whether the OAuth token is valid, which services are enabled, and live data previews (upcoming calendar events, inbox, recent Drive files).</div>
+  </div>
+
+  <div class="sub-section">
+    <div class="sub-title">Controlling Gmail Send</div>
+    <div class="doc-p">Gmail sending is off by default. To enable it at runtime without restarting: go to <strong>Control &amp; Permissions → Capabilities → Google → Gmail Send</strong>. To enable it permanently, set <code>"gmail_send_enabled": true</code> in config.json.</div>
+  </div>
+
+  <div class="callout ai-prompt">
+    <div class="callout-icon">🤖</div>
+    <div class="callout-body">
+      <div class="callout-title">Need a walkthrough? Copy this prompt and paste it into any AI assistant:</div>
+      <div class="prompt-text">"Walk me through setting up a Google Cloud project for OAuth2 access to Gmail, Calendar, and Drive on a desktop app — I need to enable the APIs, configure the consent screen for personal use, create a Desktop OAuth client ID, and download the credential JSON file. Step by step please."</div>
+      <button class="prompt-copy" onclick="copyPrompt(this,'Walk me through setting up a Google Cloud project for OAuth2 access to Gmail, Calendar, and Drive on a desktop app — I need to enable the APIs, configure the consent screen for personal use, create a Desktop OAuth client ID, and download the credential JSON file. Step by step please.')">Copy prompt</button>
+    </div>
+  </div>
+
+  <div class="callout warning">
+    <div class="callout-icon">⚠️</div>
+    <div class="callout-body">
+      <div class="callout-title">Keep credential files private</div>
+      The OAuth JSON grants the ability to request access to your Google account. If it leaks, delete and recreate the OAuth client ID in Cloud Console. The token file (<code>data\google_token.json</code>) contains a live refresh token — if it leaks, revoke it at myaccount.google.com/permissions.
+    </div>
+  </div>
+</section>
+
+<section class="doc-section" id="ug-computeruse">
+  <div class="section-eyebrow">User Guide</div>
+  <h2 class="section-title">Computer Use</h2>
+  <p class="section-lead">EOS can launch and interact with approved desktop applications. This is a layered, opt-in system — you decide which apps are allowed and what actions are permitted within each.</p>
+
+  <div class="sub-section">
+    <div class="sub-title">Operating modes</div>
+    <div class="mode-grid">
+      <div class="mode-card off">
+        <div class="mode-name">Off</div>
+        <div class="mode-desc">No computer use permitted regardless of the enabled flag.</div>
+      </div>
+      <div class="mode-card warn">
+        <div class="mode-name">Command Only</div>
+        <div class="mode-desc">Approved apps only, for explicit user-requested tasks. Recommended starting point.</div>
+      </div>
+      <div class="mode-card on">
+        <div class="mode-name">Supervised Session</div>
+        <div class="mode-desc">Approved apps with bounded continuation while you watch. More autonomous — stay present.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sub-section">
+    <div class="sub-title">Enabling computer use</div>
+    <div class="step-list">
+      <div class="step-card">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">Enable in the admin panel</div>
+          <div class="step-desc">Go to <strong>Control &amp; Permissions → Capabilities → Computer Use</strong>. Toggle <strong>Enabled</strong> on and set <strong>Default Mode</strong> to Command Only or Supervised Session.</div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">Or set it in config.json</div>
+          <div class="code-wrap" style="margin-top:4px">
+            <pre>"computer_use": {
+    "enabled": true,
+    "default_mode": "command_only"
+}</pre>
+            <button class="code-copy" onclick="copyCode(this)">Copy</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sub-section">
+    <div class="sub-title">Approving applications</div>
+    <div class="doc-p">The application allowlist lives in <code>data\computer_use\approved_shortcuts\</code>. Each <code>.json</code> file represents one approved app. Three examples are pre-loaded (Notepad, VS Code, Browser).</div>
+    <div class="step-list" style="margin-top:10px">
+      <div class="step-card">
+        <div class="step-body">
+          <div class="step-title">To add an app</div>
+          <div class="step-desc">1. Create a new <code>.json</code> file in that folder using the schema in the README.md there<br>
+          2. Ensure a matching policy entry exists in <code>data\computer_use\app_policy.json</code><br>
+          3. In the admin panel, click <strong>Computer Use → Reload from disk</strong></div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-body">
+          <div class="step-title">To revoke an app</div>
+          <div class="step-desc">Delete its <code>.json</code> file from the approved_shortcuts folder. Takes effect immediately on next policy check.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sub-section">
+    <div class="sub-title">HALT and confirmations</div>
+    <div class="card-grid">
+      <div class="cap-card">
+        <div class="cap-card-icon">⛔</div>
+        <div class="cap-card-title">HALT button</div>
+        <div class="cap-card-desc">The admin panel Computer Use tab has a red HALT button. Pressing it immediately stops all active computer-use activity and sets mode to Off. Use this if EOS does something unexpected.</div>
+      </div>
+      <div class="cap-card">
+        <div class="cap-card-icon">✅</div>
+        <div class="cap-card-title">Pending confirmations</div>
+        <div class="cap-card-desc">Actions marked soft_confirm or hard_confirm in the app policy require your approval before EOS proceeds. A dialog appears in the Computer Use tab — click Confirm or Deny.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="doc-section" id="ug-workspace">
+  <div class="section-eyebrow">User Guide</div>
+  <h2 class="section-title">Workspace</h2>
+  <p class="section-lead">EOS has a persistent private workspace at <code>data\workspace\</code>. It survives across sessions and reboots — think of it as EOS's local disk.</p>
+  <div class="card-grid">
+    <div class="cap-card">
+      <div class="cap-card-icon">📋</div>
+      <div class="cap-card-title">context/</div>
+      <div class="cap-card-desc">Files you place here appear passively in EOS's system prompt every turn. Drop background material, project briefs, or reference docs here.</div>
+    </div>
+    <div class="cap-card">
+      <div class="cap-card-icon">🔨</div>
+      <div class="cap-card-title">projects/</div>
+      <div class="cap-card-desc">Ongoing work — code, documents, research. EOS creates and modifies files here during active tasks.</div>
+    </div>
+    <div class="cap-card">
+      <div class="cap-card-icon">📝</div>
+      <div class="cap-card-title">notes/</div>
+      <div class="cap-card-desc">EOS's personal notes and observations across sessions. Persists between conversations.</div>
+    </div>
+    <div class="cap-card">
+      <div class="cap-card-icon">🗒</div>
+      <div class="cap-card-title">scratch/</div>
+      <div class="cap-card-desc">Temporary working files. Safe to delete manually at any time.</div>
+    </div>
+  </div>
+  <div class="callout tip" style="margin-top:16px">
+    <div class="callout-icon">💡</div>
+    <div class="callout-body">
+      <div class="callout-title">How to share files with EOS</div>
+      Drop any file into <code>data\workspace\context\</code>. EOS will see it automatically in every turn — no need to mention it. This is the best way to share background material or reference documents.
+    </div>
+  </div>
+  <div class="sub-section">
+    <div class="sub-title">Workspace permissions</div>
+    <div class="doc-p">By default, EOS can read and write workspace files. <strong>Delete</strong> and <strong>Execute</strong> require the corresponding capabilities to be enabled in the Capabilities panel or config.json (<code>allow_delete</code> and <code>allow_exec</code>).</div>
+  </div>
+</section>
+
+<section class="doc-section" id="ug-worldview">
+  <div class="section-eyebrow">User Guide</div>
+  <h2 class="section-title">Worldview System</h2>
+  <p class="section-lead">Give EOS a curated understanding of who you are — your values, reasoning style, priorities — without waiting for it to infer all of that from conversation over time.</p>
+  <div class="doc-p">You deposit source documents (essays, notes, reflections — anything you've written) and ask EOS to extract a structured profile from them. That profile is injected into every conversation as a compact orientation signal. EOS uses it for interpretive calibration — it shapes how EOS reads your intent, not what it says back to you.</div>
+
+  <div class="sub-section">
+    <div class="sub-title">How to use it</div>
+    <div class="step-list">
+      <div class="step-card">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">Place your documents</div>
+          <div class="step-desc">Put any documents you want EOS to understand you through into <code>data\worldview\sources\</code>. Any file format works — plain text and markdown work best.</div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">Ask EOS to process them</div>
+          <div class="step-desc">Tell EOS: <em>"Update the worldview profile"</em> or <em>"I've added new materials to worldview/sources — process them."</em></div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">EOS integrates the signal</div>
+          <div class="step-desc">EOS reads the new documents, reads the existing profile (if any), and produces an updated <code>data\worldview\profile.md</code> that integrates the new signal without discarding prior understanding.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="sub-section">
+    <div class="sub-title">How it works</div>
+    <div class="card-grid">
+      <div class="cap-card">
+        <div class="cap-card-icon">🔇</div>
+        <div class="cap-card-title">Silent by default</div>
+        <div class="cap-card-desc">Dropping a file into sources/ is a silent event. EOS will not acknowledge it until you ask it to process the new material.</div>
+      </div>
+      <div class="cap-card">
+        <div class="cap-card-icon">🎯</div>
+        <div class="cap-card-title">Shapes interpretation</div>
+        <div class="cap-card-desc">EOS does not quote the profile back at you. It uses it to shape how it reads your intent. Your expressed view in conversation always overrides the profile.</div>
+      </div>
+      <div class="cap-card">
+        <div class="cap-card-icon">🔄</div>
+        <div class="cap-card-title">Manual extraction</div>
+        <div class="cap-card-desc">There is no automatic extraction. Run it whenever you add new source documents or want to refresh EOS's model of you.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="doc-section" id="ug-cognition">
+  <div class="section-eyebrow">User Guide</div>
+  <h2 class="section-title">Cognition Panel</h2>
+  <p class="section-lead">The Cognition tab in the admin panel shows exactly what EOS was thinking during each turn. Click any turn row to expand the full detail view — useful for understanding why EOS responded a certain way.</p>
+  <div class="table-wrap">
+    <table class="doc-table">
+      <thead><tr><th>Sub-tab</th><th>What it shows</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Turn Trace</strong></td><td>Every conversation turn — model used, tools invoked, retrieval results, escalations, timing</td></tr>
+        <tr><td><strong>Memory Influence</strong></td><td>Which memory items were retrieved and injected for each turn, and their relevance scores</td></tr>
+        <tr><td><strong>Reflection Events</strong></td><td>Outputs from background reflection loops — conclusions EOS drew and self-improvement suggestions</td></tr>
+        <tr><td><strong>State Changes</strong></td><td>Persistent state before and after each turn, plus new memory entries added</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<hr class="doc-rule"/>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- POWER USER GUIDE                                                       -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<div class="guide-header purple">
+  <div class="gh-eyebrow">Guide 3 of 4</div>
+  <div class="gh-title">⚡ Power User Guide</div>
+  <div class="gh-desc">The canonical config in depth, CLI flags, launcher architecture, runtime discovery, autonomy system, and diagnostics.</div>
+</div>
+
+<section class="doc-section" id="pu-config">
+  <div class="section-eyebrow">Power User Guide</div>
+  <h2 class="section-title">Canonical Config</h2>
+  <p class="section-lead">EOS uses a single primary config file: <code>config.json</code> at the root of the EOS folder. It represents the full intended system.</p>
+  <div class="card-grid">
+    <div class="cap-card">
+      <div class="cap-card-icon">📄</div>
+      <div class="cap-card-title">One file only</div>
+      <div class="cap-card-desc">There are no separate profile configs or environment variants. config.json is the single source of truth.</div>
+    </div>
+    <div class="cap-card">
+      <div class="cap-card-icon">🎛</div>
+      <div class="cap-card-title">Runtime overrides</div>
+      <div class="cap-card-desc">Most capability flags can be changed live in the admin panel without restarting. Changes reset to config.json values on next boot.</div>
+    </div>
+    <div class="cap-card">
+      <div class="cap-card-icon">🔍</div>
+      <div class="cap-card-title">Discovery-first</div>
+      <div class="cap-card-desc">EOS probes what is actually running rather than assuming all configured services are available. Missing backends degrade gracefully.</div>
+    </div>
+  </div>
+  <div class="callout tip" style="margin-top:16px">
+    <div class="callout-icon">💡</div>
+    <div class="callout-body">
+      <div class="callout-title">The admin Config tab</div>
+      The admin panel → <strong>Config</strong> tab shows the full loaded config.json as a read-only view. Use it to inspect what is currently active without opening the file.
+    </div>
+  </div>
+</section>
+
+<section class="doc-section" id="pu-cli">
+  <div class="section-eyebrow">Power User Guide</div>
+  <h2 class="section-title">CLI Reference</h2>
+  <p class="section-lead"><code>eos.py</code> does not launch model servers. It only discovers running services, builds the capability map, and starts the WebUI.</p>
+  <div class="code-wrap">
+    <pre>python eos.py                      # discover services, print summary, start WebUI
+python eos.py --status             # print discovery + capability map only (no WebUI)
+python eos.py --port 9000          # override WebUI port (default: 7860)
+python eos.py --host 0.0.0.0      # bind WebUI to all interfaces (LAN access)
+python eos.py --config config.json # explicit config file path</pre>
+    <button class="code-copy" onclick="copyCode(this)">Copy</button>
+  </div>
+  <div class="sub-section">
+    <div class="sub-title">Start a single backend manually</div>
+    <div class="code-wrap">
+      <pre>python -m runtime.server_launcher main --accel gpu --config config.json
+python -m runtime.server_launcher tools --accel cpu --config config.json</pre>
+      <button class="code-copy" onclick="copyCode(this)">Copy</button>
+    </div>
+  </div>
+</section>
+
+<section class="doc-section" id="pu-launchers">
+  <div class="section-eyebrow">Power User Guide</div>
+  <h2 class="section-title">Launcher Architecture</h2>
+  <p class="section-lead">Three types of launchers — per-server, bundle, and bootstrap. Each has a distinct responsibility.</p>
+  <div class="sub-section">
+    <div class="sub-title">Bundle launchers — start common combinations</div>
+    <div class="table-wrap">
+      <table class="doc-table">
+        <thead><tr><th>Launcher</th><th>Starts</th><th>When to use</th></tr></thead>
+        <tbody>
+          <tr><td><code>start-minimal.bat</code></td><td>Main + Tools</td><td>Low-resource machines, quick tests</td></tr>
+          <tr><td><code>start-standard.bat</code></td><td>Main + Tools + Thinking</td><td>Recommended default</td></tr>
+          <tr><td><code>start-full.bat</code></td><td>Main + Tools + Thinking + Creativity</td><td>Full stack (requires creativity model)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="sub-section">
+    <div class="sub-title">Per-server launchers — start exactly one backend</div>
+    <div class="table-wrap">
+      <table class="doc-table">
+        <thead><tr><th>Role</th><th>CPU launcher</th><th>GPU launcher</th></tr></thead>
+        <tbody>
+          <tr><td>Main model</td><td><code>start-main-cpu.bat</code></td><td><code>start-main-gpu.bat</code></td></tr>
+          <tr><td>Tool helper</td><td><code>start-tools-cpu.bat</code></td><td><code>start-tools-gpu.bat</code></td></tr>
+          <tr><td>Thinking helper</td><td><code>start-thinking-cpu.bat</code></td><td><code>start-thinking-gpu.bat</code></td></tr>
+          <tr><td>Creativity helper</td><td><code>start-creativity-cpu.bat</code></td><td><code>start-creativity-gpu.bat</code></td></tr>
+          <tr><td>Vision helper</td><td>— (GPU only)</td><td><code>start-vision-gpu.bat</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="sub-section">
+    <div class="sub-title">Bootstrap and status</div>
+    <div class="card-grid">
+      <div class="cap-card">
+        <div class="cap-card-icon">▶</div>
+        <div class="cap-card-title">start-eos.bat</div>
+        <div class="cap-card-desc">Runtime discovery + WebUI. Never starts model servers.</div>
+      </div>
+      <div class="cap-card">
+        <div class="cap-card-icon">🔍</div>
+        <div class="cap-card-title">status-eos.bat</div>
+        <div class="cap-card-desc">Runtime discovery only — no WebUI started. Shows current capability map.</div>
+      </div>
+    </div>
+  </div>
+  <div class="callout tip" style="margin-top:12px">
+    <div class="callout-icon">ℹ</div>
+    <div class="callout-body">
+      <div class="callout-title">Legacy wrappers</div>
+      "Start *.bat" legacy wrappers still exist but now delegate to the modular launchers above. Use the modular ones directly for clarity.
+    </div>
+  </div>
+</section>
+
+<section class="doc-section" id="pu-ports">
+  <div class="section-eyebrow">Power User Guide</div>
+  <h2 class="section-title">Port Assignments</h2>
+  <p class="section-lead">Each backend listens on a fixed port. If a port is already in use, that backend will fail to start.</p>
+  <div class="table-wrap">
+    <table class="doc-table">
+      <thead><tr><th>Port</th><th>Role</th><th>Required?</th></tr></thead>
+      <tbody>
+        <tr><td><strong>8080</strong></td><td>Main model</td><td>Yes — EOS cannot start without this</td></tr>
+        <tr><td><strong>8081</strong></td><td>Vision helper</td><td>No — vision degrades cleanly if absent</td></tr>
+        <tr><td><strong>8082</strong></td><td>Tool helper</td><td>No — falls back to main model</td></tr>
+        <tr><td><strong>8083</strong></td><td>Thinking helper</td><td>No — falls back to main model</td></tr>
+        <tr><td><strong>8084</strong></td><td>Creativity helper</td><td>No — falls back to main model</td></tr>
+        <tr><td><strong>7860</strong></td><td>WebUI</td><td>Yes — override with <code>--port</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="doc-section" id="pu-configblocks">
+  <div class="section-eyebrow">Power User Guide</div>
+  <h2 class="section-title">Config Deep-Dive</h2>
+  <p class="section-lead">The key config blocks in config.json and what each field does.</p>
+
+  <div class="sub-section">
+    <div class="sub-title">autonomy_defaults</div>
+    <div class="doc-p">Controls the starting autonomy state at boot. Each dimension can be toggled live in the admin panel without a restart.</div>
+    <div class="code-wrap">
+      <pre>"autonomy_defaults": {
+    "perception": true,   // observe environment (screen capture, sensors)
+    "cognition":  true,   // background thinking, reflection, idle cognition
+    "action":     true,   // tool use and external integrations
+    "initiative": true    // proactive, unsolicited action
+}</pre>
+      <button class="code-copy" onclick="copyCode(this)">Copy</button>
+    </div>
+    <div class="doc-p" style="margin-top:8px">For a passive assistant, set <code>action</code> and <code>initiative</code> to <code>false</code>.</div>
+  </div>
+
+  <div class="sub-section">
+    <div class="sub-title">servers</div>
+    <div class="doc-p">Each server block defines its endpoint, binary paths, model location, and layer counts. The <code>n_gpu_layers</code> field controls whether the GPU or CPU binary is used by the launcher.</div>
+    <div class="code-wrap">
+      <pre>"servers": {
+    "main": {
+        "host": "127.0.0.1",
+        "port": 8080,
+        "binary_cpu": "binaries/llama-server-cpu.exe",
+        "binary_gpu": "binaries/llama-server-cuda.exe",
+        "model_path": "models/main/...",
+        "n_gpu_layers": 35,
+        "cpu_n_gpu_layers": 0,
+        "gpu_n_gpu_layers": 35
+    }
+}</pre>
+      <button class="code-copy" onclick="copyCode(this)">Copy</button>
+    </div>
+  </div>
+
+  <div class="sub-section">
+    <div class="sub-title">computer_use</div>
+    <div class="code-wrap">
+      <pre>"computer_use": {
+    "enabled": true,
+    "default_mode": "command_only",      // off | command_only | supervised_session
+    "approved_shortcuts_path": "data/computer_use/approved_shortcuts",
+    "app_policy_path": "data/computer_use/app_policy.json",
+    "decision_ring_size": 200
+}</pre>
+      <button class="code-copy" onclick="copyCode(this)">Copy</button>
+    </div>
+    <div class="doc-p" style="margin-top:8px">Mode can be changed at runtime from the admin Computer Use tab or from Capabilities. The shortcut allowlist and policy file are reloaded live from the admin panel without restart.</div>
+  </div>
+
+  <div class="sub-section">
+    <div class="sub-title">workspace_tools</div>
+    <div class="code-wrap">
+      <pre>"workspace_tools": {
+    "enabled": true,
+    "workspace_root": "data/workspace",
+    "allow_delete": true,   // can delete files in workspace
+    "allow_exec": true      // can execute shell commands
+}</pre>
+      <button class="code-copy" onclick="copyCode(this)">Copy</button>
+    </div>
+    <div class="doc-p" style="margin-top:8px"><code>allow_delete</code> and <code>allow_exec</code> can be toggled live from the Capabilities panel.</div>
+  </div>
+
+  <div class="sub-section">
+    <div class="sub-title">creativity</div>
+    <div class="code-wrap">
+      <pre>"creativity": {
+    "enabled": true,
+    "injection_frequency": "medium",     // off | low | medium | high
+    "intensity": "balanced",             // conservative | balanced | exploratory | aggressive
+    "invocation_domains": {
+        "reasoning_assistance": true,
+        "autonomous_idle": true,
+        "explanation_generation": true,
+        "brainstorming_design": true,
+        "stuck_state_recovery": true
+    }
+}</pre>
+      <button class="code-copy" onclick="copyCode(this)">Copy</button>
+    </div>
+    <div class="doc-p" style="margin-top:8px"><code>enabled</code>, <code>injection_frequency</code>, and <code>autonomous_idle</code> can be toggled live from Capabilities. Intensity presets control sampling parameters. <code>temperature</code>, <code>top_p</code>, <code>top_k</code> in the <code>advanced</code> block override the preset if set.</div>
+  </div>
+
+  <div class="sub-section">
+    <div class="sub-title">google</div>
+    <div class="code-wrap">
+      <pre>"google": {
+    "enabled": true,
+    "client_secret_glob": "AI personal files/client_secret_*.json",
+    "token_path": "data/google_token.json",
+    "calendar_enabled": true,
+    "gmail_enabled": true,
+    "gmail_send_enabled": false,   // off by default — toggle live in Capabilities
+    "drive_enabled": true
+}</pre>
+      <button class="code-copy" onclick="copyCode(this)">Copy</button>
+    </div>
+    <div class="doc-p" style="margin-top:8px"><code>gmail_send_enabled</code> can be toggled live. For individual service flags (<code>calendar_enabled</code>, etc.), edit config.json and restart.</div>
+  </div>
+
+  <div class="sub-section">
+    <div class="sub-title">discord</div>
+    <div class="code-wrap">
+      <pre>"discord": {
+    "enabled": true,
+    "credential_file": "AI personal files/Discord.txt",
+    "respond_only_to_mentions": true,   // set false to respond to all messages
+    "ignore_bots": true
+}</pre>
+      <button class="code-copy" onclick="copyCode(this)">Copy</button>
+    </div>
+  </div>
+</section>
+
+<section class="doc-section" id="pu-discovery">
+  <div class="section-eyebrow">Power User Guide</div>
+  <h2 class="section-title">Runtime Discovery &amp; Fallback</h2>
+  <p class="section-lead">At bootstrap, EOS probes each expected service from config.json, classifies them, and builds an effective capability map.</p>
+
+  <div class="sub-section">
+    <div class="sub-title">Service states</div>
+    <div class="card-grid">
+      <div class="cap-card">
+        <div class="cap-card-icon"><span class="badge active">active</span></div>
+        <div class="cap-card-title" style="margin-top:8px">Active</div>
+        <div class="cap-card-desc">Service is running, responding, and passing health checks.</div>
+      </div>
+      <div class="cap-card">
+        <div class="cap-card-icon"><span class="badge degraded">degraded</span></div>
+        <div class="cap-card-title" style="margin-top:8px">Degraded</div>
+        <div class="cap-card-desc">Service is running but health check indicates reduced capability.</div>
+      </div>
+      <div class="cap-card">
+        <div class="cap-card-icon"><span class="badge unavail">unavailable</span></div>
+        <div class="cap-card-title" style="margin-top:8px">Unavailable</div>
+        <div class="cap-card-desc">Service is not running. Fallback behavior applies.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sub-section">
+    <div class="sub-title">Example startup output</div>
+    <div class="code-wrap">
+      <pre>Main model:       active
+Tool helper:      active
+Thinking helper:  unavailable (fallback to main)
+Creativity:       unavailable (fallback to main)
+Vision:           unavailable
+STT:              active
+TTS:              active
+
+Effective capabilities:
+  chat:       available
+  tools:      available
+  reasoning:  degraded
+  creativity: degraded
+  vision:     unavailable
+  voice:      available</pre>
+    </div>
+  </div>
+
+  <div class="sub-section">
+    <div class="sub-title">Fallback behavior</div>
+    <div class="table-wrap">
+      <table class="doc-table">
+        <thead><tr><th>Missing backend</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr><td>Main model</td><td>Chat unavailable — EOS cannot start</td></tr>
+          <tr><td>Tool helper</td><td>Tool routing falls back to the main model</td></tr>
+          <tr><td>Thinking helper</td><td>Reasoning falls back to the main model</td></tr>
+          <tr><td>Creativity helper</td><td>Creativity requests fall back to main / degrade cleanly</td></tr>
+          <tr><td>Vision helper</td><td>Vision features are cleanly disabled</td></tr>
+          <tr><td>STT model</td><td>Voice input unavailable; text chat unaffected</td></tr>
+          <tr><td>TTS model</td><td>Voice output unavailable; text chat unaffected</td></tr>
+          <tr><td>Discord credential</td><td>Discord integration skipped silently at startup</td></tr>
+          <tr><td>Google credential</td><td>Google integration skipped silently at startup</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="doc-section" id="pu-diagnostics">
+  <div class="section-eyebrow">Power User Guide</div>
+  <h2 class="section-title">Diagnostics</h2>
+  <p class="section-lead">Commands for checking system state, validating the install, and generating bug reports.</p>
+
+  <div class="step-list">
+    <div class="step-card">
+      <div class="step-body">
+        <div class="step-title">Show current runtime state</div>
+        <div class="code-wrap" style="margin-top:6px">
+          <pre>status-eos.bat
+python eos.py --status</pre>
+          <button class="code-copy" onclick="copyCode(this)">Copy</button>
+        </div>
+      </div>
+    </div>
+    <div class="step-card">
+      <div class="step-body">
+        <div class="step-title">Verify the install</div>
+        <div class="code-wrap" style="margin-top:6px">
+          <pre>python verify.py</pre>
+          <button class="code-copy" onclick="copyCode(this)">Copy</button>
+        </div>
+        <div class="step-desc" style="margin-top:4px">Checks Python packages, binaries, model files, port availability, and config.json validity.</div>
+      </div>
+    </div>
+    <div class="step-card">
+      <div class="step-body">
+        <div class="step-title">Validate Python syntax across the codebase</div>
+        <div class="code-wrap" style="margin-top:6px">
+          <pre>python -m compileall eos.py runtime services webui interfaces core tools verify.py</pre>
+          <button class="code-copy" onclick="copyCode(this)">Copy</button>
+        </div>
+      </div>
+    </div>
+    <div class="step-card">
+      <div class="step-body">
+        <div class="step-title">Export a diagnostic bundle</div>
+        <div class="step-desc">Admin panel → <strong>Export</strong> tab → <strong>Generate Diagnostic Bundle</strong>. Downloads a full JSON snapshot of runtime state, server status, and recent logs. Useful when reporting an issue.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="doc-section" id="pu-datadir">
+  <div class="section-eyebrow">Power User Guide</div>
+  <h2 class="section-title">Data Directory Layout</h2>
+  <p class="section-lead">Everything EOS writes at runtime goes into the <code>data/</code> folder.</p>
+  <div class="dir-tree">data/
+  entity_state.db          <span class="dir-comment">— SQLite: identity state, relational model, memory</span>
+  memory_store/            <span class="dir-comment">— ChromaDB: vector memory (semantic retrieval)</span>
+  google_token.json        <span class="dir-comment">— Google OAuth refresh token (generated at runtime)</span>
+  workspace/               <span class="dir-comment">— Entity's persistent file environment</span>
+    context/               <span class="dir-comment">— Files here appear in system prompt every turn</span>
+    projects/              <span class="dir-comment">— Entity's ongoing work</span>
+    notes/                 <span class="dir-comment">— Entity's personal notes</span>
+    scratch/               <span class="dir-comment">— Temporary working files</span>
+  worldview/               <span class="dir-comment">— Partner orientation subsystem</span>
+    sources/               <span class="dir-comment">— Raw documents you deposit for extraction</span>
+    profile.md             <span class="dir-comment">— Extracted worldview profile (generated)</span>
+    extraction_log.json    <span class="dir-comment">— Tracks which sources have been processed</span>
+  computer_use/            <span class="dir-comment">— Computer-use configuration</span>
+    approved_shortcuts/    <span class="dir-comment">— One JSON per approved application</span>
+    app_policy.json        <span class="dir-comment">— Per-app action permissions</span>
+  backups/                 <span class="dir-comment">— Automatic state snapshots</span></div>
+</section>
+
+<hr class="doc-rule"/>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- REFERENCE                                                              -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<div class="guide-header amber">
+  <div class="gh-eyebrow">Guide 4 of 4</div>
+  <div class="gh-title">📋 Reference</div>
+  <div class="gh-desc">What EOS is, system requirements, architecture overview, and degradation behavior.</div>
+</div>
+
+<section class="doc-section" id="ref-what">
+  <div class="section-eyebrow">Reference</div>
+  <h2 class="section-title">What is EOS</h2>
+  <p class="section-lead">EOS (Entity Operating System) is a local AI system that runs one or more GGUF language models via llama.cpp. It is <strong>Windows-only</strong>.</p>
+  <div class="card-grid">
+    <div class="cap-card">
+      <div class="cap-card-icon">🏠</div>
+      <div class="cap-card-title">Fully local</div>
+      <div class="cap-card-desc">No cloud API required. All models run on your hardware. Nothing leaves your machine — conversation history, memory, and identity all stay local.</div>
+    </div>
+    <div class="cap-card">
+      <div class="cap-card-icon">🧠</div>
+      <div class="cap-card-title">Persistent identity</div>
+      <div class="cap-card-desc">EOS does not reset between conversations. It maintains a persistent identity, accumulated memory, and an ongoing model of you across all sessions.</div>
+    </div>
+    <div class="cap-card">
+      <div class="cap-card-icon">🎛</div>
+      <div class="cap-card-title">Layered autonomy</div>
+      <div class="cap-card-desc">Four independently controllable dimensions gate what EOS can do. You decide whether it can perceive, think, act, and take initiative — all adjustable live.</div>
+    </div>
+    <div class="cap-card">
+      <div class="cap-card-icon">🔌</div>
+      <div class="cap-card-title">Modular backends</div>
+      <div class="cap-card-desc">Main model, tool helper, thinking helper, creativity helper, and vision helper are each separate processes. Missing helpers degrade gracefully.</div>
+    </div>
+  </div>
+
+  <div class="sub-section">
+    <div class="sub-title">How it works at a high level</div>
+    <div class="step-list">
+      <div class="step-card">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">Start the backend servers</div>
+          <div class="step-desc">Use per-role launchers or bundle launchers to start whichever model servers you want.</div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">Start EOS</div>
+          <div class="step-desc">Run start-eos.bat. EOS probes each expected service, performs health checks, and builds a runtime capability map.</div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">Use the WebUI</div>
+          <div class="step-desc">Open http://127.0.0.1:7860/ in your browser. The admin panel at /admin is the operator's control point for all runtime controls.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="doc-section" id="ref-requirements">
+  <div class="section-eyebrow">Reference</div>
+  <h2 class="section-title">System Requirements</h2>
+  <div class="table-wrap">
+    <table class="doc-table">
+      <thead><tr><th>Component</th><th>Minimum</th><th>Recommended</th></tr></thead>
+      <tbody>
+        <tr><td>OS</td><td>Windows 10 64-bit</td><td>Windows 11 64-bit</td></tr>
+        <tr><td>Python</td><td>3.10</td><td>3.11</td></tr>
+        <tr><td>RAM</td><td>16 GB</td><td>32 GB</td></tr>
+        <tr><td>GPU</td><td>None (CPU-only works)</td><td>NVIDIA with 8 GB+ VRAM</td></tr>
+        <tr><td>Disk</td><td>20 GB free</td><td>30 GB free</td></tr>
+        <tr><td>CUDA</td><td>Not required</td><td>CUDA 13.1 compatible driver</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout warning" style="margin-top:16px">
+    <div class="callout-icon">⚠️</div>
+    <div class="callout-body">
+      <div class="callout-title">Vision requires a GPU</div>
+      The vision helper (<code>start-vision-gpu.bat</code>) requires an NVIDIA GPU with sufficient VRAM. There is no CPU-only vision launcher. Vision is an additive capability — start it alongside whichever bundle you normally use.
+    </div>
+  </div>
+  <div class="sub-section">
+    <div class="sub-title">Model file requirements for vision</div>
+    <div class="doc-p"><code>models\vision\</code> must contain both the main <code>.gguf</code> model file and a matching <code>mmproj*.gguf</code> projection file. If either is missing, vision will show as unavailable even with the GPU launcher running.</div>
+  </div>
+</section>
+
+<section class="doc-section" id="ref-degradation">
+  <div class="section-eyebrow">Reference</div>
+  <h2 class="section-title">Capability Degradation</h2>
+  <p class="section-lead">When optional backends or credentials are missing, EOS degrades gracefully rather than failing to start.</p>
+  <div class="table-wrap">
+    <table class="doc-table">
+      <thead><tr><th>Missing</th><th>Effect</th></tr></thead>
+      <tbody>
+        <tr><td>Main model</td><td>Chat unavailable — EOS will not start without this</td></tr>
+        <tr><td>Tool helper</td><td>Tool calls fall back to the main model</td></tr>
+        <tr><td>Thinking helper</td><td>Background reasoning falls back to the main model</td></tr>
+        <tr><td>Creativity helper</td><td>Creativity requests fall back to the main model</td></tr>
+        <tr><td>Vision helper</td><td>Vision features are cleanly unavailable</td></tr>
+        <tr><td>STT model</td><td>Voice input unavailable; text chat unaffected</td></tr>
+        <tr><td>TTS model</td><td>Voice output unavailable; text chat unaffected</td></tr>
+        <tr><td>Discord credential</td><td>Discord integration skipped silently at startup</td></tr>
+        <tr><td>Google credential</td><td>Google integration skipped silently at startup</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+</div><!-- /content-inner -->
+</div><!-- /content -->
+
+<script>
+// ── Sidebar active-section tracking ─────────────────────────────────────
+const sections = document.querySelectorAll('.doc-section');
+const navLinks  = document.querySelectorAll('.sb-link');
+
+function setActive(id) {
+  navLinks.forEach(l => l.classList.toggle('active', l.getAttribute('href') === '#' + id));
+}
+
+const obs = new IntersectionObserver(entries => {
+  let best = null, bestY = Infinity;
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      const y = Math.abs(e.boundingClientRect.top);
+      if (y < bestY) { bestY = y; best = e; }
+    }
+  });
+  if (best) setActive(best.target.id);
+}, { rootMargin: '-10% 0px -60% 0px', threshold: 0 });
+
+sections.forEach(s => obs.observe(s));
+
+// Smooth scroll on nav click
+navLinks.forEach(link => {
+  link.addEventListener('click', e => {
+    e.preventDefault();
+    const id = link.getAttribute('href').slice(1);
+    const el = document.getElementById(id);
+    if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    document.getElementById('sidebar').classList.remove('open');
+  });
+});
+
+// Guide card clicks
+document.querySelectorAll('.guide-card[href]').forEach(card => {
+  card.addEventListener('click', e => {
+    e.preventDefault();
+    const id = card.getAttribute('href').slice(1);
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+});
+
+// ── Copy buttons ─────────────────────────────────────────────────────────
+function copyCode(btn) {
+  const pre = btn.closest('.code-wrap').querySelector('pre');
+  navigator.clipboard.writeText(pre.textContent).then(() => {
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 1500);
+  });
+}
+
+function copyPrompt(btn, text) {
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy prompt', 1500);
+  });
+}
+
+// ── Search ───────────────────────────────────────────────────────────────
+function searchDocs(q) {
+  q = q.trim().toLowerCase();
+  sections.forEach(sec => {
+    if (!q) { sec.style.display = ''; return; }
+    sec.style.display = sec.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+  document.querySelectorAll('.guide-header, .doc-rule').forEach(el => {
+    el.style.display = q ? 'none' : '';
+  });
+}
+
+// ── Mobile sidebar ───────────────────────────────────────────────────────
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+document.addEventListener('click', e => {
+  const sb = document.getElementById('sidebar');
+  if (sb.classList.contains('open') && !sb.contains(e.target) && !document.getElementById('mob-bar').contains(e.target)) {
+    sb.classList.remove('open');
+  }
+});
+</script>
+</body>
+</html>

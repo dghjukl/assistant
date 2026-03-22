@@ -1,0 +1,3925 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EOS — Admin</title>
+  <style>
+    :root {
+      --bg:        #0d0f14;
+      --surface:   #161920;
+      --border:    #252932;
+      --accent:    #4f9cf9;
+      --accent-dk: #2563eb;
+      --green:     #22c55e;
+      --red:       #ef4444;
+      --yellow:    #eab308;
+      --text:      #e2e8f0;
+      --muted:     #64748b;
+      --font:      'Segoe UI', system-ui, sans-serif;
+      --mono:      'Cascadia Code', 'Consolas', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 14px;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 18px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    header h1 {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: var(--accent);
+    }
+    header h1 span { color: var(--muted); font-weight: 400; }
+    #ws-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--muted);
+      flex-shrink: 0;
+      transition: background 0.3s;
+    }
+    #ws-dot.live { background: var(--green); }
+    #status-bar {
+      margin-left: auto;
+      display: flex;
+      gap: 18px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    #status-bar strong { color: var(--text); }
+
+    /* ── Tab bar ── */
+    nav {
+      display: flex;
+      gap: 2px;
+      padding: 8px 18px 0;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+    .tab {
+      padding: 6px 16px;
+      border-radius: 6px 6px 0 0;
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--muted);
+      border: 1px solid transparent;
+      border-bottom: none;
+      user-select: none;
+      transition: color 0.15s, background 0.15s;
+      white-space: nowrap;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active {
+      background: var(--bg);
+      color: var(--accent);
+      border-color: var(--border);
+    }
+    .tab-separator {
+      width: 1px;
+      background: var(--border);
+      margin: 4px 6px 0;
+    }
+    .tab-docs-link {
+      text-decoration: none;
+      opacity: 0.75;
+    }
+    .tab-docs-link:hover { opacity: 1; color: var(--text); }
+
+    /* ── Main content area ── */
+    main {
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel {
+      display: none;
+      flex: 1;
+      overflow: hidden;
+      flex-direction: column;
+    }
+    .panel.active { display: flex; }
+
+    /* ── Shared panel padding ── */
+    .panel-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 18px;
+    }
+
+    /* ── Tools panel ── */
+    #search-tools {
+      width: 100%;
+      padding: 7px 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+    #search-tools:focus { outline: none; border-color: var(--accent); }
+
+    .tool-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      margin-bottom: 6px;
+      transition: border-color 0.15s;
+    }
+    .tool-row:hover { border-color: var(--accent); }
+    .tool-row.disabled-row { opacity: 0.5; }
+
+    .tool-name {
+      font-weight: 600;
+      font-size: 13px;
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .tool-desc {
+      color: var(--muted);
+      font-size: 12px;
+      flex: 2;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .perm-badge {
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: #1e293b;
+      color: var(--muted);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .perm-badge.blocked { background: #3f1515; color: var(--red); }
+
+    /* Risk / trust / confirmation badges */
+    .risk-badge, .trust-badge, .confirm-badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 700;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .risk-badge.read_only          { background: #14532d; color: var(--green); }
+    .risk-badge.draft              { background: #1e3a5f; color: var(--accent); }
+    .risk-badge.reversible_commit  { background: #3f2d00; color: var(--yellow); }
+    .risk-badge.irreversible_commit{ background: #3f1515; color: var(--red); }
+    .trust-badge.public            { background: #1e293b; color: var(--muted); }
+    .trust-badge.verified_user     { background: #1e3a5f; color: var(--accent); }
+    .trust-badge.operator_only     { background: #3f1515; color: var(--red); }
+    .confirm-badge.none            { background: #1e293b; color: var(--muted); }
+    .confirm-badge.soft_confirm    { background: #3f2d00; color: var(--yellow); }
+    .confirm-badge.hard_confirm    { background: #3f1515; color: var(--red); }
+
+    /* Pack expand */
+    .tp-pack-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .tp-pack-header:hover .tp-name { color: var(--accent); }
+    .tp-expand-arrow {
+      font-size: 11px;
+      color: var(--muted);
+      transition: transform 0.2s;
+      flex-shrink: 0;
+    }
+    .tp-pack-tools {
+      display: none;
+      padding: 6px 0 2px 18px;
+      border-top: 1px solid var(--border);
+      margin-top: 6px;
+    }
+    .tp-pack-tools.open { display: block; }
+    .tp-tool-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 8px;
+      border-radius: 5px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      margin-bottom: 4px;
+      flex-wrap: wrap;
+    }
+    .tp-tool-name { font-size: 12px; font-weight: 600; min-width: 160px; }
+    .tp-tool-desc { font-size: 11px; color: var(--muted); flex: 1; min-width: 100px;
+                    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* Audit log section */
+    .audit-row {
+      display: flex;
+      gap: 10px;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      align-items: flex-start;
+    }
+    .audit-row:last-child { border-bottom: none; }
+    .audit-ts   { color: var(--muted); font-family: var(--mono); min-width: 80px; flex-shrink: 0; }
+    .audit-tool { font-weight: 600; min-width: 140px; color: var(--text); }
+    .audit-params { flex: 1; color: var(--muted); font-family: var(--mono); font-size: 11px;
+                    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .audit-ok   { color: var(--green); font-weight: 700; font-size: 11px; flex-shrink: 0; }
+    .audit-fail { color: var(--red);   font-weight: 700; font-size: 11px; flex-shrink: 0; }
+    .audit-area {
+      max-height: 300px;
+      overflow-y: auto;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 12px;
+    }
+
+    /* Toggle switch */
+    .toggle {
+      position: relative;
+      width: 38px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute;
+      inset: 0;
+      background: #334155;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .toggle-slider::before {
+      content: '';
+      position: absolute;
+      width: 14px; height: 14px;
+      left: 3px; top: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+    .toggle input:checked + .toggle-slider { background: var(--accent); }
+    .toggle input:checked + .toggle-slider::before { transform: translateX(18px); }
+
+    /* ── Control panel sections ── */
+    .ctrl-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 18px;
+    }
+    .ctrl-section-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+    .ctrl-section-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 0.3px;
+    }
+    .ctrl-section-sub {
+      font-size: 11px;
+      color: var(--muted);
+      flex: 1;
+    }
+    .ctrl-add-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      align-items: center;
+    }
+    .ctrl-text-input {
+      flex: 1;
+      padding: 6px 12px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 13px;
+      font-family: var(--mono);
+    }
+    .ctrl-text-input:focus { outline: none; border-color: var(--accent); }
+
+    /* Allowlist chips */
+    .allowlist-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .allowlist-chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: 12px;
+      font-family: var(--mono);
+      color: var(--text);
+    }
+    .allowlist-chip:hover { border-color: var(--accent); }
+    .chip-remove {
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1;
+      border: none;
+      background: none;
+      padding: 0 2px;
+      transition: color 0.15s;
+    }
+    .chip-remove:hover { color: var(--red); }
+
+    /* Toolpack rows */
+    .tp-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      margin-bottom: 5px;
+    }
+    .tp-name { font-weight: 600; font-size: 13px; font-family: var(--mono); flex: 1; }
+    .tp-badge {
+      font-size: 10px;
+      padding: 2px 7px;
+      border-radius: 10px;
+      font-weight: 700;
+    }
+    .tp-badge.loaded   { background: #14532d; color: var(--green); }
+    .tp-badge.enabled  { background: #1e3a5f; color: var(--accent); }
+    .tp-badge.failed   { background: #3f1515; color: var(--red); }
+    .tp-badge.disabled { background: #1e293b; color: var(--muted); }
+    .tp-badge.priv     { background: #3f2d00; color: var(--yellow); }
+
+    /* Subsystem rows */
+    .subsys-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 8px;
+    }
+    .subsys-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+    }
+    .subsys-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .subsys-dot.wired   { background: var(--green); }
+    .subsys-dot.missing { background: var(--red); }
+    .subsys-name { font-size: 12px; flex: 1; }
+    .subsys-status { font-size: 11px; font-weight: 700; }
+    .subsys-status.wired   { color: var(--green); }
+    .subsys-status.missing { color: var(--red); }
+
+    /* ── Integration status cards ── */
+    .integ-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 20px;
+      margin-bottom: 16px;
+    }
+    .integ-card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .integ-logo {
+      font-size: 22px;
+      line-height: 1;
+    }
+    .integ-title {
+      font-size: 15px;
+      font-weight: 700;
+      flex: 1;
+    }
+    .integ-status-badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .integ-status-badge.healthy    { background: #14532d; color: var(--green); }
+    .integ-status-badge.degraded   { background: #3f2d00; color: var(--yellow); }
+    .integ-status-badge.unconfigured { background: #1e293b; color: var(--muted); }
+    .integ-status-badge.disabled   { background: #1e293b; color: var(--muted); }
+    .integ-status-badge.unavailable { background: #3f1515; color: var(--red); }
+    .integ-status-badge.error      { background: #3f1515; color: var(--red); }
+    .integ-flags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .integ-flag {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 12px;
+    }
+    .integ-flag-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .integ-flag-dot.on  { background: var(--green); }
+    .integ-flag-dot.off { background: var(--muted); }
+    .integ-flag-dot.warn { background: var(--yellow); }
+    .integ-flag-label { color: var(--muted); }
+    .integ-flag-value { font-weight: 600; }
+    .integ-details-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 10px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .integ-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+    .integ-hint {
+      margin-top: 12px;
+      padding: 10px 14px;
+      background: #1e3a5f20;
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      font-size: 12px;
+      color: var(--accent);
+      line-height: 1.6;
+    }
+    .integ-hint a { color: var(--accent); }
+    .integ-error {
+      margin-top: 10px;
+      padding: 8px 12px;
+      background: #3f151520;
+      border: 1px solid var(--red);
+      border-radius: 6px;
+      font-size: 12px;
+      color: var(--red);
+    }
+
+    /* ── GW live-data tabs ── */
+    .gw-tab-btn {
+      padding: 5px 14px;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--muted);
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .gw-tab-btn:hover { color: var(--text); border-color: var(--accent); }
+    .gw-tab-btn.active {
+      background: var(--surface);
+      color: var(--accent);
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+    .gw-tab-panel { }
+    .gw-data-area {
+      min-height: 60px;
+      max-height: 360px;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      background: var(--bg);
+      font-size: 12px;
+    }
+    .gw-row {
+      display: flex;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      align-items: flex-start;
+    }
+    .gw-row:last-child { border-bottom: none; }
+    .gw-row-time {
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+      min-width: 100px;
+      flex-shrink: 0;
+      padding-top: 1px;
+    }
+    .gw-row-main { flex: 1; min-width: 0; }
+    .gw-row-title { font-weight: 600; color: var(--text); white-space: nowrap;
+                    overflow: hidden; text-overflow: ellipsis; }
+    .gw-row-sub { color: var(--muted); font-size: 11px; margin-top: 2px;
+                  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .gw-row-badge {
+      font-size: 10px; padding: 2px 7px; border-radius: 10px; font-weight: 700;
+      background: var(--surface); color: var(--muted); flex-shrink: 0;
+    }
+    .action-btn.primary {
+      background: var(--accent-dk);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: 600;
+    }
+    .action-btn.primary:hover { background: var(--accent); }
+
+    /* ── Permissions panel ── */
+    .perm-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      margin-bottom: 6px;
+    }
+    .perm-name {
+      flex: 1;
+      font-weight: 600;
+      font-size: 13px;
+      font-family: var(--mono);
+    }
+    .perm-count {
+      color: var(--muted);
+      font-size: 12px;
+      min-width: 60px;
+      text-align: right;
+    }
+    .pill {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 600;
+    }
+    .pill.allowed { background: #14532d; color: var(--green); }
+    .pill.denied  { background: #3f1515; color: var(--red); }
+
+    .perm-btn {
+      padding: 4px 12px;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .perm-btn:hover { background: var(--surface); border-color: var(--accent); }
+    .perm-btn.deny-btn:hover  { border-color: var(--red);   color: var(--red); }
+    .perm-btn.allow-btn:hover { border-color: var(--green); color: var(--green); }
+
+    /* ── Server log panel extras ── */
+    .srv-panel-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .6px;
+      text-transform: uppercase;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .hw-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .5px;
+      padding: 1px 7px;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+    /* Memory stats strip */
+    .memory-stats-strip {
+      display: flex;
+      gap: 24px;
+      padding: 10px 18px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      align-items: center;
+      flex-wrap: wrap;
+      background: var(--surface);
+    }
+    .mem-stat { display: flex; flex-direction: column; gap: 2px; }
+    .mem-stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+    .mem-stat strong { font-size: 13px; color: var(--text); }
+
+    /* ── Log panel (shared between Live Logs + server tabs) ── */
+    .log-toolbar {
+      display: flex;
+      gap: 8px;
+      padding: 10px 18px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .log-filter-input {
+      flex: 1;
+      min-width: 120px;
+      padding: 5px 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--text);
+      font-size: 12px;
+      font-family: var(--mono);
+    }
+    .log-filter-input:focus { outline: none; border-color: var(--accent); }
+
+    .level-btn {
+      padding: 4px 10px;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--muted);
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .level-btn.on { background: var(--surface); color: var(--text); border-color: var(--accent); }
+
+    .clear-log-btn {
+      padding: 4px 10px;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--muted);
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .clear-log-btn:hover { color: var(--red); border-color: var(--red); }
+
+    .autoscroll-label {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      color: var(--muted);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .log-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 18px;
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    .log-empty {
+      padding: 24px 0;
+      color: var(--muted);
+      font-size: 12px;
+      font-family: var(--mono);
+      text-align: center;
+    }
+
+    .log-entry {
+      display: flex;
+      gap: 8px;
+      padding: 2px 0;
+      border-bottom: 1px solid #1a1f27;
+    }
+    .log-ts   { color: var(--muted); min-width: 60px; }
+    .log-lvl  { min-width: 38px; font-weight: 700; }
+    .log-src  { color: #7dd3fc; min-width: 70px; }
+    .log-tid  { color: #a78bfa; min-width: 40px; font-size: 11px; }
+    .log-msg  { flex: 1; color: var(--text); }
+    .log-entry.INFO  .log-lvl { color: var(--accent); }
+    .log-entry.WARN  .log-lvl { color: var(--yellow); }
+    .log-entry.ERROR .log-lvl { color: var(--red); }
+    .log-entry.DEBUG .log-lvl { color: var(--muted); }
+
+    /* ── Config panel ── */
+    #config-display {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 18px;
+    }
+    pre#config-json {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--text);
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    /* ── Overview panel ── */
+    .overview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .server-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      transition: border-color 0.2s;
+    }
+    .server-card.status-idle   { border-left: 3px solid var(--green); }
+    .server-card.status-busy   { border-left: 3px solid var(--accent); }
+    .server-card.status-down   { border-left: 3px solid var(--red); }
+    .server-card.status-error  { border-left: 3px solid var(--yellow); }
+    .server-card.status-unknown { border-left: 3px solid var(--muted); }
+
+    .sc-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .sc-dot {
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .sc-dot.idle    { background: var(--green); }
+    .sc-dot.busy    { background: var(--accent); animation: pulse 1s infinite; }
+    .sc-dot.down    { background: var(--red); }
+    .sc-dot.error   { background: var(--yellow); }
+    .sc-dot.unknown { background: var(--muted); }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    .sc-name { font-weight: 700; font-size: 13px; }
+    .sc-status-pill {
+      margin-left: auto;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .sc-status-pill.idle    { background:#14532d; color:var(--green); }
+    .sc-status-pill.busy    { background:#1e3a5f; color:var(--accent); }
+    .sc-status-pill.down    { background:#3f1515; color:var(--red); }
+    .sc-status-pill.error   { background:#3f2d00; color:var(--yellow); }
+    .sc-status-pill.unknown { background:#1e293b; color:var(--muted); }
+
+    .sc-row {
+      display: flex;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .sc-row strong { color: var(--text); font-weight: 600; }
+    .sc-error { font-size: 11px; color: var(--red); margin-top: 2px; font-family: var(--mono); }
+
+    .overview-session {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      margin-bottom: 16px;
+    }
+    .ov-stat { font-size: 12px; color: var(--muted); }
+    .ov-stat strong { display: block; font-size: 14px; color: var(--text); margin-top: 2px; }
+
+    /* ── Action buttons ── */
+    .action-row {
+      display: flex;
+      gap: 8px;
+      padding: 10px 18px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      align-items: center;
+    }
+    .action-btn {
+      padding: 5px 14px;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .action-btn:hover { background: var(--surface); border-color: var(--accent); color: var(--accent); }
+    .action-btn.primary { border-color: var(--accent); color: var(--accent); }
+    .action-btn.danger  { }
+    .action-btn.danger:hover { border-color: var(--red); color: var(--red); }
+
+    /* ── Toast notifications ── */
+    #toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s;
+      z-index: 999;
+    }
+    #toast.show { opacity: 1; }
+    #toast.ok   { background: #14532d; color: var(--green); border: 1px solid var(--green); }
+    #toast.err  { background: #3f1515; color: var(--red);   border: 1px solid var(--red); }
+
+    /* scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Capabilities panel ── */
+    .cap-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 12px;
+    }
+    .cap-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+    }
+    .cap-card-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+    }
+    .cap-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .cap-row:last-child { border-bottom: none; }
+    .cap-row-info { flex: 1; min-width: 0; }
+    .cap-row-label { font-size: 12px; color: var(--text); font-weight: 600; }
+    .cap-row-desc { font-size: 11px; color: var(--muted); margin-top: 1px; }
+    .cap-select {
+      padding: 3px 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--text);
+      font-size: 12px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .cap-select:focus { outline: none; border-color: var(--accent); }
+
+    /* ── Export panel ── */
+    #export-output {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 18px;
+    }
+    pre#export-json {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text);
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    /* ── Cognition panel ── */
+    #panel-cognition {
+      overflow: hidden;
+    }
+    .cog-toolbar {
+      display: flex;
+      gap: 8px;
+      padding: 10px 18px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      align-items: center;
+      flex-wrap: wrap;
+      background: var(--surface);
+    }
+    .cog-toolbar-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      min-width: 130px;
+    }
+    .cog-tab-btn {
+      padding: 4px 12px;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--muted);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .cog-tab-btn.active, .cog-tab-btn:hover {
+      background: var(--surface);
+      color: var(--text);
+      border-color: var(--accent);
+    }
+    .cog-tab-btn.active { color: var(--accent); }
+    .cog-refresh-btn {
+      padding: 4px 10px;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--muted);
+      font-size: 11px;
+      cursor: pointer;
+      margin-left: auto;
+    }
+    .cog-refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .cog-status-badge {
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 10px;
+      font-weight: 600;
+    }
+    .cog-status-badge.enabled  { background: #14532d; color: var(--green); }
+    .cog-status-badge.disabled { background: #3f1515; color: var(--red); }
+
+    .cog-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 18px;
+      display: none;
+    }
+    .cog-body.active { display: block; }
+
+    /* Turn list */
+    .cog-turn-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .cog-turn-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .cog-turn-row:hover, .cog-turn-row.selected { border-color: var(--accent); }
+    .cog-turn-row.selected { background: #0d1929; }
+    .cog-turn-id {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--accent);
+      min-width: 40px;
+      font-weight: 700;
+    }
+    .cog-turn-ts {
+      font-size: 11px;
+      color: var(--muted);
+      min-width: 100px;
+    }
+    .cog-turn-preview {
+      flex: 1;
+      font-size: 12px;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .cog-turn-model {
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: #1e293b;
+      color: #7dd3fc;
+      flex-shrink: 0;
+    }
+    .cog-turn-esc {
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: #3f2d00;
+      color: var(--yellow);
+      flex-shrink: 0;
+    }
+    .cog-turn-detail {
+      margin-top: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      display: none;
+    }
+    .cog-turn-detail.open { display: block; }
+    .cog-detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .cog-detail-field {
+      font-size: 12px;
+    }
+    .cog-detail-field label {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      margin-bottom: 2px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .cog-detail-field span {
+      color: var(--text);
+      font-family: var(--mono);
+      word-break: break-all;
+    }
+    .cog-detail-section {
+      margin-top: 10px;
+      border-top: 1px solid var(--border);
+      padding-top: 10px;
+    }
+    .cog-detail-section h4 {
+      font-size: 11px;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+    .cog-tag {
+      display: inline-block;
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: #1e293b;
+      color: var(--text);
+      margin: 2px;
+      font-family: var(--mono);
+    }
+
+    /* Memory list */
+    .cog-memory-row {
+      padding: 10px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+    .cog-memory-header {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .cog-score {
+      font-family: var(--mono);
+      color: var(--accent);
+      font-size: 11px;
+    }
+    .cog-mem-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 4px;
+    }
+
+    /* Reflection list */
+    .cog-reflection-row {
+      padding: 12px 14px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+    .cog-reflection-header {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .cog-reflection-id {
+      font-family: var(--mono);
+      color: var(--accent);
+      font-size: 11px;
+    }
+    .cog-trigger-badge {
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 10px;
+      background: #1e3a5f;
+      color: var(--accent);
+    }
+    .cog-list-label {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin: 6px 0 3px;
+    }
+    .cog-text-item {
+      padding: 3px 8px;
+      border-left: 2px solid var(--border);
+      margin-bottom: 3px;
+      color: var(--text);
+      font-size: 12px;
+    }
+    .cog-similar-badge {
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 10px;
+      background: #1e293b;
+      color: var(--muted);
+      margin-left: auto;
+    }
+    .cog-similar-badge.seen { background: #3f2d00; color: var(--yellow); }
+
+    /* State delta list */
+    .cog-state-row {
+      padding: 12px 14px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+    .cog-state-header {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .cog-delta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .cog-delta-block {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 8px 10px;
+    }
+    .cog-delta-block h5 {
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-bottom: 4px;
+    }
+    .cog-delta-block pre {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text);
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .cog-diff-row {
+      display: flex;
+      gap: 8px;
+      font-size: 11px;
+      font-family: var(--mono);
+      padding: 2px 0;
+    }
+    .cog-diff-key { color: #7dd3fc; min-width: 100px; }
+    .cog-diff-old { color: var(--red); }
+    .cog-diff-arrow { color: var(--muted); }
+    .cog-diff-new  { color: var(--green); }
+
+    .cog-empty {
+      padding: 32px 0;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div id="ws-dot"></div>
+  <h1>EOS <span>/ Admin</span></h1>
+  <div id="status-bar">
+    <span>Tools: <strong id="sh-tools">—</strong></span>
+    <span>Disabled: <strong id="sh-disabled">—</strong></span>
+    <span>Blocked: <strong id="sh-blocked">—</strong></span>
+    <span>Turns: <strong id="sh-turns">—</strong></span>
+    <span>Session: <strong id="sh-session">—</strong></span>
+  </div>
+</header>
+
+<nav>
+  <div class="tab active" data-panel="overview">Overview</div>
+  <div class="tab" data-panel="tools">Tools</div>
+  <div class="tab" data-panel="permissions">Control &amp; Permissions</div>
+  <div class="tab" data-panel="tooldiag">Tool Registry Diagnostics</div>
+  <div class="tab-separator"></div>
+  <div class="tab" data-panel="logs">Live Logs</div>
+  <div class="tab" data-panel="srv-main-model">Main Model</div>
+  <div class="tab" data-panel="srv-tool-svr">Tool Svr.</div>
+  <div class="tab" data-panel="srv-creativity">Creativity</div>
+  <div class="tab" data-panel="srv-sub-think">Sub. Think.</div>
+  <div class="tab" data-panel="srv-vision">Vision</div>
+  <div class="tab" data-panel="srv-memory">Memory</div>
+  <div class="tab-separator"></div>
+  <div class="tab" data-panel="cognition">Cognition</div>
+  <div class="tab-separator"></div>
+  <div class="tab" data-panel="computer-use">Computer Use</div>
+  <div class="tab-separator"></div>
+  <div class="tab" data-panel="integrations">Integrations</div>
+  <div class="tab" data-panel="config">Config</div>
+  <div class="tab" data-panel="export">Export</div>
+  <div class="tab-separator"></div>
+  <a class="tab tab-docs-link" href="/docs" target="_blank">📖 Docs</a>
+</nav>
+
+<main>
+
+  <!-- ── OVERVIEW PANEL ── -->
+  <div class="panel active" id="panel-overview">
+    <div class="panel-body">
+
+      <!-- Session info row -->
+      <div class="overview-session" id="ov-session">
+        <div class="ov-stat">Session ID<strong id="ov-session-id">—</strong></div>
+        <div class="ov-stat">Turns<strong id="ov-turns">—</strong></div>
+        <div class="ov-stat">Boot time<strong id="ov-boot">—</strong></div>
+        <div class="ov-stat">Tools loaded<strong id="ov-tools">—</strong></div>
+      </div>
+
+      <!-- Server cards -->
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px;letter-spacing:0.5px;text-transform:uppercase;">
+        Inference Servers
+        <span id="ov-refresh-ts" style="margin-left:12px;"></span>
+      </div>
+      <div class="overview-grid" id="server-cards">
+        <div class="spinner"></div> Loading…
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── TOOLS PANEL ── -->
+  <div class="panel" id="panel-tools">
+    <div class="panel-body">
+      <input type="text" id="search-tools" placeholder="Filter tools by name, description, or permission class…" />
+      <div id="tool-list"><div class="spinner"></div> Loading…</div>
+    </div>
+  </div>
+
+  <!-- ── PERMISSIONS / CONTROL PANEL ── -->
+  <div class="panel" id="panel-permissions">
+    <div class="panel-body" id="perm-panel-body">
+
+      <!-- ── Section: Capabilities ── -->
+      <div class="ctrl-section">
+        <div class="ctrl-section-header">
+          <span class="ctrl-section-title">Capabilities</span>
+          <span class="ctrl-section-sub">Live runtime controls — toggles take effect immediately without restart. Changes are memory-only and reset on next boot (set values in config.json to persist).</span>
+          <button class="action-btn" id="cap-refresh-btn" style="margin-left:auto">↻ Refresh</button>
+        </div>
+        <div class="cap-grid" id="cap-grid"><div class="spinner"></div> Loading…</div>
+      </div>
+
+      <!-- ── Section: Runtime Permission Classes ── -->
+      <div class="ctrl-section">
+        <div class="ctrl-section-header">
+          <span class="ctrl-section-title">Runtime Permission Classes</span>
+          <span class="ctrl-section-sub">Live allow/deny — takes effect immediately. Use Config Allowlist below to persist across restarts.</span>
+          <button class="action-btn" id="perm-refresh-btn" style="margin-left:auto">↻ Refresh</button>
+        </div>
+        <div id="perm-list"><div class="spinner"></div> Loading…</div>
+      </div>
+
+      <!-- ── Section: Config Allowlist (persisted) ── -->
+      <div class="ctrl-section">
+        <div class="ctrl-section-header">
+          <span class="ctrl-section-title">Config Allowlist</span>
+          <span class="ctrl-section-sub">Persisted in config.json — changes survive restart. Classes not in this list are blocked at boot.</span>
+        </div>
+        <div class="ctrl-add-row">
+          <input type="text" id="allowlist-add-input" placeholder="permission_class name…" class="ctrl-text-input" />
+          <button class="action-btn primary" id="allowlist-add-btn">+ Add to Allowlist</button>
+        </div>
+        <div id="allowlist-list"><div class="spinner"></div> Loading…</div>
+      </div>
+
+      <!-- ── Section: Toolpack Management ── -->
+      <div class="ctrl-section">
+        <div class="ctrl-section-header">
+          <span class="ctrl-section-title">Toolpack Management</span>
+          <span class="ctrl-section-sub">Enable or disable packs and individual tools. Takes effect immediately. Click a pack name to expand its tools.</span>
+          <button class="action-btn" id="tp-refresh-btn" style="margin-left:auto">↻ Refresh</button>
+        </div>
+        <div id="toolpack-list"><div class="spinner"></div> Loading…</div>
+      </div>
+
+      <!-- ── Section: Tool Action Audit Log ── -->
+      <div class="ctrl-section">
+        <div class="ctrl-section-header">
+          <span class="ctrl-section-title">Tool Action Audit Log</span>
+          <span class="ctrl-section-sub">All reversible and irreversible tool actions taken by the entity. Read-only actions are not recorded.</span>
+          <button class="action-btn" id="audit-refresh-btn" style="margin-left:auto">↻ Refresh</button>
+        </div>
+        <div id="audit-log-area" class="audit-area"><p style="color:var(--muted);font-size:12px">Loading…</p></div>
+      </div>
+
+      <!-- ── Section: Subsystem Wiring ── -->
+      <div class="ctrl-section">
+        <div class="ctrl-section-header">
+          <span class="ctrl-section-title">Subsystem Wiring</span>
+          <span class="ctrl-section-sub">Optional subsystems that return 503 when not attached.</span>
+          <button class="action-btn" id="subsys-refresh-btn" style="margin-left:auto">↻ Refresh</button>
+        </div>
+        <div id="subsystem-list"><div class="spinner"></div> Loading…</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── LIVE LOGS PANEL ── -->
+  <div class="panel" id="panel-logs">
+    <div class="log-toolbar" id="log-toolbar-main">
+      <input type="text" class="log-filter-input" id="log-filter-main" placeholder="Filter log messages…" />
+      <button class="level-btn on" data-log="main" data-level="INFO">INFO</button>
+      <button class="level-btn on" data-log="main" data-level="WARN">WARN</button>
+      <button class="level-btn on" data-log="main" data-level="ERROR">ERROR</button>
+      <button class="level-btn on" data-log="main" data-level="DEBUG">DEBUG</button>
+      <button class="clear-log-btn" data-log="main">Clear</button>
+      <label class="autoscroll-label">
+        <input type="checkbox" id="autoscroll-main" checked /> Auto-scroll
+      </label>
+    </div>
+    <div class="log-list" id="log-list-main"></div>
+  </div>
+
+  <!-- ── MAIN MODEL LOG PANEL ── -->
+  <div class="panel" id="panel-srv-main-model">
+    <div class="log-toolbar">
+      <span class="srv-panel-title">Main Model</span>
+      <span class="hw-badge" id="hw-badge-main-model"></span>
+      <input type="text" class="log-filter-input" id="log-filter-main-model" placeholder="Filter primary inference log…" />
+      <button class="level-btn on" data-log="main-model" data-level="INFO">INFO</button>
+      <button class="level-btn on" data-log="main-model" data-level="WARN">WARN</button>
+      <button class="level-btn on" data-log="main-model" data-level="ERROR">ERROR</button>
+      <button class="level-btn on" data-log="main-model" data-level="DEBUG">DEBUG</button>
+      <button class="clear-log-btn" data-log="main-model">Clear</button>
+      <label class="autoscroll-label">
+        <input type="checkbox" id="autoscroll-main-model" checked /> Auto-scroll
+      </label>
+    </div>
+    <div class="log-list" id="log-list-main-model"></div>
+  </div>
+
+  <!-- ── TOOL SERVER LOG PANEL ── -->
+  <div class="panel" id="panel-srv-tool-svr">
+    <div class="log-toolbar">
+      <span class="srv-panel-title">Tool Server</span>
+      <span class="hw-badge" id="hw-badge-tool-svr"></span>
+      <input type="text" class="log-filter-input" id="log-filter-tool-svr" placeholder="Filter tool extraction server log…" />
+      <button class="level-btn on" data-log="tool-svr" data-level="INFO">INFO</button>
+      <button class="level-btn on" data-log="tool-svr" data-level="WARN">WARN</button>
+      <button class="level-btn on" data-log="tool-svr" data-level="ERROR">ERROR</button>
+      <button class="level-btn on" data-log="tool-svr" data-level="DEBUG">DEBUG</button>
+      <button class="clear-log-btn" data-log="tool-svr">Clear</button>
+      <label class="autoscroll-label">
+        <input type="checkbox" id="autoscroll-tool-svr" checked /> Auto-scroll
+      </label>
+    </div>
+    <div class="log-list" id="log-list-tool-svr"></div>
+  </div>
+
+  <!-- ── CREATIVITY LOG PANEL ── -->
+  <div class="panel" id="panel-srv-creativity">
+    <div class="log-toolbar">
+      <span class="srv-panel-title">Creativity</span>
+      <span class="hw-badge" id="hw-badge-creativity"></span>
+      <input type="text" class="log-filter-input" id="log-filter-creativity" placeholder="Filter creativity model log…" />
+      <button class="level-btn on" data-log="creativity" data-level="INFO">INFO</button>
+      <button class="level-btn on" data-log="creativity" data-level="WARN">WARN</button>
+      <button class="level-btn on" data-log="creativity" data-level="ERROR">ERROR</button>
+      <button class="level-btn on" data-log="creativity" data-level="DEBUG">DEBUG</button>
+      <button class="clear-log-btn" data-log="creativity">Clear</button>
+      <label class="autoscroll-label">
+        <input type="checkbox" id="autoscroll-creativity" checked /> Auto-scroll
+      </label>
+    </div>
+    <div class="log-list" id="log-list-creativity"></div>
+  </div>
+
+  <!-- ── SUB. THINK. LOG PANEL ── -->
+  <div class="panel" id="panel-srv-sub-think">
+    <div class="log-toolbar">
+      <span class="srv-panel-title">Sub. Think.</span>
+      <span class="hw-badge" id="hw-badge-sub-think"></span>
+      <input type="text" class="log-filter-input" id="log-filter-sub-think" placeholder="Filter subservient thinking model log…" />
+      <button class="level-btn on" data-log="sub-think" data-level="INFO">INFO</button>
+      <button class="level-btn on" data-log="sub-think" data-level="WARN">WARN</button>
+      <button class="level-btn on" data-log="sub-think" data-level="ERROR">ERROR</button>
+      <button class="level-btn on" data-log="sub-think" data-level="DEBUG">DEBUG</button>
+      <button class="clear-log-btn" data-log="sub-think">Clear</button>
+      <label class="autoscroll-label">
+        <input type="checkbox" id="autoscroll-sub-think" checked /> Auto-scroll
+      </label>
+    </div>
+    <div class="log-list" id="log-list-sub-think"></div>
+  </div>
+
+  <!-- ── VISION LOG PANEL ── -->
+  <div class="panel" id="panel-srv-vision">
+    <div class="log-toolbar">
+      <span class="srv-panel-title">Vision</span>
+      <span class="hw-badge" id="hw-badge-vision"></span>
+      <input type="text" class="log-filter-input" id="log-filter-vision" placeholder="Filter vision server log…" />
+      <button class="level-btn on" data-log="vision" data-level="INFO">INFO</button>
+      <button class="level-btn on" data-log="vision" data-level="WARN">WARN</button>
+      <button class="level-btn on" data-log="vision" data-level="ERROR">ERROR</button>
+      <button class="level-btn on" data-log="vision" data-level="DEBUG">DEBUG</button>
+      <button class="clear-log-btn" data-log="vision">Clear</button>
+      <label class="autoscroll-label">
+        <input type="checkbox" id="autoscroll-vision" checked /> Auto-scroll
+      </label>
+    </div>
+    <div class="log-list" id="log-list-vision"></div>
+  </div>
+
+  <!-- ── MEMORY PANEL ── -->
+  <div class="panel" id="panel-srv-memory">
+    <!-- Stats strip -->
+    <div class="memory-stats-strip" id="mem-stats-strip">
+      <span class="mem-stat"><span class="mem-stat-label">Collection</span><strong id="mem-stat-size">—</strong></span>
+      <span class="mem-stat"><span class="mem-stat-label">Embed model</span><strong id="mem-stat-model">—</strong></span>
+      <span class="mem-stat"><span class="mem-stat-label">Last store</span><strong id="mem-stat-last-store">—</strong></span>
+      <span class="mem-stat"><span class="mem-stat-label">Last retrieve</span><strong id="mem-stat-last-retrieve">—</strong></span>
+      <button class="action-btn" id="mem-stats-refresh" style="margin-left:auto">↻ Refresh</button>
+    </div>
+    <!-- Live log (filtered to memory/retrieval sources) -->
+    <div class="log-toolbar">
+      <span class="srv-panel-title">Memory Log</span>
+      <input type="text" class="log-filter-input" id="log-filter-memory" placeholder="Filter memory &amp; retrieval log…" />
+      <button class="level-btn on" data-log="memory" data-level="INFO">INFO</button>
+      <button class="level-btn on" data-log="memory" data-level="WARN">WARN</button>
+      <button class="level-btn on" data-log="memory" data-level="ERROR">ERROR</button>
+      <button class="level-btn on" data-log="memory" data-level="DEBUG">DEBUG</button>
+      <button class="clear-log-btn" data-log="memory">Clear</button>
+      <label class="autoscroll-label">
+        <input type="checkbox" id="autoscroll-memory" checked /> Auto-scroll
+      </label>
+    </div>
+    <div class="log-list" id="log-list-memory"></div>
+  </div>
+
+  <!-- ── INTEGRATIONS PANEL ── -->
+  <div class="panel" id="panel-integrations">
+    <div class="panel-body">
+
+      <div class="ctrl-section">
+        <div class="ctrl-section-header">
+          <span class="ctrl-section-title">Integrations</span>
+          <span class="ctrl-section-sub">Third-party service connections. Status is live — no page reload needed.</span>
+          <button class="action-btn" id="integ-refresh-btn" style="margin-left:auto">↻ Refresh</button>
+        </div>
+
+        <!-- Google Workspace card -->
+        <div class="integ-card" id="gw-card">
+
+          <!-- ── Header ─────────────────────────────────────────────────── -->
+          <div class="integ-card-header">
+            <span class="integ-logo">🔵</span>
+            <span class="integ-title">Google Workspace</span>
+            <span id="gw-status-badge" class="integ-status-badge unconfigured">Loading…</span>
+            <button class="action-btn" id="gw-refresh-btn" style="margin-left:8px">↻ Refresh</button>
+          </div>
+
+          <!-- ── Authorization section ─────────────────────────────────── -->
+          <div id="gw-auth-section" style="margin-bottom:14px">
+
+            <div id="gw-hint-setup" style="display:none" class="integ-hint">
+              ⚙ <strong>Setup required:</strong> Place your Google OAuth desktop client JSON at
+              <code>config/google/client_secret.json</code>, set
+              <code>google_workspace.enabled = true</code> in config.json, then restart.
+              Full instructions: <code>config/google/README.md</code>
+            </div>
+            <div id="gw-hint-disabled" style="display:none" class="integ-hint">
+              ⚙ Integration is disabled. Set <code>google_workspace.enabled = true</code> in config.json and restart.
+            </div>
+            <div id="gw-hint-libs" style="display:none" class="integ-hint">
+              📦 Google API libraries not installed.
+              Run: <code>pip install google-api-python-client google-auth-oauthlib google-auth-httplib2</code>
+            </div>
+
+            <div id="gw-connected-info" style="display:none">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+                <div class="subsys-dot wired"></div>
+                <span style="font-size:13px;font-weight:600;color:var(--green)">Connected</span>
+                <span id="gw-account-hint" style="font-size:12px;color:var(--muted)"></span>
+              </div>
+            </div>
+            <div id="gw-needs-auth" style="display:none">
+              <p style="font-size:12px;color:var(--muted);margin:0 0 10px">
+                Google account not yet authorized. Click the button below — a browser window will open for sign-in. Return to this tab when done.
+              </p>
+            </div>
+            <div id="gw-auth-pending" style="display:none">
+              <div style="font-size:12px;color:var(--accent);margin-bottom:10px;display:flex;align-items:center;gap:8px">
+                <span class="spinner" style="width:12px;height:12px;border-width:2px;flex-shrink:0"></span>
+                Authorization window open — waiting for Google sign-in…
+                <button class="action-btn" id="gw-auth-cancel-btn">Cancel</button>
+              </div>
+            </div>
+
+            <div id="gw-error-box" style="display:none" class="integ-error"></div>
+
+            <div class="integ-actions">
+              <button class="action-btn primary" id="gw-authorize-btn" style="display:none">🔐 Connect Google Account</button>
+              <button class="action-btn" id="gw-reauth-btn" style="display:none">🔄 Re-authorize</button>
+              <button class="action-btn" id="gw-revoke-btn" style="display:none">✕ Revoke Access</button>
+            </div>
+          </div>
+
+          <!-- ── Service flags ──────────────────────────────────────────── -->
+          <div class="integ-flags" id="gw-flags" style="margin-bottom:14px"></div>
+
+          <!-- ── Live data tabs (shown only when token is valid) ────────── -->
+          <div id="gw-data-section" style="display:none">
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Live Data</div>
+            <div style="display:flex;gap:6px;margin-bottom:12px">
+              <button class="gw-tab-btn active" data-gwtab="calendar">📅 Calendar</button>
+              <button class="gw-tab-btn" data-gwtab="gmail">📧 Gmail</button>
+              <button class="gw-tab-btn" data-gwtab="drive">📁 Drive</button>
+            </div>
+
+            <!-- Calendar -->
+            <div class="gw-tab-panel" id="gwtab-calendar">
+              <div style="display:flex;gap:6px;margin-bottom:8px;align-items:center;flex-wrap:wrap">
+                <button class="action-btn" id="gw-cal-today-btn">Today</button>
+                <button class="action-btn" id="gw-cal-week-btn">Next 7 days</button>
+                <input type="text" id="gw-cal-search" class="ctrl-text-input"
+                  placeholder="Search events…" style="flex:1;min-width:160px;max-width:300px" />
+                <button class="action-btn" id="gw-cal-search-btn">Search</button>
+              </div>
+              <div id="gw-cal-results" class="gw-data-area">
+                <span style="color:var(--muted);font-size:12px">Click Today or Next 7 days to load events.</span>
+              </div>
+            </div>
+
+            <!-- Gmail -->
+            <div class="gw-tab-panel" id="gwtab-gmail" style="display:none">
+              <div style="display:flex;gap:6px;margin-bottom:8px;align-items:center;flex-wrap:wrap">
+                <button class="action-btn" id="gw-gmail-inbox-btn">Inbox</button>
+                <button class="action-btn" id="gw-gmail-unread-btn">Unread</button>
+                <input type="text" id="gw-gmail-query" class="ctrl-text-input"
+                  placeholder="Gmail query (e.g. from:alice)…" style="flex:1;min-width:160px;max-width:300px" />
+                <button class="action-btn" id="gw-gmail-search-btn">Search</button>
+              </div>
+              <div id="gw-gmail-results" class="gw-data-area">
+                <span style="color:var(--muted);font-size:12px">Click Inbox to load messages.</span>
+              </div>
+            </div>
+
+            <!-- Drive -->
+            <div class="gw-tab-panel" id="gwtab-drive" style="display:none">
+              <div style="display:flex;gap:6px;margin-bottom:8px;align-items:center;flex-wrap:wrap">
+                <button class="action-btn" id="gw-drive-recent-btn">Recent Files</button>
+                <input type="text" id="gw-drive-search" class="ctrl-text-input"
+                  placeholder="Search Drive files…" style="flex:1;min-width:160px;max-width:300px" />
+                <button class="action-btn" id="gw-drive-search-btn">Search</button>
+              </div>
+              <div id="gw-drive-results" class="gw-data-area">
+                <span style="color:var(--muted);font-size:12px">Click Recent Files to load.</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── Config summary ─────────────────────────────────────────── -->
+          <div id="gw-config-summary" style="display:none;margin-top:14px">
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Configuration</div>
+            <div id="gw-config-flags" class="integ-flags"></div>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CONFIG PANEL ── -->
+  <div class="panel" id="panel-config">
+    <div id="config-display">
+      <pre id="config-json">Loading…</pre>
+    </div>
+  </div>
+
+  <!-- ── EXPORT PANEL ── -->
+  <div class="panel" id="panel-export">
+    <div class="action-row">
+      <button class="action-btn primary" id="btn-export">Generate Diagnostic Bundle</button>
+      <button class="action-btn" id="btn-export-download">Download JSON</button>
+      <span style="font-size:12px;color:var(--muted);margin-left:8px;" id="export-hint">
+        Collects all runtime + server logs and saves to exports/
+      </span>
+    </div>
+    <div id="export-output">
+      <pre id="export-json" style="color:var(--muted)">Click "Generate Diagnostic Bundle" to export all logs.</pre>
+    </div>
+  </div>
+
+  <!-- ── COGNITION PANEL ── -->
+  <div class="panel" id="panel-cognition">
+
+    <!-- Toolbar with sub-tab switcher -->
+    <div class="cog-toolbar">
+      <span class="cog-toolbar-title">Cognition</span>
+      <button class="cog-tab-btn active" data-cog="turns">Turn Trace</button>
+      <button class="cog-tab-btn" data-cog="memory">Memory Influence</button>
+      <button class="cog-tab-btn" data-cog="reflection">Reflection Events</button>
+      <button class="cog-tab-btn" data-cog="state">State Changes</button>
+      <span id="cog-enabled-badge" class="cog-status-badge" style="margin-left:8px;"></span>
+      <button class="cog-refresh-btn" id="cog-refresh-btn">↻ Refresh</button>
+    </div>
+
+    <!-- Panel 1: Turn Trace -->
+    <div class="cog-body active" id="cog-body-turns">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">
+        Select a turn to inspect its full trace across all panels.
+      </div>
+      <div id="cog-turn-list" class="cog-turn-list">
+        <div class="cog-empty">No turn traces yet. Start a conversation to populate this view.</div>
+      </div>
+      <!-- Expandable detail pane (shown below the selected row) -->
+      <div class="cog-turn-detail" id="cog-turn-detail"></div>
+    </div>
+
+    <!-- Panel 2: Memory Influence -->
+    <div class="cog-body" id="cog-body-memory">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">
+        Memory items retrieved and injected into context for each turn.
+      </div>
+      <div id="cog-memory-list">
+        <div class="cog-empty">No memory traces yet.</div>
+      </div>
+    </div>
+
+    <!-- Panel 3: Reflection Events -->
+    <div class="cog-body" id="cog-body-reflection">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">
+        Outputs from reflection loops: conclusions, suggestions, and whether similar reflections occurred before.
+      </div>
+      <div id="cog-reflection-list">
+        <div class="cog-empty">No reflection events recorded yet.</div>
+      </div>
+    </div>
+
+    <!-- Panel 4: State Changes -->
+    <div class="cog-body" id="cog-body-state">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">
+        Persistent state snapshots before and after each turn, plus new memory entries added.
+      </div>
+      <div id="cog-state-list">
+        <div class="cog-empty">No state deltas recorded yet.</div>
+      </div>
+    </div>
+
+  </div>
+
+
+  <div class="panel" id="panel-tooldiag">
+    <div class="panel-body">
+
+      <div class="ctrl-section">
+        <div class="ctrl-section-header">
+          <span class="ctrl-section-title">Tool Registry Diagnostics</span>
+          <span class="ctrl-section-sub">Live snapshot of the tool registry — loaded packs, resolved names, and permission annotations.</span>
+          <button class="action-btn" id="tooldiag-refresh-btn" style="margin-left:auto">↻ Refresh</button>
+        </div>
+        <pre id="tooldiag-pre" style="font-family:var(--mono);font-size:12px;color:var(--text);white-space:pre-wrap;word-break:break-all;">Loading…</pre>
+      </div>
+
+      <div class="ctrl-section">
+        <div class="ctrl-section-header">
+          <span class="ctrl-section-title">Shadow Databases</span>
+          <span class="ctrl-section-sub">Per-tool shadow state records persisted across turns.</span>
+        </div>
+        <pre id="shadowdb-pre" style="font-family:var(--mono);font-size:12px;color:var(--text);white-space:pre-wrap;word-break:break-all;">Loading…</pre>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── COMPUTER USE PANEL ── -->
+  <div class="panel" id="panel-computer-use">
+    <div class="panel-body">
+
+      <!-- Mode control -->
+      <div class="ctrl-section">
+        <div class="ctrl-section-header">
+          <span class="ctrl-section-title">Mode</span>
+          <span class="ctrl-section-sub">Controls whether the entity may use any computer applications at all.</span>
+          <button class="action-btn" id="cu-halt-btn" style="margin-left:auto;background:#3f1515;color:var(--red);border-color:#5a1e1e;" onclick="cuHalt()">⛔ HALT</button>
+          <button class="action-btn" id="cu-refresh-btn" style="margin-left:8px" onclick="loadComputerUse()">↻ Refresh</button>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+          <button class="action-btn cu-mode-btn" data-mode="off"                onclick="cuSetMode('off')"                style="min-width:90px">Off</button>
+          <button class="action-btn cu-mode-btn" data-mode="command_only"       onclick="cuSetMode('command_only')"       style="min-width:140px">Command Only</button>
+          <button class="action-btn cu-mode-btn" data-mode="supervised_session" onclick="cuSetMode('supervised_session')" style="min-width:180px">Supervised Session</button>
+        </div>
+        <div id="cu-mode-desc" style="font-size:12px;color:var(--muted);margin-bottom:6px;"></div>
+        <div id="cu-session-info" style="display:flex;gap:18px;font-size:12px;flex-wrap:wrap;"></div>
+      </div>
+
+      <!-- Active context -->
+      <div class="ctrl-section">
+        <div class="ctrl-section-header">
+          <span class="ctrl-section-title">Active Context</span>
+          <span class="ctrl-section-sub">What the entity is currently interacting with, if anything.</span>
+        </div>
+        <div id="cu-active-ctx" style="font-size:13px;color:var(--muted);">No active application.</div>
+        <div id="cu-pending-conf" style="margin-top:12px;"></div>
+      </div>
+
+      <!-- Approved shortcuts -->
+      <div class="ctrl-section">
+        <div class="ctrl-section-header">
+          <span class="ctrl-section-title">Approved Shortcuts</span>
+          <span class="ctrl-section-sub">Only applications listed here may be accessed. Add or remove files from <code>data/computer_use/approved_shortcuts/</code> to change this list, then click Reload.</span>
+          <button class="action-btn" style="margin-left:auto" onclick="cuReload()">↻ Reload from disk</button>
+        </div>
+        <div id="cu-shortcuts-list" style="display:flex;flex-direction:column;gap:6px;"></div>
+      </div>
+
+      <!-- Per-app policies -->
+      <div class="ctrl-section">
+        <div class="ctrl-section-header">
+          <span class="ctrl-section-title">Application Policies</span>
+          <span class="ctrl-section-sub">Per-application action policies loaded from <code>data/computer_use/app_policy.json</code>.</span>
+        </div>
+        <div id="cu-policies-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+      </div>
+
+      <!-- Decision log -->
+      <div class="ctrl-section">
+        <div class="ctrl-section-header">
+          <span class="ctrl-section-title">Recent Decisions</span>
+          <span class="ctrl-section-sub">Last 20 allow/deny/pending/event entries from the decision ring.</span>
+        </div>
+        <div class="audit-area" id="cu-decision-log"></div>
+      </div>
+
+    </div>
+  </div>
+
+</main>
+
+<div id="toast"></div>
+<script>
+// ═══════════════════════════════════════════════════════════
+//  Utilities
+// ═══════════════════════════════════════════════════════════
+
+function toast(msg, ok = true) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `show ${ok ? 'ok' : 'err'}`;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 2400);
+}
+
+async function api(method, path, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body !== undefined) opts.body = JSON.stringify(body);
+  const r = await fetch(path, opts);
+  return r.json();
+}
+
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  Tab switching
+// ═══════════════════════════════════════════════════════════
+
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    const panelId = `panel-${tab.dataset.panel}`;
+    document.getElementById(panelId).classList.add('active');
+    if (tab.dataset.panel === 'tools')       loadTools();
+    if (tab.dataset.panel === 'permissions') loadPermissionsPanel();
+    if (tab.dataset.panel === 'tooldiag') loadToolDiagnostics();
+    if (tab.dataset.panel === 'config')      loadConfig();
+    if (tab.dataset.panel === 'overview')    loadOverview();
+    // Re-render server log panels when switching to them (in case new entries arrived)
+    if (tab.dataset.panel === 'srv-main-model')  renderServerLog('main-model');
+    if (tab.dataset.panel === 'srv-tool-svr')    renderServerLog('tool-svr');
+    if (tab.dataset.panel === 'srv-creativity')  renderServerLog('creativity');
+    if (tab.dataset.panel === 'srv-sub-think')   renderServerLog('sub-think');
+    if (tab.dataset.panel === 'srv-vision')      renderServerLog('vision');
+    if (tab.dataset.panel === 'srv-memory')      { renderServerLog('memory'); loadMemoryStats(); }
+    // Load cognition data when switching to the Cognition tab
+    if (tab.dataset.panel === 'cognition')     loadCognition();
+    if (tab.dataset.panel === 'integrations')  loadIntegrations();
+    if (tab.dataset.panel === 'computer-use')  loadComputerUse();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
+//  Status bar
+// ═══════════════════════════════════════════════════════════
+
+async function refreshStatus() {
+  try {
+    const d = await api('GET', '/admin/status');
+    if (!d.ok) return;
+    document.getElementById('sh-tools').textContent    = d.tool_count ?? '—';
+    document.getElementById('sh-disabled').textContent = d.disabled_count ?? '0';
+    document.getElementById('sh-blocked').textContent  = (d.denied_classes || []).length;
+    document.getElementById('sh-turns').textContent    = d.turn_count ?? '—';
+    // Session ID: just show last 8 chars
+    const sid = d.session_id || '';
+    document.getElementById('sh-session').textContent = sid ? sid.slice(-8) : '—';
+  } catch(e) {}
+}
+refreshStatus();
+setInterval(refreshStatus, 5000);
+
+// ═══════════════════════════════════════════════════════════
+//  Overview panel
+// ═══════════════════════════════════════════════════════════
+
+async function loadOverview() {
+  try {
+    const [statusRes, serversRes] = await Promise.all([
+      api('GET', '/api/status'),
+      api('GET', '/admin/servers/status'),
+    ]);
+
+    // Session info
+    if (statusRes.ok) {
+      const s = statusRes.session || {};
+      document.getElementById('ov-session-id').textContent = s.session_id || '—';
+      document.getElementById('ov-turns').textContent      = s.turn_count ?? '—';
+      document.getElementById('ov-boot').textContent       = statusRes.boot_time_s != null
+        ? `${statusRes.boot_time_s}s` : '—';
+    }
+    try {
+      const toolsRes = await api('GET', '/admin/tools');
+      document.getElementById('ov-tools').textContent = toolsRes.data ? toolsRes.data.length : '—';
+    } catch(e) {}
+
+    // Server cards
+    const grid = document.getElementById('server-cards');
+    if (!serversRes.ok || !serversRes.data) {
+      grid.innerHTML = '<p style="color:var(--red)">Could not load server status.</p>';
+      return;
+    }
+    document.getElementById('ov-refresh-ts').textContent =
+      `Last checked: ${new Date().toLocaleTimeString('en-US', {hour12: false})}`;
+
+    grid.innerHTML = serversRes.data.map(sv => {
+      const st = sv.status || 'unknown';
+      const dotCls = st;
+      const latency = sv.latency_ms != null ? `${sv.latency_ms}ms` : '—';
+      const modelPath = sv.model || sv.model_path || '';
+      const model = modelPath ? modelPath.replace(/\\/g, '/').split('/').pop() || 'unknown' : 'unknown';
+      const checked = sv.last_checked || '—';
+      const errorHtml = sv.error
+        ? `<div class="sc-error">⚠ ${escHtml(sv.error)}</div>` : '';
+      return `
+        <div class="server-card status-${st}">
+          <div class="sc-header">
+            <div class="sc-dot ${dotCls}"></div>
+            <div class="sc-name">${escHtml(sv.role)}</div>
+            <div class="sc-status-pill ${st}">${st}</div>
+          </div>
+          <div class="sc-row"><span>Role:</span> <strong>${escHtml(sv.role)}</strong></div>
+          <div class="sc-row"><span>Port:</span> <strong>${sv.port}</strong></div>
+          <div class="sc-row"><span>Model:</span> <strong>${escHtml(model)}</strong></div>
+          <div class="sc-row"><span>Latency:</span> <strong>${latency}</strong></div>
+          <div class="sc-row"><span>Last probed:</span> <strong>${checked}</strong></div>
+          ${errorHtml}
+        </div>`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('server-cards').innerHTML =
+      `<p style="color:var(--red)">Error loading overview: ${escHtml(e.message)}</p>`;
+  }
+}
+
+// Load overview on startup
+loadOverview();
+setInterval(loadOverview, 15000);
+
+// ═══════════════════════════════════════════════════════════
+//  Tools panel
+// ═══════════════════════════════════════════════════════════
+
+let _toolsCache = [];
+
+async function loadTools() {
+  const list = document.getElementById('tool-list');
+  list.innerHTML = '<div class="spinner"></div> Loading…';
+  try {
+    const d = await api('GET', '/admin/tools');
+    if (!d.ok) { list.innerHTML = `<p style="color:var(--red)">Error loading tools</p>`; return; }
+    _toolsCache = d.data || [];
+    renderTools(document.getElementById('search-tools').value.trim().toLowerCase());
+  } catch(e) {
+    list.innerHTML = `<p style="color:var(--red)">${e.message}</p>`;
+  }
+}
+
+function _riskLabel(r) {
+  const m = { read_only:'READ', draft:'DRAFT', reversible_commit:'REV', irreversible_commit:'IRREV' };
+  return m[r] || r || '—';
+}
+function _trustLabel(t) {
+  const m = { public:'PUBLIC', verified_user:'USER', operator_only:'OPERATOR' };
+  return m[t] || t || '—';
+}
+function _confirmLabel(c) {
+  const m = { none:'NO-CONFIRM', soft_confirm:'SOFT', hard_confirm:'HARD' };
+  return m[c] || c || '—';
+}
+
+function renderTools(filter) {
+  const list = document.getElementById('tool-list');
+  const tools = filter
+    ? _toolsCache.filter(t =>
+        t.name.toLowerCase().includes(filter) ||
+        (t.description||'').toLowerCase().includes(filter) ||
+        (t.pack||'').toLowerCase().includes(filter) ||
+        (t.risk_level||'').toLowerCase().includes(filter) ||
+        (t.trust_level||'').toLowerCase().includes(filter))
+    : _toolsCache;
+
+  if (!tools.length) {
+    list.innerHTML = '<p style="color:var(--muted);padding:8px 0">No tools match filter.</p>';
+    return;
+  }
+
+  list.innerHTML = tools.map(t => {
+    const enabled = t.enabled !== false;
+    const rl = t.risk_level  || '';
+    const tl = t.trust_level || '';
+    const cp = t.confirmation_policy || '';
+    return `
+      <div class="tool-row${enabled ? '' : ' disabled-row'}" data-name="${escHtml(t.name)}">
+        <div class="tool-name" title="${escHtml(t.name)}">${escHtml(t.name)}</div>
+        <div class="tool-desc" title="${escHtml(t.description||'')}">${escHtml(t.description||'')}</div>
+        <span class="risk-badge ${escHtml(rl)}" title="Risk: ${escHtml(rl)}">${_riskLabel(rl)}</span>
+        <span class="trust-badge ${escHtml(tl)}" title="Trust: ${escHtml(tl)}">${_trustLabel(tl)}</span>
+        <span class="confirm-badge ${escHtml(cp)}" title="Confirm: ${escHtml(cp)}">${_confirmLabel(cp)}</span>
+        <label class="toggle" title="${enabled ? 'Click to disable' : 'Click to enable'}">
+          <input type="checkbox" ${enabled ? 'checked' : ''} data-tool="${escHtml(t.name)}" />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>`;
+  }).join('');
+
+  list.querySelectorAll('input[data-tool]').forEach(cb => {
+    cb.addEventListener('change', async () => {
+      const name = cb.dataset.tool;
+      const action = cb.checked ? 'enable' : 'disable';
+      try {
+        const r = await api('POST', `/admin/tools/${encodeURIComponent(name)}/${action}`);
+        if (r.ok) {
+          toast(`${name}: ${action}d`, true);
+          await loadTools();
+        } else {
+          toast(r.error || 'Failed', false);
+          cb.checked = !cb.checked;
+        }
+      } catch(e) {
+        toast(e.message, false);
+        cb.checked = !cb.checked;
+      }
+    });
+  });
+}
+
+document.getElementById('search-tools').addEventListener('input', e => {
+  renderTools(e.target.value.trim().toLowerCase());
+});
+
+loadTools();
+
+// ═══════════════════════════════════════════════════════════
+//  Permissions / Control panel  (full dashboard)
+// ═══════════════════════════════════════════════════════════
+
+async function loadToolDiagnostics() {
+  const d = await api('GET', '/admin/tool-registry-diagnostics');
+  const s = await api('GET', '/admin/shadow-databases');
+  document.getElementById('tooldiag-pre').textContent = JSON.stringify((d||{}).diagnostics || d, null, 2);
+  document.getElementById('shadowdb-pre').textContent = JSON.stringify((s||{}).duplicates || s, null, 2);
+}
+
+// ── Capabilities ───────────────────────────────────────────
+async function loadCapabilities() {
+  const grid = document.getElementById('cap-grid');
+  if (!grid) return;
+  grid.innerHTML = '<div class="spinner"></div> Loading…';
+  try {
+    const d = await api('GET', '/admin/capabilities');
+    if (!d.ok) {
+      grid.innerHTML = `<p style="color:var(--red)">Error: ${escHtml(d.error || 'Could not load capabilities')}</p>`;
+      return;
+    }
+    const c = d.data;
+    const auton = c.autonomy || {};
+    const cu    = c.computer_use || {};
+    const ws    = c.workspace || {};
+    const cr    = c.creativity || {};
+    const goo   = c.google || {};
+
+    // Autonomy Dimensions card
+    const autonDims = ['perception','cognition','action','initiative'];
+    const autonDescs = {
+      perception: 'Observe the environment',
+      cognition:  'Think, reflect, and plan',
+      action:     'Use tools and take actions',
+      initiative: 'Act without user prompting',
+    };
+    const autonCard = `
+      <div class="cap-card">
+        <div class="cap-card-title">Autonomy</div>
+        ${autonDims.map(dim => `
+        <div class="cap-row">
+          <div class="cap-row-info">
+            <div class="cap-row-label">${dim.charAt(0).toUpperCase() + dim.slice(1)}</div>
+            <div class="cap-row-desc">${autonDescs[dim]}</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" ${auton[dim] ? 'checked' : ''}
+              data-cap-group="autonomy" data-cap-key="${dim}" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>`).join('')}
+      </div>`;
+
+    // Computer Use card
+    const cuCard = `
+      <div class="cap-card">
+        <div class="cap-card-title">Computer Use</div>
+        <div class="cap-row">
+          <div class="cap-row-info">
+            <div class="cap-row-label">Enabled</div>
+            <div class="cap-row-desc">Allow any computer-use at all</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" ${cu.enabled ? 'checked' : ''}
+              data-cap-group="computer_use" data-cap-key="enabled" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="cap-row">
+          <div class="cap-row-info" style="flex:1"><div class="cap-row-label">Default Mode</div></div>
+          <select class="cap-select" data-cap-group="computer_use" data-cap-key="default_mode">
+            <option value="off"                ${cu.default_mode === 'off'                ? 'selected' : ''}>Off</option>
+            <option value="command_only"       ${cu.default_mode === 'command_only'       ? 'selected' : ''}>Command Only</option>
+            <option value="supervised_session" ${cu.default_mode === 'supervised_session' ? 'selected' : ''}>Supervised</option>
+          </select>
+        </div>
+      </div>`;
+
+    // Workspace card
+    const wsCard = `
+      <div class="cap-card">
+        <div class="cap-card-title">Workspace</div>
+        <div class="cap-row">
+          <div class="cap-row-info">
+            <div class="cap-row-label">Allow Delete</div>
+            <div class="cap-row-desc">Entity may delete workspace files</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" ${ws.allow_delete ? 'checked' : ''}
+              data-cap-group="workspace" data-cap-key="allow_delete" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="cap-row">
+          <div class="cap-row-info">
+            <div class="cap-row-label">Allow Exec</div>
+            <div class="cap-row-desc">Entity may execute shell commands</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" ${ws.allow_exec ? 'checked' : ''}
+              data-cap-group="workspace" data-cap-key="allow_exec" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>`;
+
+    // Creativity card
+    const crCard = `
+      <div class="cap-card">
+        <div class="cap-card-title">Creativity</div>
+        <div class="cap-row">
+          <div class="cap-row-info">
+            <div class="cap-row-label">Enabled</div>
+            <div class="cap-row-desc">Activate creativity subsystem</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" ${cr.enabled !== false ? 'checked' : ''}
+              data-cap-group="creativity" data-cap-key="enabled" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="cap-row">
+          <div class="cap-row-info" style="flex:1"><div class="cap-row-label">Frequency</div></div>
+          <select class="cap-select" data-cap-group="creativity" data-cap-key="injection_frequency">
+            <option value="off"    ${cr.injection_frequency === 'off'    ? 'selected' : ''}>Off</option>
+            <option value="low"    ${cr.injection_frequency === 'low'    ? 'selected' : ''}>Low</option>
+            <option value="medium" ${cr.injection_frequency === 'medium' ? 'selected' : ''}>Medium</option>
+            <option value="high"   ${cr.injection_frequency === 'high'   ? 'selected' : ''}>High</option>
+          </select>
+        </div>
+        <div class="cap-row">
+          <div class="cap-row-info">
+            <div class="cap-row-label">Autonomous Idle</div>
+            <div class="cap-row-desc">Invoke during idle cognition</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" ${cr.autonomous_idle ? 'checked' : ''}
+              data-cap-group="creativity" data-cap-key="autonomous_idle" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>`;
+
+    // Google card
+    const googCard = `
+      <div class="cap-card">
+        <div class="cap-card-title">Google</div>
+        <div class="cap-row">
+          <div class="cap-row-info">
+            <div class="cap-row-label">Gmail Send</div>
+            <div class="cap-row-desc">Allow outgoing email ⚠</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" ${goo.gmail_send_enabled ? 'checked' : ''}
+              data-cap-group="google" data-cap-key="gmail_send_enabled" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>`;
+
+    grid.innerHTML = autonCard + cuCard + wsCard + crCard + googCard;
+
+    // Wire toggle checkboxes
+    grid.querySelectorAll('input[data-cap-group]').forEach(cb => {
+      cb.addEventListener('change', async () => {
+        const group = cb.dataset.capGroup;
+        const key   = cb.dataset.capKey;
+        const value = cb.checked;
+        try {
+          const r = await api('POST', '/admin/capabilities', { group, key, value });
+          if (r.ok) toast(`${group}.${key} → ${value}`, true);
+          else { toast(r.error || 'Failed', false); cb.checked = !cb.checked; }
+        } catch(e2) { toast(e2.message, false); cb.checked = !cb.checked; }
+      });
+    });
+
+    // Wire select dropdowns
+    grid.querySelectorAll('select[data-cap-group]').forEach(sel => {
+      sel.addEventListener('change', async () => {
+        const group = sel.dataset.capGroup;
+        const key   = sel.dataset.capKey;
+        const value = sel.value;
+        try {
+          const r = await api('POST', '/admin/capabilities', { group, key, value });
+          if (r.ok) toast(`${group}.${key} → ${value}`, true);
+          else toast(r.error || 'Failed', false);
+        } catch(e2) { toast(e2.message, false); }
+      });
+    });
+
+  } catch(e) {
+    const g = document.getElementById('cap-grid');
+    if (g) g.innerHTML = `<p style="color:var(--red)">Error: ${escHtml(e.message)}</p>`;
+  }
+}
+
+document.getElementById('cap-refresh-btn')?.addEventListener('click', loadCapabilities);
+
+// ── Runtime permission classes ─────────────────────────────
+async function loadPermissions() {
+  const list = document.getElementById('perm-list');
+  if (!list) return;
+  list.innerHTML = '<div class="spinner"></div> Loading…';
+  try {
+    const d = await api('GET', '/admin/permissions');
+    if (!d.ok) { list.innerHTML = `<p style="color:var(--red)">Error loading permissions</p>`; return; }
+    const classes = d.classes || [];
+    if (!classes.length) { list.innerHTML = '<p style="color:var(--muted)">No permission classes found.</p>'; return; }
+
+    list.innerHTML = classes.map(c => `
+      <div class="perm-row" data-class="${escHtml(c.name)}">
+        <div class="perm-name">${escHtml(c.name)}</div>
+        <div class="perm-count">${c.tool_count} tool${c.tool_count !== 1 ? 's' : ''}</div>
+        <div class="pill ${c.denied ? 'denied' : 'allowed'}">${c.denied ? 'BLOCKED' : 'ALLOWED'}</div>
+        ${c.denied
+          ? `<button class="perm-btn allow-btn" data-class="${escHtml(c.name)}" data-action="allow">Allow</button>`
+          : `<button class="perm-btn deny-btn"  data-class="${escHtml(c.name)}" data-action="deny">Block</button>`}
+      </div>
+    `).join('');
+
+    list.querySelectorAll('.perm-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const cls = btn.dataset.class;
+        const action = btn.dataset.action;
+        try {
+          const r = await api('POST', `/admin/permissions/${encodeURIComponent(cls)}/${action}`);
+          if (r.ok) {
+            toast(`Class "${cls}" ${action === 'deny' ? 'blocked' : 'allowed'}`, true);
+            await loadPermissions();
+            await loadTools();
+            refreshStatus();
+          } else { toast(r.error || 'Failed', false); }
+        } catch(e) { toast(e.message, false); }
+      });
+    });
+  } catch(e) {
+    list.innerHTML = `<p style="color:var(--red)">${escHtml(e.message)}</p>`;
+  }
+}
+
+document.getElementById('perm-refresh-btn')?.addEventListener('click', () => {
+  loadPermissions(); loadAllowlist();
+});
+
+// ── Config Allowlist (persisted) ───────────────────────────
+async function loadAllowlist() {
+  const el = document.getElementById('allowlist-list');
+  if (!el) return;
+  el.innerHTML = '<div class="spinner"></div> Loading…';
+  try {
+    const d = await api('GET', '/admin/config/allowlist');
+    if (!d.ok) { el.innerHTML = `<p style="color:var(--red)">Error loading allowlist</p>`; return; }
+    const allowlist = d.allowlist || [];
+    if (!allowlist.length) {
+      el.innerHTML = '<p style="color:var(--yellow);font-size:12px;">⚠ Allowlist is empty — all permission classes will be blocked at next boot.</p>';
+      return;
+    }
+    el.innerHTML = `<div class="allowlist-chips">${
+      allowlist.map(cls => `
+        <div class="allowlist-chip">
+          <span>${escHtml(cls)}</span>
+          <button class="chip-remove" data-class="${escHtml(cls)}" title="Remove from allowlist">×</button>
+        </div>`).join('')
+    }</div>`;
+    el.querySelectorAll('.chip-remove').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const cls = btn.dataset.class;
+        if (!confirm(`Remove "${cls}" from the persisted allowlist?\n\nThis class will be blocked on next restart.`)) return;
+        try {
+          const r = await api('POST', '/admin/config/allowlist/remove', { class: cls });
+          if (r.ok) { toast(`Removed "${cls}" from allowlist`, true); await loadAllowlist(); await loadPermissions(); }
+          else toast(r.error || 'Failed', false);
+        } catch(e) { toast(e.message, false); }
+      });
+    });
+  } catch(e) {
+    el.innerHTML = `<p style="color:var(--red)">${escHtml(e.message)}</p>`;
+  }
+}
+
+document.getElementById('allowlist-add-btn')?.addEventListener('click', async () => {
+  const input = document.getElementById('allowlist-add-input');
+  const cls = (input?.value || '').trim();
+  if (!cls) { toast('Enter a permission class name', false); return; }
+  try {
+    const r = await api('POST', '/admin/config/allowlist/add', { class: cls });
+    if (r.ok) {
+      toast(`Added "${cls}" to allowlist`, true);
+      if (input) input.value = '';
+      await loadAllowlist();
+      await loadPermissions();
+    } else toast(r.error || 'Failed', false);
+  } catch(e) { toast(e.message, false); }
+});
+
+document.getElementById('allowlist-add-input')?.addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('allowlist-add-btn')?.click();
+});
+
+// ── Toolpack management ────────────────────────────────────
+async function loadToolpacks() {
+  const el = document.getElementById('toolpack-list');
+  if (!el) return;
+  el.innerHTML = '<div class="spinner"></div> Loading…';
+  try {
+    const d = await api('GET', '/admin/toolpacks');
+    if (!d.ok) { el.innerHTML = `<p style="color:var(--red)">Error: ${escHtml(d.error||'')}</p>`; return; }
+    const packs = d.data || [];
+    if (!packs.length) { el.innerHTML = '<p style="color:var(--muted)">No toolpacks loaded — check config toolpacks.packs list.</p>'; return; }
+
+    el.innerHTML = packs.map((p, idx) => {
+      const enabled = p.enabled;
+      const count   = p.tool_count || 0;
+      const ena_cnt = p.enabled_count || 0;
+      const statusBadge = enabled
+        ? `<span class="tp-badge loaded">${ena_cnt}/${count} enabled</span>`
+        : `<span class="tp-badge disabled">DISABLED</span>`;
+      const btn = enabled
+        ? `<button class="perm-btn deny-btn" data-pack="${escHtml(p.name)}" data-action="disable">Disable All</button>`
+        : `<button class="perm-btn allow-btn" data-pack="${escHtml(p.name)}" data-action="enable">Enable All</button>`;
+
+      const toolRows = (p.tools||[]).map(t => {
+        const rl = t.risk_level || '';
+        const tl = t.trust_level || '';
+        const cp = t.confirmation_policy || '';
+        const tEnabled = t.enabled !== false;
+        return `<div class="tp-tool-row">
+          <div class="tp-tool-name">${escHtml(t.name)}</div>
+          <div class="tp-tool-desc" title="${escHtml(t.description||'')}">${escHtml(t.description||'')}</div>
+          <span class="risk-badge ${escHtml(rl)}">${_riskLabel(rl)}</span>
+          <span class="trust-badge ${escHtml(tl)}">${_trustLabel(tl)}</span>
+          <span class="confirm-badge ${escHtml(cp)}">${_confirmLabel(cp)}</span>
+          <label class="toggle" style="margin-left:auto">
+            <input type="checkbox" ${tEnabled ? 'checked' : ''} data-tool="${escHtml(t.name)}" class="tp-tool-toggle" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>`;
+      }).join('');
+
+      return `<div class="tp-row" style="flex-direction:column;align-items:stretch;gap:0">
+        <div class="tp-pack-header" data-idx="${idx}">
+          <span class="tp-expand-arrow" id="tparrow-${idx}">▶</span>
+          <div class="tp-name">${escHtml(p.name)}</div>
+          ${statusBadge}
+          ${btn}
+        </div>
+        <div class="tp-pack-tools" id="tptools-${idx}">
+          ${toolRows || '<p style="color:var(--muted);font-size:12px;padding:4px 0">No tools registered.</p>'}
+        </div>
+      </div>`;
+    }).join('');
+
+    // Pack-level expand/collapse
+    el.querySelectorAll('.tp-pack-header').forEach(hdr => {
+      hdr.addEventListener('click', e => {
+        if (e.target.closest('[data-pack]')) return; // ignore button clicks
+        const idx    = hdr.dataset.idx;
+        const tools  = document.getElementById(`tptools-${idx}`);
+        const arrow  = document.getElementById(`tparrow-${idx}`);
+        const open   = tools.classList.toggle('open');
+        arrow.style.transform = open ? 'rotate(90deg)' : '';
+      });
+    });
+
+    // Pack-level enable/disable buttons
+    el.querySelectorAll('[data-pack]').forEach(btn => {
+      btn.addEventListener('click', async e => {
+        e.stopPropagation();
+        const pack = btn.dataset.pack;
+        const action = btn.dataset.action;
+        try {
+          const r = await api('POST', `/admin/toolpacks/${encodeURIComponent(pack)}/${action}`);
+          if (r.ok) {
+            toast(`Pack "${pack}" ${action}d`, true);
+            await loadToolpacks();
+          } else toast(r.error || 'Failed', false);
+        } catch(e2) { toast(e2.message, false); }
+      });
+    });
+
+    // Individual tool toggles inside packs
+    el.querySelectorAll('.tp-tool-toggle').forEach(cb => {
+      cb.addEventListener('change', async e => {
+        e.stopPropagation();
+        const name   = cb.dataset.tool;
+        const action = cb.checked ? 'enable' : 'disable';
+        try {
+          const r = await api('POST', `/admin/tools/${encodeURIComponent(name)}/${action}`);
+          if (r.ok) {
+            toast(`${name}: ${action}d`, true);
+            await loadToolpacks();
+          } else {
+            toast(r.error || 'Failed', false);
+            cb.checked = !cb.checked;
+          }
+        } catch(e2) {
+          toast(e2.message, false);
+          cb.checked = !cb.checked;
+        }
+      });
+    });
+  } catch(e) {
+    el.innerHTML = `<p style="color:var(--red)">${escHtml(e.message)}</p>`;
+  }
+}
+
+document.getElementById('tp-refresh-btn')?.addEventListener('click', loadToolpacks);
+
+// ── Tool action audit log ───────────────────────────────────
+async function loadAuditLog() {
+  const el = document.getElementById('audit-log-area');
+  if (!el) return;
+  el.innerHTML = '<p style="color:var(--muted);font-size:12px">Loading…</p>';
+  try {
+    const d = await api('GET', '/admin/tools/audit?limit=100');
+    if (!d.ok) { el.innerHTML = `<p style="color:var(--red)">Error: ${escHtml(d.error||'')}</p>`; return; }
+    const entries = (d.data && d.data.entries) ? d.data.entries : [];
+    if (!entries.length) {
+      el.innerHTML = '<p style="color:var(--muted);font-size:12px">No audited actions yet. Only reversible and irreversible tool actions are recorded here.</p>';
+      return;
+    }
+    const rows = [...entries].reverse().map(e => {
+      const ts = new Date(e.timestamp).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+      const okCls = e.success ? 'audit-ok' : 'audit-fail';
+      const okTxt = e.success ? 'OK' : 'FAIL';
+      return `<div class="audit-row">
+        <div class="audit-ts">${ts}</div>
+        <div class="audit-tool">${escHtml(e.tool_name)}</div>
+        <div class="audit-params" title="${escHtml(e.params_summary||'')}">${escHtml(e.params_summary||'—')}</div>
+        <div class="${okCls}">${okTxt}</div>
+      </div>`;
+    }).join('');
+    el.innerHTML = rows;
+  } catch(e) {
+    el.innerHTML = `<p style="color:var(--red)">${escHtml(e.message)}</p>`;
+  }
+}
+
+document.getElementById('audit-refresh-btn')?.addEventListener('click', loadAuditLog);
+
+// ══════════════════════════════════════════════════════════
+//  Integrations panel — Google Workspace
+// ══════════════════════════════════════════════════════════
+
+let _gwAuthPollTimer = null;
+let _gwAuthWindow   = null;
+
+// ── Helpers ────────────────────────────────────────────────
+
+function _gwShow(id)  { const el = document.getElementById(id); if (el) el.style.display = ''; }
+function _gwHide(id)  { const el = document.getElementById(id); if (el) el.style.display = 'none'; }
+function _gwSetHtml(id, html) { const el = document.getElementById(id); if (el) el.innerHTML = html; }
+
+function _gwFormatDate(iso) {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    return d.toLocaleString([], { month:'short', day:'numeric',
+      hour:'2-digit', minute:'2-digit' });
+  } catch(e) { return iso.slice(0,16).replace('T',' '); }
+}
+
+function _gwMimeIcon(mime) {
+  if (!mime) return '📄';
+  if (mime.includes('folder'))       return '📁';
+  if (mime.includes('spreadsheet'))  return '📊';
+  if (mime.includes('document'))     return '📝';
+  if (mime.includes('presentation')) return '📽';
+  if (mime.includes('pdf'))          return '📕';
+  if (mime.includes('image'))        return '🖼';
+  if (mime.includes('video'))        return '🎬';
+  if (mime.includes('audio'))        return '🎵';
+  return '📄';
+}
+
+// ── Main status loader ──────────────────────────────────────
+
+async function loadGoogleWorkspace() {
+  const badge = document.getElementById('gw-status-badge');
+  if (!badge) return;
+  badge.textContent = 'Checking…';
+  badge.className   = 'integ-status-badge unconfigured';
+
+  // Reset visible sections
+  ['gw-hint-setup','gw-hint-disabled','gw-hint-libs',
+   'gw-connected-info','gw-needs-auth','gw-auth-pending',
+   'gw-error-box','gw-data-section','gw-config-summary',
+   'gw-authorize-btn','gw-reauth-btn','gw-revoke-btn'].forEach(_gwHide);
+
+  try {
+    const d = await api('GET', '/api/google_workspace/status');
+
+    // ── Badge ──────────────────────────────────────────────
+    const status = (d.overall_status || (d.ok ? 'unknown' : 'error')).toLowerCase();
+    badge.textContent = status.toUpperCase();
+    badge.className   = `integ-status-badge ${status}`;
+
+    // ── Library / config hints ─────────────────────────────
+    if (status === 'unavailable') {
+      _gwShow('gw-hint-libs'); return;
+    }
+    if (status === 'disabled') {
+      _gwShow('gw-hint-disabled'); return;
+    }
+    if (!d.client_secret_exists) {
+      _gwShow('gw-hint-setup'); return;
+    }
+
+    // ── Auth / connection state ────────────────────────────
+    if (d.token_valid) {
+      _gwShow('gw-connected-info');
+      _gwShow('gw-revoke-btn');
+      _gwShow('gw-reauth-btn');
+      _gwShow('gw-data-section');
+      // Load account hint
+      api('GET', '/api/google_workspace/account').then(acc => {
+        const el = document.getElementById('gw-account-hint');
+        if (el && acc.connected) {
+          el.textContent = acc.email
+            ? `· ${escHtml(acc.email)}`
+            : '· account connected';
+        }
+      }).catch(() => {});
+    } else if (d.token_exists && !d.token_valid) {
+      // Token exists but invalid / expired
+      _gwSetHtml('gw-error-box', 'Token exists but is invalid or expired. Re-authorize to reconnect.');
+      _gwShow('gw-error-box');
+      _gwShow('gw-reauth-btn');
+    } else {
+      // No token at all
+      _gwShow('gw-needs-auth');
+      _gwShow('gw-authorize-btn');
+    }
+
+    if (d.last_auth_error) {
+      _gwSetHtml('gw-error-box', `Auth error: ${escHtml(d.last_auth_error)}`);
+      _gwShow('gw-error-box');
+    }
+
+    // ── Service flags ──────────────────────────────────────
+    const svc = d.services_enabled || {};
+    const flagDefs = [
+      { label:'Calendar', on: !!svc.calendar },
+      { label:'Gmail',    on: !!svc.gmail },
+      { label:'Drive',    on: !!svc.drive },
+      { label:'Token',    on: !!d.token_valid, warn: d.token_exists && !d.token_valid },
+      { label:'Gmail Send', on: !!d.gmail_send_enabled, warn: !!d.gmail_send_enabled },
+    ];
+    document.getElementById('gw-flags').innerHTML = flagDefs.map(f => `
+      <div class="integ-flag">
+        <div class="integ-flag-dot ${f.warn ? 'warn' : f.on ? 'on' : 'off'}"></div>
+        <span class="integ-flag-label">${escHtml(f.label)}</span>
+        <span class="integ-flag-value">${f.on ? (f.warn && f.label==='Gmail Send' ? 'ON ⚠' : 'ON') : 'OFF'}</span>
+      </div>`).join('');
+
+    // ── Config summary ─────────────────────────────────────
+    if (d.integration_enabled) {
+      const cfgFlags = [
+        { label:'Calendar read',   on: !!svc.calendar },
+        { label:'Cal. create',     on: !!(d.calendar_create_enabled ?? false), warn:true },
+        { label:'Gmail read',      on: !!svc.gmail },
+        { label:'Gmail send',      on: !!d.gmail_send_enabled, warn: !!d.gmail_send_enabled },
+        { label:'Drive read',      on: !!svc.drive },
+        { label:'Drive download',  on: !!(d.drive_download_enabled ?? false), warn:true },
+      ];
+      document.getElementById('gw-config-flags').innerHTML = cfgFlags.map(f => `
+        <div class="integ-flag">
+          <div class="integ-flag-dot ${f.warn && f.on ? 'warn' : f.on ? 'on' : 'off'}"></div>
+          <span class="integ-flag-label">${escHtml(f.label)}</span>
+          <span class="integ-flag-value">${f.on ? 'enabled' : 'off'}</span>
+        </div>`).join('');
+      _gwShow('gw-config-summary');
+    }
+
+  } catch(e) {
+    badge.textContent = 'ERROR';
+    badge.className   = 'integ-status-badge error';
+    _gwSetHtml('gw-error-box', `Could not reach status endpoint: ${escHtml(e.message)}`);
+    _gwShow('gw-error-box');
+  }
+}
+
+// ── OAuth flow ─────────────────────────────────────────────
+
+async function gwStartAuth() {
+  _gwHide('gw-authorize-btn'); _gwHide('gw-reauth-btn');
+  _gwHide('gw-needs-auth');    _gwHide('gw-error-box');
+  _gwShow('gw-auth-pending');
+
+  try {
+    const d = await api('GET', '/api/google_workspace/authorize');
+    if (!d.ok) {
+      _gwHide('gw-auth-pending');
+      _gwSetHtml('gw-error-box', escHtml(d.error || 'Authorization failed.'));
+      _gwShow('gw-error-box'); _gwShow('gw-authorize-btn');
+      return;
+    }
+
+    // Open auth URL in new tab / popup
+    _gwAuthWindow = window.open(d.auth_url, 'gw_oauth',
+      'width=520,height=640,noopener=0');
+
+    // Listen for postMessage from the callback page
+    const _msgHandler = (ev) => {
+      if (ev.data === 'gw_auth_complete') {
+        window.removeEventListener('message', _msgHandler);
+        _gwStopPoll();
+        setTimeout(() => loadGoogleWorkspace(), 800);
+      }
+    };
+    window.addEventListener('message', _msgHandler);
+
+    // Also poll status as fallback (popups may be blocked)
+    _gwStartPoll();
+
+  } catch(e) {
+    _gwHide('gw-auth-pending');
+    _gwSetHtml('gw-error-box', `Auth request failed: ${escHtml(e.message)}`);
+    _gwShow('gw-error-box'); _gwShow('gw-authorize-btn');
+  }
+}
+
+function _gwStartPoll() {
+  _gwStopPoll();
+  let attempts = 0;
+  _gwAuthPollTimer = setInterval(async () => {
+    attempts++;
+    try {
+      const d = await api('GET', '/api/google_workspace/status');
+      if (d.token_valid || attempts >= 90) { // 90 × 2s = 3 min timeout
+        _gwStopPoll();
+        loadGoogleWorkspace();
+      }
+    } catch(e) { /* ignore */ }
+  }, 2000);
+}
+
+function _gwStopPoll() {
+  if (_gwAuthPollTimer) { clearInterval(_gwAuthPollTimer); _gwAuthPollTimer = null; }
+}
+
+function gwCancelAuth() {
+  _gwStopPoll();
+  if (_gwAuthWindow) { try { _gwAuthWindow.close(); } catch(e) {} _gwAuthWindow = null; }
+  _gwHide('gw-auth-pending');
+  _gwShow('gw-authorize-btn'); _gwShow('gw-needs-auth');
+}
+
+async function gwRevoke() {
+  if (!confirm('Revoke Google Workspace access? The assistant will need to re-authorize before using Google services.')) return;
+  try {
+    const d = await api('POST', '/api/google_workspace/revoke');
+    if (!d.ok) { alert(d.error || 'Revoke failed.'); return; }
+    loadGoogleWorkspace();
+  } catch(e) { alert(`Revoke failed: ${e.message}`); }
+}
+
+// ── Data tab switching ──────────────────────────────────────
+
+document.querySelectorAll('.gw-tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.gw-tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.gw-tab-panel').forEach(p => p.style.display = 'none');
+    btn.classList.add('active');
+    const panel = document.getElementById(`gwtab-${btn.dataset.gwtab}`);
+    if (panel) panel.style.display = '';
+  });
+});
+
+// ── Calendar data ──────────────────────────────────────────
+
+function _gwRenderEvents(events, container) {
+  if (!events || events.length === 0) {
+    container.innerHTML = '<span style="color:var(--muted);font-size:12px">No events found.</span>';
+    return;
+  }
+  container.innerHTML = events.map(e => {
+    const start = e.start_time || e.start || '';
+    const end   = e.end_time   || e.end   || '';
+    const loc   = e.location ? `<span> · 📍 ${escHtml(e.location)}</span>` : '';
+    return `<div class="gw-row">
+      <div class="gw-row-time">${escHtml(_gwFormatDate(start))}</div>
+      <div class="gw-row-main">
+        <div class="gw-row-title">${escHtml(e.summary || e.title || '(no title)')}</div>
+        <div class="gw-row-sub">${escHtml(end ? 'Until ' + _gwFormatDate(end) : '')}${loc}</div>
+      </div>
+      ${e.status ? `<span class="gw-row-badge">${escHtml(e.status)}</span>` : ''}
+    </div>`;
+  }).join('');
+}
+
+async function gwCalToday() {
+  const el = document.getElementById('gw-cal-results');
+  el.innerHTML = '<span style="color:var(--muted)"><span class="spinner" style="width:12px;height:12px;border-width:2px;margin-right:6px"></span>Loading…</span>';
+  try {
+    const d = await api('GET', '/api/google_workspace/calendar/today');
+    if (!d.ok) { el.innerHTML = `<span style="color:var(--red)">${escHtml(d.error)}</span>`; return; }
+    _gwRenderEvents(d.events, el);
+  } catch(e) { el.innerHTML = `<span style="color:var(--red)">${escHtml(e.message)}</span>`; }
+}
+
+async function gwCalWeek() {
+  const el = document.getElementById('gw-cal-results');
+  el.innerHTML = '<span style="color:var(--muted)"><span class="spinner" style="width:12px;height:12px;border-width:2px;margin-right:6px"></span>Loading…</span>';
+  try {
+    const d = await api('GET', '/api/google_workspace/calendar/upcoming?days=7&max_results=20');
+    if (!d.ok) { el.innerHTML = `<span style="color:var(--red)">${escHtml(d.error)}</span>`; return; }
+    _gwRenderEvents(d.events, el);
+  } catch(e) { el.innerHTML = `<span style="color:var(--red)">${escHtml(e.message)}</span>`; }
+}
+
+async function gwCalSearch() {
+  const q = document.getElementById('gw-cal-search')?.value?.trim();
+  if (!q) return;
+  const el = document.getElementById('gw-cal-results');
+  el.innerHTML = '<span style="color:var(--muted)">Searching…</span>';
+  try {
+    const d = await api('GET', '/api/google_workspace/calendar/upcoming?days=30&max_results=20');
+    // Search is done client-side for simplicity (filter by query text)
+    const filtered = (d.events || []).filter(e =>
+      (e.summary||'').toLowerCase().includes(q.toLowerCase()) ||
+      (e.description||'').toLowerCase().includes(q.toLowerCase())
+    );
+    _gwRenderEvents(filtered, el);
+  } catch(e) { el.innerHTML = `<span style="color:var(--red)">${escHtml(e.message)}</span>`; }
+}
+
+// ── Gmail data ─────────────────────────────────────────────
+
+function _gwRenderMessages(messages, container) {
+  if (!messages || messages.length === 0) {
+    container.innerHTML = '<span style="color:var(--muted);font-size:12px">No messages found.</span>';
+    return;
+  }
+  container.innerHTML = messages.map(m => {
+    const from = m.from || m.sender || '—';
+    const subj = m.subject || '(no subject)';
+    const snippet = m.snippet || m.body_preview || '';
+    const date  = m.date || m.received_at || '';
+    return `<div class="gw-row">
+      <div class="gw-row-time">${escHtml(_gwFormatDate(date))}</div>
+      <div class="gw-row-main">
+        <div class="gw-row-title">${escHtml(subj)}</div>
+        <div class="gw-row-sub">${escHtml('From: ' + from)}${snippet ? ' · ' + escHtml(snippet.slice(0,80)) : ''}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function gwGmailLoad(query) {
+  const el = document.getElementById('gw-gmail-results');
+  el.innerHTML = '<span style="color:var(--muted)"><span class="spinner" style="width:12px;height:12px;border-width:2px;margin-right:6px"></span>Loading…</span>';
+  try {
+    const enc = encodeURIComponent(query);
+    const d = await api('GET', `/api/google_workspace/gmail/inbox?query=${enc}&max_results=15`);
+    if (!d.ok) { el.innerHTML = `<span style="color:var(--red)">${escHtml(d.error)}</span>`; return; }
+    _gwRenderMessages(d.messages, el);
+  } catch(e) { el.innerHTML = `<span style="color:var(--red)">${escHtml(e.message)}</span>`; }
+}
+
+// ── Drive data ─────────────────────────────────────────────
+
+function _gwRenderFiles(files, container) {
+  if (!files || files.length === 0) {
+    container.innerHTML = '<span style="color:var(--muted);font-size:12px">No files found.</span>';
+    return;
+  }
+  container.innerHTML = files.map(f => {
+    const icon = _gwMimeIcon(f.mime_type || f.mimeType || '');
+    const modified = f.modified_time || f.modifiedTime || '';
+    const owner = f.owner || (f.owners && f.owners[0]?.displayName) || '';
+    const link = f.web_view_link || f.webViewLink || '';
+    const nameHtml = link
+      ? `<a href="${escHtml(link)}" target="_blank" style="color:var(--accent);text-decoration:none">${escHtml(f.name)}</a>`
+      : escHtml(f.name || '—');
+    return `<div class="gw-row">
+      <div class="gw-row-time" style="font-size:16px;min-width:28px">${icon}</div>
+      <div class="gw-row-main">
+        <div class="gw-row-title">${nameHtml}</div>
+        <div class="gw-row-sub">${modified ? 'Modified ' + escHtml(_gwFormatDate(modified)) : ''}${owner ? ' · ' + escHtml(owner) : ''}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function gwDriveRecent() {
+  const el = document.getElementById('gw-drive-results');
+  el.innerHTML = '<span style="color:var(--muted)"><span class="spinner" style="width:12px;height:12px;border-width:2px;margin-right:6px"></span>Loading…</span>';
+  try {
+    const d = await api('GET', '/api/google_workspace/drive/recent?max_results=15');
+    if (!d.ok) { el.innerHTML = `<span style="color:var(--red)">${escHtml(d.error)}</span>`; return; }
+    _gwRenderFiles(d.files, el);
+  } catch(e) { el.innerHTML = `<span style="color:var(--red)">${escHtml(e.message)}</span>`; }
+}
+
+async function gwDriveSearch() {
+  const q = document.getElementById('gw-drive-search')?.value?.trim();
+  if (!q) return;
+  const el = document.getElementById('gw-drive-results');
+  el.innerHTML = '<span style="color:var(--muted)">Searching…</span>';
+  try {
+    const d = await api('GET', `/api/google_workspace/drive/search?q=${encodeURIComponent(q)}`);
+    if (!d.ok) { el.innerHTML = `<span style="color:var(--red)">${escHtml(d.error)}</span>`; return; }
+    _gwRenderFiles(d.files, el);
+  } catch(e) { el.innerHTML = `<span style="color:var(--red)">${escHtml(e.message)}</span>`; }
+}
+
+// ── Button wiring ──────────────────────────────────────────
+
+document.getElementById('integ-refresh-btn')?.addEventListener('click', loadIntegrations);
+document.getElementById('gw-refresh-btn')?.addEventListener('click', loadGoogleWorkspace);
+document.getElementById('gw-authorize-btn')?.addEventListener('click', gwStartAuth);
+document.getElementById('gw-reauth-btn')?.addEventListener('click', gwStartAuth);
+document.getElementById('gw-revoke-btn')?.addEventListener('click', gwRevoke);
+document.getElementById('gw-auth-cancel-btn')?.addEventListener('click', gwCancelAuth);
+document.getElementById('gw-cal-today-btn')?.addEventListener('click', gwCalToday);
+document.getElementById('gw-cal-week-btn')?.addEventListener('click', gwCalWeek);
+document.getElementById('gw-cal-search-btn')?.addEventListener('click', gwCalSearch);
+document.getElementById('gw-cal-search')?.addEventListener('keydown', e => { if (e.key==='Enter') gwCalSearch(); });
+document.getElementById('gw-gmail-inbox-btn')?.addEventListener('click', () => gwGmailLoad('in:inbox'));
+document.getElementById('gw-gmail-unread-btn')?.addEventListener('click', () => gwGmailLoad('in:inbox is:unread'));
+document.getElementById('gw-gmail-search-btn')?.addEventListener('click', () => {
+  const q = document.getElementById('gw-gmail-query')?.value?.trim();
+  if (q) gwGmailLoad(q);
+});
+document.getElementById('gw-gmail-query')?.addEventListener('keydown', e => {
+  if (e.key==='Enter') { const q = e.target.value.trim(); if (q) gwGmailLoad(q); }
+});
+document.getElementById('gw-drive-recent-btn')?.addEventListener('click', gwDriveRecent);
+document.getElementById('gw-drive-search-btn')?.addEventListener('click', gwDriveSearch);
+document.getElementById('gw-drive-search')?.addEventListener('keydown', e => { if (e.key==='Enter') gwDriveSearch(); });
+
+async function loadIntegrations() {
+  await loadGoogleWorkspace();
+}
+
+// ── Subsystem wiring ───────────────────────────────────────
+async function loadSubsystems() {
+  const el = document.getElementById('subsystem-list');
+  if (!el) return;
+  el.innerHTML = '<div class="spinner"></div> Loading…';
+  try {
+    const d = await api('GET', '/admin/subsystems');
+    if (!d.ok) { el.innerHTML = `<p style="color:var(--red)">Error: ${escHtml(d.error||'')}</p>`; return; }
+    const subs = d.subsystems || [];
+    const wired = d.wired || 0;
+    const missing = d.missing || 0;
+    const summaryColor = missing === 0 ? 'var(--green)' : missing <= 3 ? 'var(--yellow)' : 'var(--red)';
+    el.innerHTML = `
+      <div style="font-size:12px;color:${summaryColor};margin-bottom:10px;font-weight:600;">
+        ${wired} wired · ${missing} missing${missing > 0 ? ' — missing subsystems return 503' : ' — all subsystems attached'}
+      </div>
+      <div class="subsys-grid">${
+        subs.map(s => `
+          <div class="subsys-row">
+            <div class="subsys-dot ${s.status}"></div>
+            <div class="subsys-name">${escHtml(s.subsystem)}</div>
+            <div class="subsys-status ${s.status}">${s.status.toUpperCase()}</div>
+          </div>`).join('')
+      }</div>`;
+  } catch(e) {
+    el.innerHTML = `<p style="color:var(--red)">${escHtml(e.message)}</p>`;
+  }
+}
+
+document.getElementById('subsys-refresh-btn')?.addEventListener('click', loadSubsystems);
+
+// ── Load all permissions-panel sections on tab open ────────
+function loadPermissionsPanel() {
+  loadCapabilities();
+  loadPermissions();
+  loadAllowlist();
+  loadToolpacks();
+  loadAuditLog();
+  loadSubsystems();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  Log management — shared across main + server-specific logs
+// ═══════════════════════════════════════════════════════════
+
+// State per log panel: logKey → { entries, activeLevels, autoScroll }
+const _logState = {
+  main:            { entries: [], activeLevels: new Set(['INFO','WARN','ERROR','DEBUG']) },
+  'main-model':    { entries: [], activeLevels: new Set(['INFO','WARN','ERROR','DEBUG']) },
+  'tool-svr':      { entries: [], activeLevels: new Set(['INFO','WARN','ERROR','DEBUG']) },
+  creativity:      { entries: [], activeLevels: new Set(['INFO','WARN','ERROR','DEBUG']) },
+  'sub-think':     { entries: [], activeLevels: new Set(['INFO','WARN','ERROR','DEBUG']) },
+  vision:          { entries: [], activeLevels: new Set(['INFO','WARN','ERROR','DEBUG']) },
+  memory:          { entries: [], activeLevels: new Set(['INFO','WARN','ERROR','DEBUG']) },
+};
+
+function _getAutoScroll(logKey) {
+  const cb = document.getElementById(`autoscroll-${logKey}`);
+  return cb ? cb.checked : true;
+}
+
+function _renderLogList(logKey) {
+  const state = _logState[logKey];
+  const filterEl = document.getElementById(`log-filter-${logKey}`);
+  const filter = filterEl ? filterEl.value.trim().toLowerCase() : '';
+  const el = document.getElementById(`log-list-${logKey}`);
+  if (!el) return;
+
+  const visible = state.entries.filter(e =>
+    state.activeLevels.has(e.level) &&
+    (!filter ||
+      (e.message||'').toLowerCase().includes(filter) ||
+      (e.source||'').toLowerCase().includes(filter) ||
+      ((e.detail && e.detail.turn_id) ? String(e.detail.turn_id).toLowerCase().includes(filter) : false))
+  );
+
+  if (!visible.length) {
+    el.innerHTML = `<div class="log-empty">${state.entries.length === 0 ? 'No activity yet.' : 'No entries match filter.'}</div>`;
+    return;
+  }
+
+  el.innerHTML = visible.map(e => {
+    const turnId = (e.detail && e.detail.turn_id) ? e.detail.turn_id : '';
+    // Extract turn_id from message brackets if not in detail
+    let tid = turnId;
+    if (!tid) {
+      const m = String(e.message).match(/\[(T\d+)\]/);
+      if (m) tid = m[1];
+    }
+    const detailObj = Object.assign({}, e.detail || {});
+    delete detailObj.turn_id; // already shown in tid column
+    const detailStr = Object.keys(detailObj).length
+      ? `<span style="color:var(--muted)"> · ${escHtml(JSON.stringify(detailObj))}</span>` : '';
+    return `
+      <div class="log-entry ${e.level}">
+        <span class="log-ts">${e.ts}</span>
+        <span class="log-lvl">${e.level}</span>
+        <span class="log-src">${escHtml(e.source||'')}</span>
+        <span class="log-tid">${tid ? escHtml(tid) : ''}</span>
+        <span class="log-msg">${escHtml(e.message||'')}${detailStr}</span>
+      </div>`;
+  }).join('');
+
+  if (_getAutoScroll(logKey)) el.scrollTop = el.scrollHeight;
+}
+
+// Wire level-toggle buttons
+document.querySelectorAll('.level-btn').forEach(btn => {
+  const logKey = btn.dataset.log;
+  const lvl    = btn.dataset.level;
+  btn.addEventListener('click', () => {
+    const state = _logState[logKey];
+    if (!state) return;
+    if (state.activeLevels.has(lvl)) { state.activeLevels.delete(lvl); btn.classList.remove('on'); }
+    else                              { state.activeLevels.add(lvl);    btn.classList.add('on'); }
+    _renderLogList(logKey);
+  });
+});
+
+// Wire clear buttons
+document.querySelectorAll('.clear-log-btn').forEach(btn => {
+  const logKey = btn.dataset.log;
+  btn.addEventListener('click', () => {
+    if (_logState[logKey]) { _logState[logKey].entries = []; _renderLogList(logKey); }
+  });
+});
+
+// Wire filter inputs
+['main','main-model','tool-svr','creativity','sub-think','vision','memory'].forEach(key => {
+  const el = document.getElementById(`log-filter-${key}`);
+  if (el) el.addEventListener('input', () => _renderLogList(key));
+  const as = document.getElementById(`autoscroll-${key}`);
+  // no-op; auto-scroll checked inline via _getAutoScroll
+});
+
+// Normalise a raw server log entry to the shape the renderer expects:
+//   ts    → human-readable time string
+//   level → uppercase (server sends lowercase)
+function _normEntry(e) {
+  if (!e || typeof e !== 'object') return null;
+  const ts = e.ts ||
+    (e.timestamp
+      ? new Date(e.timestamp * 1000).toLocaleTimeString('en-US', { hour12: false })
+      : '??:??:??');
+  const level = (e.level || 'INFO').toUpperCase();
+  return { ...e, ts, level };
+}
+
+function appendMainLog(entry) {
+  const norm = _normEntry(entry);
+  if (!norm) return;
+  _logState.main.entries.push(norm);
+  _renderLogList('main');
+}
+
+function appendServerLog(serverKey, entry) {
+  if (!_logState[serverKey]) return;
+  const norm = _normEntry(entry);
+  if (!norm) return;
+  _logState[serverKey].entries.push(norm);
+  // Only re-render if that panel is currently active
+  const panel = document.getElementById(`panel-srv-${serverKey}`);
+  if (panel && panel.classList.contains('active')) {
+    _renderLogList(serverKey);
+  }
+}
+
+// Convenience alias used by existing WS handler
+function renderServerLog(key) {
+  _renderLogList(key);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  Config panel
+// ═══════════════════════════════════════════════════════════
+
+async function loadConfig() {
+  const pre = document.getElementById('config-json');
+  pre.textContent = 'Loading…';
+  try {
+    const d = await api('GET', '/admin/config');
+    if (!d.ok) { pre.textContent = `Error: ${d.error}`; return; }
+    pre.textContent = JSON.stringify(d.config, null, 2);
+  } catch(e) {
+    pre.textContent = `Error: ${e.message}`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  Export panel
+// ═══════════════════════════════════════════════════════════
+
+let _lastExportBundle = null;
+
+document.getElementById('btn-export').addEventListener('click', async () => {
+  const pre = document.getElementById('export-json');
+  const hint = document.getElementById('export-hint');
+  pre.textContent = 'Generating…';
+  hint.textContent = '';
+  try {
+    const d = await api('GET', '/admin/export');
+    if (!d.ok) {
+      pre.textContent = `Error: ${d.error || 'Unknown'}`;
+      return;
+    }
+    _lastExportBundle = d.data;
+    pre.textContent = JSON.stringify(d.data, null, 2);
+    const saved = d.data?._saved_to || '';
+    hint.textContent = saved ? `Saved to ${saved}` : 'Generated (not saved — check exports/ permissions)';
+    toast('Diagnostic bundle generated', true);
+  } catch(e) {
+    pre.textContent = `Error: ${e.message}`;
+    toast('Export failed', false);
+  }
+});
+
+document.getElementById('btn-export-download').addEventListener('click', () => {
+  if (!_lastExportBundle) { toast('Generate a bundle first', false); return; }
+  const blob = new Blob([JSON.stringify(_lastExportBundle, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `eos_diagnostics_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'_')}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('Download started', true);
+});
+
+// ═══════════════════════════════════════════════════════════
+//  WebSocket — live log feed
+// ═══════════════════════════════════════════════════════════
+
+const wsDot = document.getElementById('ws-dot');
+let _ws, _wsReconnectTimeout, _wsHeartbeatInterval;
+
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  _ws = new WebSocket(`${proto}://${location.host}/admin/ws`);
+
+  _ws.onopen = () => {
+    wsDot.classList.add('live');
+    appendMainLog({
+      ts: new Date().toLocaleTimeString('en-US', { hour12: false }),
+      level: 'INFO',
+      source: 'admin-ui',
+      message: 'WebSocket connected',
+    });
+    // Seed main log from ring via REST (server replays via WS too, but REST
+    // is guaranteed and avoids timing races on fast reconnects).
+    api('GET', '/admin/logs?limit=200').then(d => {
+      if (d.ok && d.data) {
+        const seen = new Set(_logState.main.entries.map(e => `${e.timestamp}|${e.message}`));
+        for (const raw of d.data) {
+          const key = `${raw.timestamp}|${raw.message}`;
+          if (!seen.has(key)) { seen.add(key); _logState.main.entries.push(_normEntry(raw)); }
+        }
+        _renderLogList('main');
+      }
+    }).catch(() => {});
+    // Fetch per-server log history on connect
+    _loadServerLogHistory();
+  };
+
+  _ws.onclose = () => {
+    wsDot.classList.remove('live');
+    clearTimeout(_wsReconnectTimeout);
+    _wsReconnectTimeout = setTimeout(connectWS, 3000);
+  };
+
+  _ws.onerror = () => _ws.close();
+
+  _ws.onmessage = e => {
+    try {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'log_history') {
+        // Seed main log from ring buffer on connect
+        _logState.main.entries = msg.entries || [];
+        _renderLogList('main');
+      } else if (msg.type === 'log') {
+        appendMainLog(msg.data || msg.entry);
+      } else if (msg.type === 'server_log') {
+        // Route backend server keys to their UI log channel.
+        const _SK_SPECIFIC = {
+          'primary':   'main-model',
+          'tool':      'tool-svr',
+          'creativity':'creativity',
+          'thinking':  'sub-think',
+          'vision':    'vision',
+          'memory':    'memory',
+        };
+        const specificKey = _SK_SPECIFIC[msg.server] || msg.server;
+        appendServerLog(specificKey, msg.data || msg.entry);
+        const mergedKey = null; // no merged panel
+        if (mergedKey) appendServerLog(mergedKey, msg.data || msg.entry);
+      } else if (msg.type === 'pong') {
+        // keep-alive ack
+      }
+    } catch {}
+  };
+
+  // Heartbeat — clear any stale timer from a previous connect cycle before
+  // creating a new one, so we never accumulate multiple ping loops.
+  clearInterval(_wsHeartbeatInterval);
+  _wsHeartbeatInterval = setInterval(() => {
+    if (_ws && _ws.readyState === WebSocket.OPEN) {
+      _ws.send(JSON.stringify({ type: 'ping' }));
+    }
+  }, 15000);
+}
+
+async function _loadServerLogHistory() {
+  // Fetch existing per-server log entries at connect time.
+  // Each pair is [backendKey, uiKey].
+  const _histKeyMap = [
+    ['primary',    'main-model'],
+    ['tool',       'tool-svr'],
+    ['creativity', 'creativity'],
+    ['thinking',   'sub-think'],
+    ['vision',     'vision'],
+    ['memory',     'memory'],
+  ];
+  const _seenByKey = {
+    'main-model':  new Set(),
+    'tool-svr':    new Set(),
+    creativity:    new Set(),
+    'sub-think':   new Set(),
+    vision:        new Set(),
+    memory:        new Set(),
+  };
+  for (const [serverKey, logKey] of _histKeyMap) {
+    try {
+      const d = await api('GET', `/admin/servers/${serverKey}/logs`);
+      if (d.ok && d.data) {
+        for (const raw of d.data) {
+          const entry = _normEntry(raw);
+          if (!entry) continue;
+          // Deduplicate by timestamp+message within the same UI panel
+          const dedupId = `${raw.timestamp}|${entry.message}`;
+          if (!_seenByKey[logKey].has(dedupId)) {
+            _seenByKey[logKey].add(dedupId);
+            _logState[logKey].entries.push(entry);
+          }
+        }
+      }
+    } catch {}
+  }
+  // Re-render whichever server panels are currently active
+  for (const logKey of ['main-model', 'tool-svr', 'creativity', 'sub-think', 'vision', 'memory']) {
+    const panelId = `panel-srv-${logKey}`;
+    const panel = document.getElementById(panelId);
+    if (panel && panel.classList.contains('active')) {
+      _renderLogList(logKey);
+    }
+  }
+}
+
+// ── Hardware badges ────────────────────────────────────────────────────────────
+// Maps topology role → log-panel key for badge placement.
+const _HW_ROLE_MAP = {
+  primary:    'main-model',
+  tool:       'tool-svr',
+  creativity: 'creativity',
+  thinking:   'sub-think',
+  vision:     'vision',
+};
+async function loadHardwareBadges() {
+  try {
+    const d = await api('GET', '/admin/servers/status');
+    if (!d.ok || !d.data) return;
+    for (const srv of d.data) {
+      const logKey = _HW_ROLE_MAP[srv.role];
+      if (!logKey) continue;
+      const badge = document.getElementById(`hw-badge-${logKey}`);
+      if (!badge) continue;
+      const hw = srv.hardware;
+      if (hw === 'GPU') {
+        badge.textContent = 'GPU';
+        badge.style.cssText = 'background:#7c3aed;color:#fff;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.5px;';
+      } else if (hw === 'CPU') {
+        badge.textContent = 'CPU';
+        badge.style.cssText = 'background:#1d4ed8;color:#fff;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.5px;';
+      }
+    }
+  } catch(e) {}
+}
+loadHardwareBadges();
+
+// ── Memory stats ───────────────────────────────────────────────────────────────
+async function loadMemoryStats() {
+  const setEl = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val ?? '—';
+  };
+  try {
+    const d = await api('GET', '/admin/memory/health');
+    if (!d.ok || !d.data) return;
+    const h = d.data;
+    setEl('mem-stat-size',         h.entry_count != null ? `${h.entry_count} entries` : null);
+    setEl('mem-stat-model',        h.embed_model ?? null);
+    setEl('mem-stat-last-store',   h.last_store_at ?? null);
+    setEl('mem-stat-last-retrieve',h.last_retrieve_at ?? null);
+  } catch(e) {}
+}
+document.getElementById('mem-stats-refresh')?.addEventListener('click', loadMemoryStats);
+
+connectWS();
+
+// ═══════════════════════════════════════════════════════════
+//  Cognition Tab
+// ═══════════════════════════════════════════════════════════
+
+// Active sub-panel within the Cognition tab
+let _cogActivePanel = 'turns';
+// Cache of loaded data
+const _cogData = { turns: [], memory: [], reflection: [], state: [] };
+// Currently selected turn ID
+let _cogSelectedTurn = null;
+
+// Sub-tab switching within Cognition panel
+document.querySelectorAll('.cog-tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.cog-tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.cog-body').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    _cogActivePanel = btn.dataset.cog;
+    document.getElementById(`cog-body-${_cogActivePanel}`).classList.add('active');
+    _cogRenderActive();
+  });
+});
+
+document.getElementById('cog-refresh-btn').addEventListener('click', () => loadCognition());
+
+async function loadCognition() {
+  try {
+    const sum = await api('GET', '/admin/cognition/summary');
+    const badge = document.getElementById('cog-enabled-badge');
+    if (sum.ok) {
+      const enabled = sum.data?.enabled;
+      badge.textContent = enabled ? 'Tracing enabled' : 'Tracing disabled';
+      badge.className = `cog-status-badge ${enabled ? 'enabled' : 'disabled'}`;
+    } else {
+      badge.textContent = 'Tracing unavailable';
+      badge.className = 'cog-status-badge disabled';
+    }
+  } catch(e) { console.error('[Cognition] summary fetch failed:', e); }
+
+  await Promise.all([
+    _cogFetch('turns'),
+    _cogFetch('memory'),
+    _cogFetch('reflection'),
+    _cogFetch('state'),
+  ]);
+  _cogRenderActive();
+}
+
+async function _cogFetch(panel) {
+  const urlMap = {
+    turns:      '/admin/cognition/turns?limit=100',
+    memory:     '/admin/cognition/memory?limit=100',
+    reflection: '/admin/cognition/reflection?limit=100',
+    state:      '/admin/cognition/state?limit=100',
+  };
+  const keyMap = {
+    turns:      'turns',
+    memory:     'memory_traces',
+    reflection: 'reflections',
+    state:      'state_deltas',
+  };
+  try {
+    const d = await api('GET', urlMap[panel]);
+    if (d.ok) {
+      _cogData[panel] = d[keyMap[panel]] || [];
+    } else {
+      console.error('[Cognition] API returned ok=false for panel', panel, d);
+    }
+  } catch(e) { console.error('[Cognition] fetch failed for panel', panel, e); }
+}
+
+function _cogRenderActive() {
+  if (_cogActivePanel === 'turns')      _cogRenderTurns();
+  if (_cogActivePanel === 'memory')     _cogRenderMemory();
+  if (_cogActivePanel === 'reflection') _cogRenderReflection();
+  if (_cogActivePanel === 'state')      _cogRenderState();
+}
+
+// ── Panel 1: Turn Trace ────────────────────────────────────
+
+function _cogRenderTurns() {
+  const list = document.getElementById('cog-turn-list');
+  const detail = document.getElementById('cog-turn-detail');
+  if (!_cogData.turns.length) {
+    list.innerHTML = '<div class="cog-empty">No turn traces yet. Start a conversation to populate this view.</div>';
+    detail.innerHTML = '';
+    detail.classList.remove('open');
+    return;
+  }
+  list.innerHTML = _cogData.turns.map(t => {
+    const ts = t.timestamp ? t.timestamp.replace('T', ' ').slice(0, 19) : '—';
+    const model = t.model_server || '—';
+    const escalated = !!t.escalation;
+    const preview = escHtml((t.user_input || '').slice(0, 80));
+    const selected = t.turn_id === _cogSelectedTurn ? ' selected' : '';
+    const escBadge = escalated
+      ? `<span class="cog-turn-esc">↑ escalated</span>` : '';
+    return `<div class="cog-turn-row${selected}" data-turn="${escHtml(t.turn_id || '')}" onclick="cogSelectTurn(this)">
+  <span class="cog-turn-id">${escHtml(t.turn_id || '—')}</span>
+  <span class="cog-turn-ts">${ts}</span>
+  <span class="cog-turn-preview">${preview}</span>
+  <span class="cog-turn-model">${escHtml(model)}</span>
+  ${escBadge}
+</div>`;
+  }).join('');
+
+  // Re-render detail if a turn is selected
+  if (_cogSelectedTurn) {
+    const t = _cogData.turns.find(x => x.turn_id === _cogSelectedTurn);
+    if (t) _cogRenderTurnDetail(t, detail);
+  }
+}
+
+function cogSelectTurn(el) {
+  const turnId = el.dataset.turn;
+  const detail = document.getElementById('cog-turn-detail');
+  if (_cogSelectedTurn === turnId) {
+    // Toggle off
+    _cogSelectedTurn = null;
+    detail.classList.remove('open');
+    detail.innerHTML = '';
+    document.querySelectorAll('.cog-turn-row').forEach(r => r.classList.remove('selected'));
+    return;
+  }
+  _cogSelectedTurn = turnId;
+  document.querySelectorAll('.cog-turn-row').forEach(r => {
+    r.classList.toggle('selected', r.dataset.turn === turnId);
+  });
+  const t = _cogData.turns.find(x => x.turn_id === turnId);
+  if (t) {
+    _cogRenderTurnDetail(t, detail);
+    // Also enrich with memory + state from cached data
+    const mem   = _cogData.memory.find(m => m.turn_id === turnId);
+    const state = _cogData.state.find(s => s.turn_id === turnId);
+    _cogAppendMemoryDetail(mem, detail);
+    _cogAppendStateDetail(state, detail);
+    detail.classList.add('open');
+    // Scroll detail into view
+    detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
+function _cogRenderTurnDetail(t, container) {
+  const tools = (t.tools_invoked || []).map(n => `<span class="cog-tag">${escHtml(n)}</span>`).join('') || '<span style="color:var(--muted)">none</span>';
+  const retrieval = (t.retrieval_results || []).map(r => {
+    const id = r.id != null ? escHtml(String(r.id)) : '?';
+    const summary = r.summary ? ` — ${escHtml(r.summary)}` : '';
+    return `<span class="cog-tag">${id}${summary}</span>`;
+  }).join('') || '<span style="color:var(--muted)">none</span>';
+
+  container.innerHTML = `
+<div class="cog-detail-grid">
+  <div class="cog-detail-field"><label>Turn ID</label><span>${escHtml(t.turn_id || '—')}</span></div>
+  <div class="cog-detail-field"><label>Timestamp</label><span>${escHtml((t.timestamp || '—').replace('T',' ').slice(0,19))}</span></div>
+  <div class="cog-detail-field"><label>Model Server</label><span>${escHtml(t.model_server || '—')}</span></div>
+  <div class="cog-detail-field"><label>Escalation</label><span>${t.escalation ? '⚠ Yes' : 'No'}${t.escalation_reason ? ` (${escHtml(t.escalation_reason)})` : ''}</span></div>
+  <div class="cog-detail-field"><label>Tool Routing</label><span>${escHtml(t.tool_routing || '—')}</span></div>
+  <div class="cog-detail-field"><label>Response Route</label><span>${escHtml(t.response_route || '—')}</span></div>
+  <div class="cog-detail-field"><label>Elapsed</label><span>${t.elapsed_ms != null ? t.elapsed_ms + ' ms' : '—'}</span></div>
+  ${t.error ? `<div class="cog-detail-field"><label>Error</label><span style="color:var(--red)">${escHtml(t.error)}</span></div>` : ''}
+</div>
+<div class="cog-detail-section">
+  <h4>User Input</h4>
+  <div style="font-size:12px;color:var(--text);padding:4px 0;">${escHtml(t.user_input || '—')}</div>
+</div>
+<div class="cog-detail-section">
+  <h4>Tools Invoked</h4>
+  <div>${tools}</div>
+</div>
+<div class="cog-detail-section">
+  <h4>Retrieval Results</h4>
+  <div>${retrieval}</div>
+</div>`;
+}
+
+function _cogAppendMemoryDetail(mem, container) {
+  if (!mem) return;
+  const injected = (mem.items_injected || []).map(r => {
+    const id = r && r.id != null ? escHtml(String(r.id)) : (typeof r === 'string' ? escHtml(r) : '?');
+    const summary = r && r.summary ? ` — ${escHtml(r.summary)}` : '';
+    return `<span class="cog-tag">${id}${summary}</span>`;
+  }).join('') || '<span style="color:var(--muted)">none</span>';
+
+  const scores = mem.ranking_scores && Object.keys(mem.ranking_scores).length
+    ? Object.entries(mem.ranking_scores).map(([id, sc]) =>
+        `<span class="cog-tag">${escHtml(id)}: <span class="cog-score">${escHtml(String(sc))}</span></span>`
+      ).join('')
+    : '<span style="color:var(--muted)">not available</span>';
+
+  container.innerHTML += `
+<div class="cog-detail-section" id="cog-mem-detail-${escHtml(mem.turn_id||'')}">
+  <h4>Memory Influence</h4>
+  <div class="cog-list-label">Items injected into context</div>
+  <div>${injected}</div>
+  <div class="cog-list-label" style="margin-top:6px;">Ranking scores</div>
+  <div>${scores}</div>
+</div>`;
+}
+
+function _cogAppendStateDetail(state, container) {
+  if (!state) return;
+  const diffRows = state.diff && Object.keys(state.diff).length
+    ? Object.entries(state.diff).map(([k, v]) => {
+        const before = v && v.before != null ? escHtml(JSON.stringify(v.before)) : '—';
+        const after  = v && v.after  != null ? escHtml(JSON.stringify(v.after))  : '—';
+        return `<div class="cog-diff-row">
+  <span class="cog-diff-key">${escHtml(k)}</span>
+  <span class="cog-diff-old">${before}</span>
+  <span class="cog-diff-arrow">→</span>
+  <span class="cog-diff-new">${after}</span>
+</div>`;
+      }).join('')
+    : '<span style="color:var(--muted);font-size:12px;">No changes recorded</span>';
+
+  const newEntries = (state.new_memory_entries || []).length
+    ? (state.new_memory_entries || []).map(id => `<span class="cog-tag">${escHtml(String(id))}</span>`).join('')
+    : '<span style="color:var(--muted)">none</span>';
+
+  container.innerHTML += `
+<div class="cog-detail-section">
+  <h4>State Changes</h4>
+  <div class="cog-delta-grid">
+    <div class="cog-delta-block">
+      <h5>Before</h5>
+      <pre>${escHtml(JSON.stringify(state.snapshot_before || {}, null, 2))}</pre>
+    </div>
+    <div class="cog-delta-block">
+      <h5>After</h5>
+      <pre>${escHtml(JSON.stringify(state.snapshot_after || {}, null, 2))}</pre>
+    </div>
+  </div>
+  <div class="cog-list-label">Delta</div>
+  ${diffRows}
+  <div class="cog-list-label" style="margin-top:8px;">New memory entries</div>
+  <div>${newEntries}</div>
+</div>`;
+}
+
+// ── Panel 2: Memory Influence ─────────────────────────────
+
+function _cogRenderMemory() {
+  const el = document.getElementById('cog-memory-list');
+  if (!_cogData.memory.length) {
+    el.innerHTML = '<div class="cog-empty">No memory traces yet.</div>';
+    return;
+  }
+  el.innerHTML = _cogData.memory.map(m => {
+    const ts = (m.timestamp || '—').replace('T',' ').slice(0,19);
+    const retrieved = (m.items_retrieved || []).length;
+    const injected  = (m.items_injected  || []).length;
+    const usedIds   = (m.used_in_assembly || []).map(id => `<span class="cog-tag">${escHtml(String(id))}</span>`).join('');
+    const scores = m.ranking_scores && Object.keys(m.ranking_scores).length
+      ? Object.entries(m.ranking_scores).slice(0,5).map(([id,sc]) =>
+          `<span class="cog-tag">${escHtml(id)}: <span class="cog-score">${escHtml(String(sc))}</span></span>`
+        ).join('')
+      : '<span style="color:var(--muted)">—</span>';
+
+    return `<div class="cog-memory-row">
+  <div class="cog-memory-header">
+    <span class="cog-turn-id">${escHtml(m.turn_id || '—')}</span>
+    <span class="cog-turn-ts">${ts}</span>
+    <span style="font-size:11px;color:var(--muted);">retrieved: <strong style="color:var(--text)">${retrieved}</strong> &nbsp; injected: <strong style="color:var(--text)">${injected}</strong></span>
+  </div>
+  <div class="cog-list-label">Used in assembly</div>
+  <div class="cog-mem-list">${usedIds || '<span style="color:var(--muted)">none</span>'}</div>
+  <div class="cog-list-label" style="margin-top:6px;">Ranking scores (top 5)</div>
+  <div class="cog-mem-list">${scores}</div>
+</div>`;
+  }).join('');
+}
+
+// ── Panel 3: Reflection Events ────────────────────────────
+
+function _cogRenderReflection() {
+  const el = document.getElementById('cog-reflection-list');
+  if (!_cogData.reflection.length) {
+    el.innerHTML = '<div class="cog-empty">No reflection events recorded yet.</div>';
+    return;
+  }
+  el.innerHTML = _cogData.reflection.map(r => {
+    const ts = (r.timestamp || '—').replace('T',' ').slice(0,19);
+    const trigger = r.trigger || 'unknown';
+    const conclusions = (r.conclusions || []).map(c => `<div class="cog-text-item">${escHtml(String(c))}</div>`).join('') || '<div style="color:var(--muted);font-size:12px;">none</div>';
+    const suggestions = (r.suggestions || []).map(s => `<div class="cog-text-item">${escHtml(String(s))}</div>`).join('') || '<div style="color:var(--muted);font-size:12px;">none</div>';
+    const inputs = (r.inputs_reviewed || []).map(i => `<span class="cog-tag">${escHtml(String(i)).slice(0,60)}</span>`).join('') || '<span style="color:var(--muted)">none</span>';
+    const simCount = r.similar_before;
+    const simBadge = simCount
+      ? `<span class="cog-similar-badge seen">similar seen: ${escHtml(String(simCount))}</span>`
+      : `<span class="cog-similar-badge">no prior similar</span>`;
+
+    return `<div class="cog-reflection-row">
+  <div class="cog-reflection-header">
+    <span class="cog-reflection-id">${escHtml(r.reflection_id || '—')}</span>
+    <span class="cog-turn-ts">${ts}</span>
+    <span class="cog-trigger-badge">${escHtml(trigger)}</span>
+    ${simBadge}
+  </div>
+  <div class="cog-list-label">Inputs reviewed</div>
+  <div>${inputs}</div>
+  <div class="cog-list-label" style="margin-top:8px;">Conclusions</div>
+  ${conclusions}
+  <div class="cog-list-label" style="margin-top:8px;">Improvement suggestions</div>
+  ${suggestions}
+</div>`;
+  }).join('');
+}
+
+// ── Panel 4: State Changes ────────────────────────────────
+
+function _cogRenderState() {
+  const el = document.getElementById('cog-state-list');
+  if (!_cogData.state.length) {
+    el.innerHTML = '<div class="cog-empty">No state deltas recorded yet.</div>';
+    return;
+  }
+  el.innerHTML = _cogData.state.map(s => {
+    const ts = (s.timestamp || '—').replace('T',' ').slice(0,19);
+    const diffRows = s.diff && Object.keys(s.diff).length
+      ? Object.entries(s.diff).map(([k, v]) => {
+          const before = v && v.before != null ? escHtml(JSON.stringify(v.before)) : '—';
+          const after  = v && v.after  != null ? escHtml(JSON.stringify(v.after))  : '—';
+          return `<div class="cog-diff-row">
+  <span class="cog-diff-key">${escHtml(k)}</span>
+  <span class="cog-diff-old">${before}</span>
+  <span class="cog-diff-arrow">→</span>
+  <span class="cog-diff-new">${after}</span>
+</div>`;
+        }).join('')
+      : '<span style="color:var(--muted);font-size:12px;">No changes</span>';
+
+    const newEntries = (s.new_memory_entries || []).length
+      ? (s.new_memory_entries || []).map(id => `<span class="cog-tag">${escHtml(String(id))}</span>`).join('')
+      : '<span style="color:var(--muted)">none</span>';
+
+    return `<div class="cog-state-row">
+  <div class="cog-state-header">
+    <span class="cog-turn-id">${escHtml(s.turn_id || '—')}</span>
+    <span class="cog-turn-ts">${ts}</span>
+  </div>
+  <div class="cog-delta-grid">
+    <div class="cog-delta-block">
+      <h5>Before</h5>
+      <pre>${escHtml(JSON.stringify(s.snapshot_before || {}, null, 2))}</pre>
+    </div>
+    <div class="cog-delta-block">
+      <h5>After</h5>
+      <pre>${escHtml(JSON.stringify(s.snapshot_after || {}, null, 2))}</pre>
+    </div>
+  </div>
+  <div class="cog-list-label">Delta</div>
+  ${diffRows}
+  <div class="cog-list-label" style="margin-top:8px;">New memory entries</div>
+  <div>${newEntries}</div>
+</div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  Computer Use panel
+// ═══════════════════════════════════════════════════════════
+
+const CU_MODE_LABELS = {
+  off:                'Off — No computer use permitted.',
+  command_only:       'Command Only — Approved apps, direct user-requested tasks only.',
+  supervised_session: 'Supervised Session — Approved apps with bounded continuation while operator supervises.',
+};
+
+const CU_OUTCOME_COLORS = {
+  allow:   'var(--green)',
+  deny:    'var(--red)',
+  pending: 'var(--yellow)',
+};
+
+let _cuAutoRefreshTimer = null;
+
+async function loadComputerUse() {
+  try {
+    const d = await api('GET', '/admin/computer_use/state');
+    if (!d.ok) {
+      document.getElementById('cu-mode-desc').textContent =
+        d.error || 'ComputerUseService not available (set computer_use.enabled=true in config).';
+      return;
+    }
+    renderCuState(d.data);
+    // Start auto-refresh while panel is visible
+    clearInterval(_cuAutoRefreshTimer);
+    _cuAutoRefreshTimer = setInterval(async () => {
+      const active = document.querySelector('.tab[data-panel="computer-use"].active');
+      if (!active) { clearInterval(_cuAutoRefreshTimer); return; }
+      const r = await api('GET', '/admin/computer_use/state');
+      if (r.ok) renderCuState(r.data);
+    }, 4000);
+  } catch(e) {
+    document.getElementById('cu-mode-desc').textContent = 'Failed to load: ' + e.message;
+  }
+}
+
+function renderCuState(s) {
+  // ── Mode buttons ──────────────────────────────────────────
+  document.querySelectorAll('.cu-mode-btn').forEach(btn => {
+    const active = btn.dataset.mode === s.mode;
+    btn.style.background    = active ? 'var(--accent-dk)' : '';
+    btn.style.borderColor   = active ? 'var(--accent)'    : '';
+    btn.style.color         = active ? '#fff'             : '';
+    btn.style.fontWeight    = active ? '700'              : '';
+  });
+
+  // ── Mode description ──────────────────────────────────────
+  document.getElementById('cu-mode-desc').textContent = CU_MODE_LABELS[s.mode] || s.mode_description || '';
+
+  // ── Session info strip ────────────────────────────────────
+  const infoEl = document.getElementById('cu-session-info');
+  const fmtTs = ts => ts ? new Date(ts).toLocaleTimeString() : '—';
+  infoEl.innerHTML = `
+    <span style="color:var(--muted)">Session started: <strong style="color:var(--text)">${fmtTs(s.session_started_at)}</strong></span>
+    <span style="color:var(--muted)">Last action: <strong style="color:var(--text)">${fmtTs(s.last_action_at)}</strong></span>
+    <span style="color:var(--muted)">Total decisions: <strong style="color:var(--text)">${s.total_decisions}</strong></span>
+  `;
+
+  // ── Active context ────────────────────────────────────────
+  const ctxEl = document.getElementById('cu-active-ctx');
+  if (s.active_app_id) {
+    ctxEl.innerHTML = `
+      <span style="color:var(--text);font-weight:600">${escHtml(s.active_app_id)}</span>
+      ${s.active_shortcut_id ? `<span style="color:var(--muted);margin-left:8px">shortcut: ${escHtml(s.active_shortcut_id)}</span>` : ''}
+      ${s.active_window_title ? `<span style="color:var(--muted);margin-left:8px">window: "${escHtml(s.active_window_title)}"</span>` : ''}
+    `;
+  } else {
+    ctxEl.textContent = 'No active application.';
+    ctxEl.style.color = 'var(--muted)';
+  }
+
+  // ── Pending confirmation ──────────────────────────────────
+  const pendEl = document.getElementById('cu-pending-conf');
+  if (s.pending_confirmation) {
+    const p = s.pending_confirmation;
+    pendEl.innerHTML = `
+      <div style="background:#3f2d00;border:1px solid #7a5500;border-radius:6px;padding:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <span style="color:var(--yellow);font-weight:700;font-size:13px;">⚠ Confirmation Required</span>
+        <span style="color:var(--text);font-size:12px;">
+          <strong>${escHtml(p.app_id)}</strong> → <strong>${escHtml(p.action)}</strong>
+          <span style="color:var(--muted);margin-left:8px">id: ${escHtml(p.confirmation_id)}</span>
+        </span>
+        <button class="action-btn" style="background:#14532d;color:var(--green);border-color:#22c55e" onclick="cuConfirm('${escHtml(p.confirmation_id)}')">✓ Confirm</button>
+        <button class="action-btn" style="background:#3f1515;color:var(--red);border-color:#ef4444"   onclick="cuDeny('${escHtml(p.confirmation_id)}')">✗ Deny</button>
+      </div>
+    `;
+  } else {
+    pendEl.innerHTML = '';
+  }
+
+  // ── Approved shortcuts ────────────────────────────────────
+  const scEl = document.getElementById('cu-shortcuts-list');
+  if (!s.approved_shortcuts || s.approved_shortcuts.length === 0) {
+    scEl.innerHTML = '<p style="color:var(--muted);font-size:12px;">No shortcuts in allowlist. Add .json files to data/computer_use/approved_shortcuts/.</p>';
+  } else {
+    scEl.innerHTML = s.approved_shortcuts.map(sc => `
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface);">
+        <span style="font-weight:600;font-size:13px;min-width:120px;">${escHtml(sc.display_name)}</span>
+        <span style="font-size:11px;color:var(--muted);font-family:var(--mono);flex:1;">${escHtml(sc.app_id)}</span>
+        ${sc.executable ? `<span style="font-size:11px;color:var(--muted);">${escHtml(sc.executable)}</span>` : ''}
+        ${sc.path_restriction ? `<span style="font-size:10px;padding:2px 6px;border-radius:3px;background:#1e3a5f;color:var(--accent);">path: ${escHtml(sc.path_restriction)}</span>` : ''}
+        <span style="font-size:11px;color:var(--muted);">${escHtml(sc.description || '')}</span>
+      </div>
+    `).join('');
+  }
+
+  // ── Policies ──────────────────────────────────────────────
+  // (Loaded separately via loadComputerUsePolicies, called on first load)
+
+  // ── Decision log ──────────────────────────────────────────
+  const logEl = document.getElementById('cu-decision-log');
+  const recent = (s.recent_decisions || []).slice().reverse();
+  if (!recent.length) {
+    logEl.innerHTML = '<p style="color:var(--muted);font-size:12px;padding:4px">No decisions recorded yet.</p>';
+  } else {
+    logEl.innerHTML = recent.map(d => {
+      const ts = d.timestamp ? new Date(d.timestamp).toLocaleTimeString() : '';
+      if (d.event) {
+        // Lifecycle event row
+        const evtColor = d.event === 'halt' ? 'var(--red)' : (d.event === 'mode_changed' ? 'var(--yellow)' : 'var(--muted)');
+        return `<div class="audit-row">
+          <span class="audit-ts">${ts}</span>
+          <span class="audit-tool" style="color:${evtColor}">[${escHtml(d.event)}]</span>
+          <span class="audit-params">${escHtml(d.new_mode ? `→ ${d.new_mode}` : (d.reason || ''))}</span>
+        </div>`;
+      }
+      const color = CU_OUTCOME_COLORS[d.outcome] || 'var(--muted)';
+      return `<div class="audit-row">
+        <span class="audit-ts">${ts}</span>
+        <span class="audit-tool">${escHtml(d.app_id || '?')}.${escHtml(d.action || '?')}</span>
+        <span class="audit-params" style="color:var(--muted);font-size:11px;">${escHtml(d.reason || '')}</span>
+        <span style="font-size:11px;font-weight:700;color:${color};flex-shrink:0;">${(d.outcome || '').toUpperCase()}</span>
+      </div>`;
+    }).join('');
+  }
+}
+
+async function loadComputerUsePolicies() {
+  const el = document.getElementById('cu-policies-list');
+  if (!el) return;
+  try {
+    const d = await api('GET', '/admin/computer_use/policies');
+    if (!d.ok) { el.innerHTML = `<p style="color:var(--muted);font-size:12px;">${escHtml(d.error || 'Not available')}</p>`; return; }
+    const policies = d.data || [];
+    if (!policies.length) { el.innerHTML = '<p style="color:var(--muted);font-size:12px;">No policies loaded.</p>'; return; }
+
+    el.innerHTML = policies.map(p => {
+      const allowed  = (p.allowed_actions || []).map(a => `<span style="background:#14532d;color:var(--green);font-size:10px;padding:2px 5px;border-radius:3px;margin:2px;">${escHtml(a)}</span>`).join('');
+      const confirm_ = (p.confirmation_required_actions || []).map(a => `<span style="background:#3f2d00;color:var(--yellow);font-size:10px;padding:2px 5px;border-radius:3px;margin:2px;">${escHtml(a)}</span>`).join('');
+      const blocked  = (p.blocked_actions || []).map(a => `<span style="background:#3f1515;color:var(--red);font-size:10px;padding:2px 5px;border-radius:3px;margin:2px;">${escHtml(a)}</span>`).join('');
+      const domains  = (p.domain_restrictions || []).length
+        ? `<div style="font-size:11px;color:var(--muted);margin-top:6px;">Domains: ${escHtml(p.domain_restrictions.join(', '))}</div>` : '';
+      const paths    = (p.path_restrictions || []).length
+        ? `<div style="font-size:11px;color:var(--muted);">Paths: ${escHtml(p.path_restrictions.join(', '))}</div>` : '';
+      return `<div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+          <span style="font-weight:700;font-size:13px;color:var(--accent);">${escHtml(p.display_name || p.app_id)}</span>
+          <span style="font-size:11px;color:var(--muted);font-family:var(--mono);">${escHtml(p.app_id)}</span>
+          ${p.window_title_match ? `<span style="font-size:10px;color:var(--muted);padding:2px 5px;border-radius:3px;background:var(--surface);">window: ${escHtml(p.window_title_match)}</span>` : ''}
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:2px;margin-bottom:4px;">${allowed || '<span style="color:var(--muted);font-size:11px;">no allowed actions</span>'}</div>
+        ${confirm_ ? `<div style="display:flex;flex-wrap:wrap;gap:2px;margin-bottom:4px;">${confirm_}</div>` : ''}
+        ${blocked  ? `<div style="display:flex;flex-wrap:wrap;gap:2px;margin-bottom:4px;">${blocked}</div>` : ''}
+        ${domains}${paths}
+        ${p.notes ? `<div style="font-size:11px;color:var(--muted);margin-top:6px;font-style:italic;">${escHtml(p.notes)}</div>` : ''}
+      </div>`;
+    }).join('');
+  } catch(e) {
+    el.innerHTML = `<p style="color:var(--red);font-size:12px;">Error: ${escHtml(e.message)}</p>`;
+  }
+}
+
+async function cuSetMode(mode) {
+  try {
+    const d = await api('POST', '/admin/computer_use/mode', { mode, reason: 'admin panel' });
+    if (!d.ok) { toast(d.error || 'Failed', false); return; }
+    renderCuState(d.data);
+    toast(`Mode set to: ${mode}`, true);
+  } catch(e) { toast(e.message, false); }
+}
+
+async function cuHalt() {
+  try {
+    const d = await api('POST', '/admin/computer_use/halt', { reason: 'admin panel halt' });
+    if (!d.ok) { toast(d.error || 'Failed', false); return; }
+    toast('Computer use HALTED', true);
+    loadComputerUse();
+  } catch(e) { toast(e.message, false); }
+}
+
+async function cuReload() {
+  try {
+    const d = await api('POST', '/admin/computer_use/reload');
+    if (!d.ok) { toast(d.error || 'Reload failed', false); return; }
+    toast(`Reloaded: ${d.data.shortcuts_loaded} shortcuts, ${d.data.policies_loaded} policies`, true);
+    loadComputerUse();
+    loadComputerUsePolicies();
+  } catch(e) { toast(e.message, false); }
+}
+
+async function cuConfirm(confirmationId) {
+  try {
+    const d = await api('POST', `/admin/computer_use/confirm/${encodeURIComponent(confirmationId)}`);
+    if (!d.ok) { toast(d.error || 'Failed', false); return; }
+    toast('Action confirmed', true);
+    loadComputerUse();
+  } catch(e) { toast(e.message, false); }
+}
+
+async function cuDeny(confirmationId) {
+  try {
+    const d = await api('POST', `/admin/computer_use/deny/${encodeURIComponent(confirmationId)}`);
+    if (!d.ok) { toast(d.error || 'Failed', false); return; }
+    toast('Action denied', false);
+    loadComputerUse();
+  } catch(e) { toast(e.message, false); }
+}
+
+// Load policies once on page load (they change rarely)
+loadComputerUsePolicies();
+
+</script>
+</body>
+</html>
