@@ -125,8 +125,9 @@ def _launch_server(role: str, srv_cfg: dict, root: Path) -> subprocess.Popen:
     binary = _resolve_binary(srv_cfg, root)
     host   = srv_cfg.get("host", "127.0.0.1")
     port   = srv_cfg["port"]
-    ctx    = srv_cfg.get("context_size", 4096)
-    layers = srv_cfg.get("n_gpu_layers", 0)
+    ctx      = srv_cfg.get("context_size", 4096)
+    layers   = srv_cfg.get("n_gpu_layers", 0)
+    parallel = srv_cfg.get("parallel", 1)
 
     # Resolve model path — supports both specific files and bare directories.
     model = _resolve_model_path(srv_cfg["model_path"], root)
@@ -143,6 +144,7 @@ def _launch_server(role: str, srv_cfg: dict, root: Path) -> subprocess.Popen:
         "--port",         str(port),
         "--ctx-size",     str(ctx),
         "--n-gpu-layers", str(layers),
+        "--parallel",     str(parallel),
         "--log-disable",  # suppress llama.cpp verbose stdout
     ]
 

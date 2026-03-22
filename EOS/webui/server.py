@@ -644,6 +644,17 @@ async def startup_event():
         _emit_log("info", "startup", "Runtime discovery complete", _runtime_discovery.to_dict())
         logger.info("Runtime discovery complete: %s", _topology)
 
+        # 3a. On-demand server manager (tool / thinking / creativity start only when needed)
+        try:
+            from runtime.on_demand import init_on_demand_manager
+            _on_demand_manager = init_on_demand_manager(_cfg, config_path.parent, _topology)
+            idle_task = _on_demand_manager.start_idle_loop()
+            _background_tasks.add(idle_task)
+            idle_task.add_done_callback(_background_tasks.discard)
+            _emit_log("info", "startup", "OnDemandServerManager initialised")
+        except Exception as exc:
+            logger.warning("OnDemandServerManager init failed: %s", exc)
+
         # 3b. Crash recovery — record this boot and detect unclean shutdowns
         _crash_report = None
         try:
@@ -1079,6 +1090,14 @@ async def shutdown_event():
     global _topology
 
     try:
+        from runtime.on_demand import get_on_demand_manager
+        _odm = get_on_demand_manager()
+        if _odm is not None:
+            await _odm.shutdown_all()
+    except Exception as exc:
+        logger.warning("OnDemandServerManager shutdown failed: %s", exc)
+
+    try:
         # Record clean shutdown before anything else (lifecycle first, then crash ledger)
 
         # Save session continuity excerpt for next boot's primer
@@ -1146,6 +1165,18 @@ async def get_index():
         return FileResponse(html_path, media_type="text/html")
     return JSONResponse(
         {"ok": False, "error": "UI not found"},
+        status_code=404
+    )
+
+
+@app.get("/workspace")
+async def get_workspace():
+    """Serve workspace chat UI (original index)."""
+    html_path = Path(__file__).parent / "index_workspace.html"
+    if html_path.is_file():
+        return FileResponse(html_path, media_type="text/html")
+    return JSONResponse(
+        {"ok": False, "error": "Workspace UI not found"},
         status_code=404
     )
 

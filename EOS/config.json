@@ -9,7 +9,8 @@
       "host": "127.0.0.1",
       "port": 8080,
       "n_gpu_layers": 99,
-      "context_size": 8192,
+      "context_size": 16384,
+      "parallel": 1,
       "required": true,
       "enabled": true,
       "cpu_n_gpu_layers": 0,
@@ -23,7 +24,8 @@
       "host": "127.0.0.1",
       "port": 8081,
       "n_gpu_layers": 99,
-      "context_size": 4096,
+      "context_size": 2048,
+      "parallel": 1,
       "required": false,
       "enabled": true,
       "cpu_n_gpu_layers": 0,
@@ -36,7 +38,8 @@
       "host": "127.0.0.1",
       "port": 8082,
       "n_gpu_layers": 0,
-      "context_size": 4096,
+      "context_size": 2048,
+      "parallel": 1,
       "required": false,
       "enabled": true,
       "cpu_n_gpu_layers": 0,
@@ -50,7 +53,8 @@
       "host": "127.0.0.1",
       "port": 8083,
       "n_gpu_layers": 0,
-      "context_size": 4096,
+      "context_size": 2048,
+      "parallel": 1,
       "required": false,
       "enabled": true,
       "cpu_n_gpu_layers": 0,
@@ -64,7 +68,8 @@
       "host": "127.0.0.1",
       "port": 8084,
       "n_gpu_layers": 0,
-      "context_size": 4096,
+      "context_size": 2048,
+      "parallel": 1,
       "required": false,
       "enabled": true,
       "cpu_n_gpu_layers": 0,
@@ -300,5 +305,9 @@
       "discord_credential_file": "AI personal files/Discord.txt"
     }
   },
-  "deployment_mode": "standard"
+  "deployment_mode": "standard",
+  "on_demand": {
+    "_comment": "Helper servers (tool, thinking, creativity) start only when the primary model needs them and shut down after idle_ttl_seconds of inactivity.",
+    "idle_ttl_seconds": 300
+  }
 }

@@ -1,5 +1,4 @@
 @echo off
 cd /d "%~dp0"
-echo [EOS] Launching standard backend bundle (main + tools + thinking)
+echo [EOS] Launching standard mode (main model only — helpers start on-demand)
 call "%~dp0start-minimal.bat"
-start "EOS thinking (CPU)" cmd /k "\"%~dp0start-thinking-cpu.bat\""

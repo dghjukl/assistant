@@ -223,8 +223,11 @@ class CreativityService:
         if not self._is_globally_enabled(ccfg):
             return False
 
-        if self._topology.creativity_endpoint() is None:
-            return False  # server not running — skip silently
+        from runtime.on_demand import get_on_demand_manager
+        if get_on_demand_manager() is None:
+            # No on-demand manager — gate on live server status
+            if self._topology.creativity_endpoint() is None:
+                return False
 
         if not self._domain_enabled(ccfg, domain):
             return False
@@ -266,9 +269,15 @@ class CreativityService:
         context : str
             Optional extra context to inject into the creativity prompt.
         """
-        t0       = time.time()
-        ccfg     = self._get_cfg(cfg)
-        endpoint = self._topology.creativity_endpoint()
+        t0   = time.time()
+        ccfg = self._get_cfg(cfg)
+
+        from runtime.on_demand import get_on_demand_manager
+        manager = get_on_demand_manager()
+        if manager is not None:
+            endpoint = await manager.ensure("creativity")
+        else:
+            endpoint = self._topology.creativity_endpoint()
 
         if endpoint is None:
             logger.debug("[Creativity] Server not available — returning empty artifact.")

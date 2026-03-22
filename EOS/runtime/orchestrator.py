@@ -410,14 +410,15 @@ async def call_qwen3(
             )
             resp.raise_for_status()
             response = resp.json()["choices"][0]["message"]["content"].strip()
-        except httpx.ConnectError:
+        except (httpx.ConnectError, httpx.RemoteProtocolError, httpx.ReadError):
             response = (
                 "I can't reach my brain right now. "
                 "Please check that the Qwen3 server is running."
             )
         except Exception as exc:
-            logger.error("Qwen3 call error: %s", exc)
-            response = f"[Error communicating with primary model: {exc}]"
+            detail = str(exc) or repr(exc)
+            logger.error("Qwen3 call error: %s", detail)
+            response = f"[Error communicating with primary model: {detail}]"
 
     _conv.add("assistant", response)
     return response

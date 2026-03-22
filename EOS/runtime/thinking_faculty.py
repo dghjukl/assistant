@@ -192,7 +192,13 @@ class ThinkingFaculty:
         temperature : Sampling temperature (default 0.3 for precision).
         max_tokens  : Response length budget.
         """
-        endpoint = self._topology.thinking_endpoint()
+        from runtime.on_demand import get_on_demand_manager
+        manager = get_on_demand_manager()
+        if manager is not None:
+            endpoint = await manager.ensure("thinking")
+        else:
+            endpoint = self._topology.thinking_endpoint()
+
         if endpoint:
             model = "lfm25-thinking"
         else:

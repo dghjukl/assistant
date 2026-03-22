@@ -33,6 +33,10 @@
       overflow: hidden;
     }
 
+    /* ── Embedded mode (inside unified shell) ── */
+    /* Hide only the title header bar; keep the tab nav visible */
+    html.embedded header { display: none !important; }
+
     /* ── Header ── */
     header {
       display: flex;
@@ -1276,6 +1280,12 @@
       font-size: 13px;
     }
   </style>
+<script>
+// Embedded mode: hide chrome when running inside the unified shell
+if (new URLSearchParams(location.search).get('embed') === '1') {
+  document.documentElement.classList.add('embedded');
+}
+</script>
 </head>
 <body>
 

@@ -16,1523 +16,182 @@
     --red:      #f25f5c;
     --text:     #e2e6f0;
     --muted:    #5a6070;
-    --user-bg:  #1a1e2a;
-    --mc-bg:    #141926;
-    --radius:   10px;
-    --font:     'Segoe UI', system-ui, sans-serif;
   }
-
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; }
 
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--font);
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  /* ── Header ── */
-  #header {
+  /* App shell header */
+  #app-header {
+    height: 44px;
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 10px 20px;
+    gap: 0;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
+    padding: 0 16px;
   }
-
-  #logo {
-    width: 34px; height: 34px;
+  #app-logo {
+    width: 28px; height: 28px;
     border-radius: 50%;
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    background: linear-gradient(135deg, #4f8ef7, #7c5cfc);
     display: flex; align-items: center; justify-content: center;
-    font-weight: 700; font-size: 13px; color: #fff;
+    font-weight: 700; font-size: 11px; color: #fff;
     flex-shrink: 0;
-    box-shadow: 0 0 12px rgba(79,142,247,0.4);
+    margin-right: 10px;
+    box-shadow: 0 0 10px rgba(79,142,247,0.35);
   }
-
-  #header-name {
-    font-weight: 600;
+  #app-name {
+    font-weight: 700;
     font-size: 15px;
-    letter-spacing: 0.03em;
+    color: var(--accent);
+    margin-right: 20px;
+    flex-shrink: 0;
   }
 
-  #status-dot {
+  /* Tab navigation */
+  #app-nav {
+    display: flex;
+    gap: 2px;
+    flex: 1;
+  }
+  .app-tab-btn {
+    padding: 6px 16px;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    color: var(--muted);
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s;
+    font-weight: 500;
+  }
+  .app-tab-btn:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+  .app-tab-btn.active { color: var(--accent); background: rgba(79,142,247,0.1); }
+
+  /* Status area */
+  #app-status-area {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+  #app-status-dot {
     width: 8px; height: 8px;
     border-radius: 50%;
     background: var(--muted);
-    margin-left: 2px;
     transition: background 0.4s;
-    flex-shrink: 0;
   }
-  #status-dot.online  { background: var(--green); box-shadow: 0 0 6px var(--green); }
-  #status-dot.booting { background: var(--yellow); box-shadow: 0 0 6px var(--yellow); animation: pulse 1.2s infinite; }
-  #status-dot.error   { background: var(--red); }
+  #app-status-dot.online  { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  #app-status-dot.booting { background: var(--yellow); box-shadow: 0 0 6px var(--yellow); animation: pulse 1.2s infinite; }
+  #app-status-dot.error   { background: var(--red); }
+  #app-status-label { font-size: 12px; color: var(--muted); }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
 
-  #status-label { font-size: 12px; color: var(--muted); }
-
-  #header-spacer { flex: 1; }
-
-  .panel-toggle {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--muted);
-    padding: 5px 11px;
-    border-radius: 6px;
-    font-size: 12px;
-    cursor: pointer;
-    transition: all 0.2s;
-    font-family: var(--font);
+  /* Tab panes */
+  #app-body {
+    height: calc(100vh - 44px);
+    position: relative;
   }
-  .panel-toggle:hover, .panel-toggle.active {
-    border-color: var(--accent);
-    color: var(--accent);
-    background: rgba(79,142,247,0.08);
-  }
-
-  /* ── Body ── */
-  #body {
-    display: flex;
-    flex: 1;
-    overflow: hidden;
-  }
-
-  /* ── Chat ── */
-  #chat-col {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-  }
-
-  #messages {
-    flex: 1;
-    overflow-y: auto;
-    padding: 24px 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    scroll-behavior: smooth;
-  }
-
-  #messages::-webkit-scrollbar { width: 5px; }
-  #messages::-webkit-scrollbar-track { background: transparent; }
-  #messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-
-  .msg {
-    display: flex;
-    gap: 12px;
-    max-width: 820px;
-  }
-
-  .msg.user { flex-direction: row-reverse; align-self: flex-end; }
-  .msg.mcore { align-self: flex-start; }
-
-  .msg-avatar {
-    width: 30px; height: 30px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 11px; font-weight: 700;
-    margin-top: 2px;
-  }
-
-  .msg.mcore .msg-avatar {
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    color: #fff;
-    box-shadow: 0 0 8px rgba(79,142,247,0.3);
-  }
-
-  .msg.user .msg-avatar {
-    background: var(--border);
-    color: var(--muted);
-  }
-
-  .msg-body { display: flex; flex-direction: column; gap: 4px; }
-
-  .msg-sender {
-    font-size: 11px;
-    color: var(--muted);
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-  }
-  .msg.user .msg-sender { text-align: right; }
-
-  .msg-bubble {
-    padding: 10px 14px;
-    border-radius: var(--radius);
-    font-size: 14px;
-    line-height: 1.6;
-    max-width: 600px;
-    word-break: break-word;
-    white-space: pre-wrap;
-  }
-
-  .msg.mcore .msg-bubble {
-    background: var(--mc-bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-  }
-
-  .msg.user .msg-bubble {
-    background: var(--user-bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-  }
-
-  .msg-meta {
-    font-size: 11px;
-    color: var(--muted);
-    display: flex;
-    gap: 8px;
-    align-items: center;
-  }
-
-  .tool-badge {
-    background: rgba(79,142,247,0.12);
-    color: var(--accent);
-    border: 1px solid rgba(79,142,247,0.25);
-    border-radius: 4px;
-    padding: 1px 6px;
-    font-size: 10px;
-    font-weight: 600;
-  }
-
-  /* Thinking indicator */
-  .thinking .msg-bubble {
-    display: flex;
-    gap: 5px;
-    align-items: center;
-    padding: 14px;
-  }
-
-  .dot-flashing {
-    width: 7px; height: 7px;
-    border-radius: 50%;
-    background: var(--accent);
-    animation: dot-flash 1.2s infinite;
-  }
-  .dot-flashing:nth-child(2) { animation-delay: 0.2s; }
-  .dot-flashing:nth-child(3) { animation-delay: 0.4s; }
-
-  @keyframes dot-flash {
-    0%, 100% { opacity: 0.2; transform: scale(0.8); }
-    50%       { opacity: 1;   transform: scale(1.1); }
-  }
-
-  /* System / initiative messages */
-  .msg.system {
-    align-self: center;
-  }
-  .msg.system .msg-bubble {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--muted);
-    font-size: 12px;
-    font-style: italic;
-    padding: 6px 12px;
-  }
-
-  /* ── Input bar ── */
-  #input-bar {
-    padding: 14px 20px;
-    border-top: 1px solid var(--border);
-    background: var(--surface);
-    display: flex;
-    gap: 10px;
-    align-items: flex-end;
-    flex-shrink: 0;
-  }
-
-  #input-wrap {
-    flex: 1;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    display: flex;
-    align-items: flex-end;
-    padding: 2px 4px;
-    transition: border-color 0.2s;
-  }
-  #input-wrap:focus-within { border-color: var(--accent); }
-
-  #msg-input {
-    flex: 1;
-    background: transparent;
-    border: none;
-    outline: none;
-    color: var(--text);
-    font-family: var(--font);
-    font-size: 14px;
-    padding: 9px 10px;
-    resize: none;
-    max-height: 140px;
-    line-height: 1.5;
-  }
-
-  #msg-input::placeholder { color: var(--muted); }
-
-  #send-btn {
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    border: none;
-    border-radius: 8px;
-    width: 40px; height: 40px;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: opacity 0.2s, transform 0.1s;
-    color: #fff;
-  }
-  #send-btn:hover  { opacity: 0.9; }
-  #send-btn:active { transform: scale(0.95); }
-  #send-btn:disabled { opacity: 0.3; cursor: default; }
-
-  .icon-btn {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    width: 40px;
-    height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    flex-shrink: 0;
-    color: var(--text);
-    transition: all 0.2s;
-  }
-  .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
-  .icon-btn:disabled { opacity: 0.35; cursor: default; }
-  .icon-btn.active {
-    border-color: var(--red);
-    color: var(--red);
-    box-shadow: 0 0 0 1px rgba(242,95,92,0.2) inset;
-  }
-  .icon-btn.on {
-    border-color: var(--green);
-    color: var(--green);
-    box-shadow: 0 0 0 1px rgba(61,214,140,0.2) inset;
-  }
-
-  /* ── Side panels ── */
-  #panel-col {
-    width: 0;
-    overflow: hidden;
-    transition: width 0.25s ease;
-    border-left: 0px solid var(--border);
-    background: var(--surface);
-    display: flex;
-    flex-direction: column;
-    flex-shrink: 0;
-  }
-  #panel-col.open {
-    width: 280px;
-    border-left-width: 1px;
-  }
-
-  #panel-inner {
-    width: 280px;
-    padding: 16px;
-    overflow-y: auto;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
-
-  #panel-inner::-webkit-scrollbar { width: 4px; }
-  #panel-inner::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-  .panel-section {
-    display: none;
-    flex-direction: column;
-    gap: 10px;
-  }
-  .panel-section.visible { display: flex; }
-
-  .panel-title {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--muted);
-    padding-bottom: 6px;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .stat-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 12px;
-  }
-  .stat-label { color: var(--muted); }
-  .stat-value { color: var(--text); font-weight: 600; }
-  .stat-value.green { color: var(--green); }
-  .stat-value.yellow { color: var(--yellow); }
-  .stat-value.red { color: var(--red); }
-
-  .tool-item {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 7px;
-    padding: 8px 10px;
-    font-size: 12px;
-  }
-  .tool-name { color: var(--accent); font-weight: 600; margin-bottom: 2px; }
-  .tool-desc { color: var(--muted); font-size: 11px; line-height: 1.4; }
-
-  .memory-item {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 7px;
-    padding: 8px 10px;
-    font-size: 12px;
-    color: var(--text);
-    line-height: 1.4;
-  }
-  .memory-class {
-    font-size: 10px;
-    color: var(--accent);
-    font-weight: 600;
-    text-transform: uppercase;
-    margin-bottom: 2px;
-  }
-
-  .empty-state {
-    font-size: 12px;
-    color: var(--muted);
-    font-style: italic;
-    text-align: center;
-    padding: 12px 0;
-  }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0.4; }
-  }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(6px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-  .msg { animation: fadeIn 0.2s ease; }
-
-  /* ── Attachment preview strip ── */
-  #attach-strip {
-    display: none;
-    padding: 6px 20px 0;
-    background: var(--surface);
-    border-top: 1px solid var(--border);
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
-    flex-shrink: 0;
-  }
-  #attach-strip.visible { display: flex; }
-
-  .attach-chip {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 4px 8px;
-    font-size: 12px;
-    color: var(--text);
-    max-width: 260px;
-  }
-  .attach-chip-kind {
-    font-size: 10px;
-    color: var(--accent);
-    font-weight: 700;
-    text-transform: uppercase;
-    flex-shrink: 0;
-  }
-  .attach-chip-name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    flex: 1;
-  }
-  .attach-remove {
-    background: none;
-    border: none;
-    color: var(--muted);
-    cursor: pointer;
-    font-size: 15px;
-    line-height: 1;
-    padding: 0 2px;
-    flex-shrink: 0;
-  }
-  .attach-remove:hover { color: var(--red); }
-
-  .attach-thumb {
-    width: 28px; height: 28px;
-    border-radius: 4px;
-    object-fit: cover;
-    flex-shrink: 0;
-    border: 1px solid var(--border);
-  }
-
-  /* ── Webcam modal ── */
-  #webcam-modal {
-    position: fixed;
+  .app-pane {
+    position: absolute;
     inset: 0;
-    background: rgba(0, 0, 0, 0.75);
     display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
   }
-  #webcam-modal.open { display: flex; }
-
-  #webcam-box {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    width: 440px;
-    max-width: 95vw;
-  }
-  #webcam-title {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--muted);
-  }
-  #webcam-video {
+  .app-pane.active { display: block; }
+  .app-pane iframe {
     width: 100%;
-    border-radius: 8px;
-    background: #000;
-    max-height: 290px;
-    object-fit: cover;
-  }
-  #webcam-canvas { display: none; }
-  #webcam-error {
-    font-size: 12px;
-    color: var(--red);
-    text-align: center;
-    display: none;
-  }
-  .webcam-actions {
-    display: flex;
-    gap: 8px;
-    justify-content: flex-end;
-  }
-  .wc-btn-primary {
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    height: 100%;
     border: none;
-    border-radius: 8px;
-    color: #fff;
-    padding: 8px 18px;
-    font-size: 13px;
-    font-family: var(--font);
-    cursor: pointer;
-    transition: opacity 0.2s;
-  }
-  .wc-btn-primary:hover  { opacity: 0.88; }
-  .wc-btn-primary:disabled { opacity: 0.35; cursor: default; }
-  .wc-btn-secondary {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    color: var(--muted);
-    padding: 8px 18px;
-    font-size: 13px;
-    font-family: var(--font);
-    cursor: pointer;
-  }
-  .wc-btn-secondary:hover { color: var(--text); border-color: var(--muted); }
-
-  /* ── Attached image inside a message bubble ── */
-  .msg-image {
-    max-width: 220px;
-    max-height: 160px;
-    border-radius: 7px;
-    border: 1px solid var(--border);
-    object-fit: cover;
     display: block;
-    margin-top: 6px;
-  }
-
-  /* ── Vision-off dim on vision-dependent buttons ── */
-  .vision-gated.vision-off {
-    opacity: 0.38;
-    pointer-events: none;
   }
 </style>
 </head>
 <body>
-
-<!-- ── Header ── -->
-<div id="header">
-  <div id="logo">MC</div>
-  <div id="header-name">EOS</div>
-  <div id="status-dot" class="booting"></div>
-  <div id="status-label">booting...</div>
-  <div id="header-spacer"></div>
-  <button class="panel-toggle" id="btn-status"  onclick="togglePanel('status')">Status</button>
-  <button class="panel-toggle" id="btn-tools"   onclick="togglePanel('tools')">Tools</button>
-  <button class="panel-toggle" id="btn-memory"  onclick="togglePanel('memory')">Memory</button>
-</div>
-
-<!-- ── Body ── -->
-<div id="body">
-
-  <!-- Chat column -->
-  <div id="chat-col">
-    <div id="messages"></div>
-    <!-- Attachment preview strip — visible when a file is pending -->
-    <div id="attach-strip"></div>
-    <div id="input-bar">
-      <button id="ptt-btn" class="icon-btn" title="Click to start / click to stop talking" disabled>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-          <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-          <line x1="12" y1="19" x2="12" y2="23"></line>
-          <line x1="8" y1="23" x2="16" y2="23"></line>
-        </svg>
-      </button>
-      <!-- File attachment button -->
-      <button id="attach-btn" class="icon-btn" title="Attach file (image, PDF, or text)" disabled onclick="triggerFileInput()">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
-        </svg>
-      </button>
-      <!-- Hidden file input — triggered by attach-btn -->
-      <input type="file" id="file-input"
-        accept="image/png,image/jpeg,image/webp,.pdf,application/pdf,.txt,.md,.csv,text/plain,text/csv,text/markdown"
-        style="display:none"
-        onchange="handleFileSelected(event)">
-      <div id="input-wrap">
-        <textarea id="msg-input" rows="1" placeholder="Say something..." disabled></textarea>
-      </div>
-      <button id="tts-btn" class="icon-btn" title="Toggle text-to-speech" disabled>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-          <path d="M15.5 8.5a5 5 0 0 1 0 7"></path>
-          <path d="M18.5 5.5a9 9 0 0 1 0 13"></path>
-        </svg>
-      </button>
-      <!-- Vision toggle button — green = on, muted = off -->
-      <button id="vision-btn" class="icon-btn" title="Enable vision (process images)" disabled onclick="toggleVision()">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-          <circle cx="12" cy="12" r="3"></circle>
-        </svg>
-      </button>
-      <!-- Webcam capture button — only enabled when vision is on -->
-      <button id="webcam-btn" class="icon-btn vision-gated" title="Capture from webcam" disabled onclick="openWebcam()">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M23 7l-7 5 7 5V7z"></path>
-          <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
-        </svg>
-      </button>
-      <button id="send-btn" onclick="sendMessage()" disabled title="Send">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="22" y1="2" x2="11" y2="13"></line>
-          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-        </svg>
-      </button>
-    </div>
+<div id="app-header">
+  <div id="app-logo">EOS</div>
+  <div id="app-name">EOS</div>
+  <div id="app-nav">
+    <button class="app-tab-btn active" onclick="switchTab('workspace')">Workspace</button>
+    <button class="app-tab-btn" onclick="switchTab('system')">System</button>
+    <button class="app-tab-btn" onclick="switchTab('docs')">Docs</button>
   </div>
-
-  <!-- Side panel -->
-  <div id="panel-col">
-    <div id="panel-inner">
-
-      <!-- Status section -->
-      <div class="panel-section" id="section-status">
-        <div class="panel-title">System Status</div>
-        <div class="stat-row"><span class="stat-label">Model</span><span class="stat-value" id="s-model">—</span></div>
-        <div class="stat-row"><span class="stat-label">Session turns</span><span class="stat-value" id="s-turns">0</span></div>
-        <div class="stat-row"><span class="stat-label">Boot time</span><span class="stat-value" id="s-boot">—</span></div>
-        <div class="stat-row"><span class="stat-label">Memory items</span><span class="stat-value" id="s-memory">—</span></div>
-        <div class="stat-row"><span class="stat-label">Initiative queue</span><span class="stat-value" id="s-initiative">—</span></div>
-        <div class="stat-row"><span class="stat-label">WebSocket</span><span class="stat-value" id="s-ws">connecting</span></div>
-      </div>
-
-      <!-- Tools section -->
-      <div class="panel-section" id="section-tools">
-        <div class="panel-title">Available Tools</div>
-        <div id="tools-list"><div class="empty-state">Loading...</div></div>
-      </div>
-
-      <!-- Memory section -->
-      <div class="panel-section" id="section-memory">
-        <div class="panel-title">Recent Memory</div>
-        <div id="memory-list"><div class="empty-state">Loading...</div></div>
-      </div>
-
-    </div>
+  <div id="app-status-area">
+    <div id="app-status-dot" class="booting"></div>
+    <div id="app-status-label">connecting...</div>
   </div>
-
 </div>
-
+<div id="app-body">
+  <div class="app-pane active" id="pane-workspace">
+    <iframe id="frame-workspace" src="/workspace?embed=1" title="Workspace"></iframe>
+  </div>
+  <div class="app-pane" id="pane-system">
+    <iframe id="frame-system" data-src="/admin?embed=1" title="System"></iframe>
+  </div>
+  <div class="app-pane" id="pane-docs">
+    <iframe id="frame-docs" data-src="/docs?embed=1" title="Docs"></iframe>
+  </div>
+</div>
 <script>
-// ── Per-tab vision session token ──────────────────────────────────────────────
-// Generated once per browser tab and kept in sessionStorage so the same token
-// survives a page refresh but a new tab gets a new token.  This is the key
-// the server uses to scope vision-enabled state without sharing it across tabs.
-const VISION_SESSION_TOKEN = (() => {
-  const KEY = '_mcore_vstok';
-  const existing = sessionStorage.getItem(KEY);
-  if (existing) return existing;
-  const fresh = (typeof crypto !== 'undefined' && crypto.randomUUID)
-    ? crypto.randomUUID()
-    : 'vs-' + Date.now() + '-' + Math.random().toString(36).slice(2);
-  sessionStorage.setItem(KEY, fresh);
-  return fresh;
-})();
+let activeTab = 'workspace';
 
-// ── State ────────────────────────────────────────────────────────────────────
-let ws = null;
-let wsReady = false;
-let activePanel = null;
-let thinkingEl = null;
-let ttsEnabled = false;
-let recognition = null;
-let pttSupported = false;
-let pttActive = false;  // toggle state for push-to-talk
+function switchTab(name) {
+  if (name === activeTab) return;
 
-// Vision / file attachment state
-let visionCapable = false;   // determined at boot from /api/status
-let visionEnabled = true;    // user toggle, synced to /api/vision/settings
-let currentAttachment = null; // {file_id, filename, content_type, kind, previewUrl}
-let webcamStream = null;      // active MediaStream or null
-
-// ── Panel toggle ─────────────────────────────────────────────────────────────
-function togglePanel(name) {
-  const col = document.getElementById('panel-col');
-  const sections = ['status','tools','memory'];
-
-  if (activePanel === name) {
-    // Close
-    activePanel = null;
-    col.classList.remove('open');
-    sections.forEach(s => {
-      document.getElementById('section-' + s).classList.remove('visible');
-      document.getElementById('btn-' + s).classList.remove('active');
-    });
-    return;
-  }
-
-  activePanel = name;
-  col.classList.add('open');
-  sections.forEach(s => {
-    const show = s === name;
-    document.getElementById('section-' + s).classList.toggle('visible', show);
-    document.getElementById('btn-' + s).classList.toggle('active', show);
+  // Update buttons
+  document.querySelectorAll('.app-tab-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.toLowerCase() === name);
   });
 
-  // Refresh data when panel opens
-  if (name === 'tools') loadTools();
-  if (name === 'memory') loadMemory();
-  if (name === 'status') loadStatus();
-}
+  // Update panes
+  document.querySelectorAll('.app-pane').forEach(p => p.classList.remove('active'));
+  document.getElementById('pane-' + name).classList.add('active');
 
-// ── WebSocket ─────────────────────────────────────────────────────────────────
-function connectWS() {
-  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  ws = new WebSocket(`${proto}://${location.host}/ws`);
-
-  ws.onopen = () => {
-    wsReady = true;
-    document.getElementById('s-ws').textContent = 'connected';
-    document.getElementById('s-ws').className = 'stat-value green';
-  };
-
-  ws.onclose = () => {
-    wsReady = false;
-    document.getElementById('s-ws').textContent = 'reconnecting';
-    document.getElementById('s-ws').className = 'stat-value yellow';
-    // If a response was in flight, clear the spinner so the user isn't
-    // stuck staring at "thinking…" forever after a disconnect.
-    removeThinking();
-    setTimeout(connectWS, 3000);
-  };
-
-  ws.onerror = () => {
-    document.getElementById('s-ws').textContent = 'error';
-    document.getElementById('s-ws').className = 'stat-value red';
-  };
-
-  ws.onmessage = (evt) => {
-    const msg = JSON.parse(evt.data);
-    handleWSMessage(msg);
-  };
-}
-
-function handleWSMessage(msg) {
-  if (msg.type === 'thinking') {
-    showThinking();
-    return;
-  }
-  if (msg.type === 'response') {
-    removeThinking();
-    const safeResponse = normalizeAssistantText(msg.response);
-    appendMessage('eos', safeResponse, msg.tool_used);
-    maybeSpeak(safeResponse);
-    updateTurnCount(msg.turn_count);
-    return;
-  }
-  if (msg.type === 'error') {
-    removeThinking();
-    appendSystemMessage('⚠ ' + (msg.message || msg.error || 'Unknown error'));
-    return;
-  }
-  if (msg.type === 'initiative') {
-    appendSystemMessage('💡 ' + msg.message);
-    return;
-  }
-}
-
-// ── Send message ──────────────────────────────────────────────────────────────
-function sendMessage() {
-  const input = document.getElementById('msg-input');
-  const text = input.value.trim();
-
-  // Need either text or a pending attachment
-  if (!text && !currentAttachment) return;
-
-  // ── Build display text for the user bubble ─────────────────────────────────
-  const displayText = text || `[Attached: ${currentAttachment.filename}]`;
-  const attachInfo  = currentAttachment ? { ...currentAttachment } : null;
-  appendMessage('user', displayText, null, attachInfo);
-
-  input.value = '';
-  autoResize(input);
-
-  // ── Build modality / multimodal payload ────────────────────────────────────
-  let modality = 'text';
-  let multimodal = null;
-  let textAttachment = null;  // for .txt / .csv / .md uploads (kind==="text")
-
-  if (currentAttachment) {
-    if (visionEnabled && (currentAttachment.kind === 'image' || currentAttachment.kind === 'document')) {
-      // Image / PDF turns use the vision path (requires vision enabled).
-      modality = currentAttachment.kind;
-      multimodal = {
-        vision: {
-          file_id:      currentAttachment.file_id,
-          content_type: currentAttachment.content_type,
-          source_ref:   currentAttachment.filename,
-        },
-      };
-    } else if (currentAttachment.kind === 'text') {
-      // Text-kind uploads (.txt / .csv / .md) are always allowed regardless of
-      // the vision toggle.  The server reads the file from the upload store and
-      // prepends it as an [ATTACHMENT] block before the user's typed message.
-      textAttachment = {
-        file_id:  currentAttachment.file_id,
-        filename: currentAttachment.filename,
-      };
-    }
+  // Lazy-load iframes on first open (use data-loaded flag; src="" resolves to page URL)
+  const iframe = document.getElementById('frame-' + name);
+  if (iframe && !iframe.dataset.loaded && iframe.dataset.src) {
+    iframe.src = iframe.dataset.src;
+    iframe.dataset.loaded = '1';
   }
 
-  // Capture and clear before the async path so the user can start typing again
-  clearAttachment();
-
-  // ── Dispatch ───────────────────────────────────────────────────────────────
-  if (wsReady && ws && ws.readyState === WebSocket.OPEN) {
-    const wsPayload = { type: 'chat', text, vision_session: VISION_SESSION_TOKEN };
-    if (multimodal) {
-      wsPayload.modality   = modality;
-      wsPayload.multimodal = multimodal;
-    }
-    if (textAttachment) {
-      wsPayload.text_attachment = textAttachment;
-    }
-    showThinking();
-    ws.send(JSON.stringify(wsPayload));
-  } else {
-    // Fallback to HTTP POST
-    showThinking();
-    const body = { text };
-    if (multimodal) {
-      body.modality   = modality;
-      body.multimodal = multimodal;
-    }
-    if (textAttachment) {
-      body.text_attachment = textAttachment;
-    }
-    fetch('/api/chat', {
-      method: 'POST',
-      headers: {
-        'Content-Type':    'application/json',
-        'X-Vision-Session': VISION_SESSION_TOKEN,
-      },
-      body: JSON.stringify(body),
-    })
-    .then(r => r.json())
-    .then(data => {
-      removeThinking();
-      if (data.ok) {
-        const safeResponse = normalizeAssistantText(data.response);
-        appendMessage('eos', safeResponse, data.tool_used);
-        maybeSpeak(safeResponse);
-        updateTurnCount(data.turn_count);
-      } else {
-        appendSystemMessage('⚠ ' + (data.error || 'Unknown error'));
-      }
-    })
-    .catch(err => {
-      removeThinking();
-      appendSystemMessage('⚠ Connection error: ' + err.message);
-    });
-  }
+  activeTab = name;
+  history.pushState({tab: name}, '', '#' + name);
 }
 
-// ── Message rendering ─────────────────────────────────────────────────────────
-// attachInfo: optional {previewUrl, filename} — appends a safe <img> inside the bubble.
-function appendMessage(role, text, toolUsed, attachInfo) {
-  const msgs = document.getElementById('messages');
-  const div = document.createElement('div');
-  div.className = `msg ${role}`;
-
-  const initials = role === 'mcore' ? 'EOS' : 'YOU';
-  const senderName = role === 'mcore' ? 'EOS' : 'You';
-
-  let toolBadge = '';
-  if (toolUsed && toolUsed.name) {
-    const icon = toolUsed.ok ? '✓' : '✗';
-    toolBadge = `<span class="tool-badge">${icon} ${toolUsed.name}</span>`;
-  }
-
-  const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-  // Build skeleton with empty bubble so we can populate it safely via DOM
-  div.innerHTML = `
-    <div class="msg-avatar">${initials}</div>
-    <div class="msg-body">
-      <div class="msg-sender">${senderName}</div>
-      <div class="msg-bubble"></div>
-      <div class="msg-meta">${time}${toolBadge}</div>
-    </div>
-  `;
-
-  // Use textContent for user-supplied text — prevents any HTML injection
-  const bubble = div.querySelector('.msg-bubble');
-  bubble.textContent = text;
-
-  // Attach image preview (blob URL we generated — safe to inject as <img>)
-  if (attachInfo && attachInfo.previewUrl) {
-    const img = document.createElement('img');
-    img.className = 'msg-image';
-    img.src = attachInfo.previewUrl;
-    img.alt = attachInfo.filename || 'attached image';
-    img.loading = 'lazy';
-    bubble.appendChild(img);
-  }
-
-  msgs.appendChild(div);
-  msgs.scrollTop = msgs.scrollHeight;
-}
-
-function appendSystemMessage(text) {
-  const msgs = document.getElementById('messages');
-  const div = document.createElement('div');
-  div.className = 'msg system';
-  div.innerHTML = `<div class="msg-body"><div class="msg-bubble">${escapeHtml(text)}</div></div>`;
-  msgs.appendChild(div);
-  msgs.scrollTop = msgs.scrollHeight;
-}
-
-function showThinking() {
-  if (thinkingEl) return;
-  const msgs = document.getElementById('messages');
-  thinkingEl = document.createElement('div');
-  thinkingEl.className = 'msg mcore thinking';
-  thinkingEl.innerHTML = `
-    <div class="msg-avatar">MC</div>
-    <div class="msg-body">
-      <div class="msg-sender">EOS</div>
-      <div class="msg-bubble">
-        <div class="dot-flashing"></div>
-        <div class="dot-flashing"></div>
-        <div class="dot-flashing"></div>
-      </div>
-    </div>
-  `;
-  msgs.appendChild(thinkingEl);
-  msgs.scrollTop = msgs.scrollHeight;
-}
-
-function removeThinking() {
-  if (thinkingEl) {
-    thinkingEl.remove();
-    thinkingEl = null;
-  }
-}
-
-// ── Status / data loaders ─────────────────────────────────────────────────────
-async function loadStatus() {
-  try {
-    const r = await fetch('/api/status');
-    const data = await r.json();
-    if (!data.ok) return;
-
-    const primary = data.model_status?.primary_reasoning;
-    document.getElementById('s-model').textContent = primary?.model_name || '—';
-    document.getElementById('s-turns').textContent = data.session?.turn_count ?? 0;
-    document.getElementById('s-boot').textContent = data.boot_time_s ? data.boot_time_s + 's' : '—';
-
-    const memData = data.memory;
-    document.getElementById('s-memory').textContent =
-      memData?.total_count ?? memData?.count ?? '—';
-
-    const initData = data.initiative;
-    const queueCount = initData?.ready ?? initData?.pending ?? '—';
-    document.getElementById('s-initiative').textContent = queueCount;
-  } catch (e) { /* silent */ }
-}
-
-async function loadTools() {
-  try {
-    const r = await fetch('/api/tools');
-    const data = await r.json();
-    const el = document.getElementById('tools-list');
-    if (!data.ok || !data.tools?.length) {
-      el.innerHTML = '<div class="empty-state">No tools registered.</div>';
-      return;
-    }
-    el.innerHTML = data.tools.map(t => `
-      <div class="tool-item">
-        <div class="tool-name">${escapeHtml(t.name)}</div>
-        <div class="tool-desc">${escapeHtml(t.description || '')}</div>
-      </div>
-    `).join('');
-  } catch (e) {
-    document.getElementById('tools-list').innerHTML = '<div class="empty-state">Error loading tools.</div>';
-  }
-}
-
-async function loadMemory() {
-  try {
-    const r = await fetch('/api/memory/recent');
-    const data = await r.json();
-    const el = document.getElementById('memory-list');
-    if (!data.ok || !data.memories?.length) {
-      el.innerHTML = '<div class="empty-state">No memories yet.</div>';
-      return;
-    }
-    el.innerHTML = data.memories.map(m => `
-      <div class="memory-item">
-        <div class="memory-class">${escapeHtml(m.memory_class || 'memory')}</div>
-        ${escapeHtml((m.content || '').slice(0, 120))}${(m.content || '').length > 120 ? '…' : ''}
-      </div>
-    `).join('');
-  } catch (e) {
-    document.getElementById('memory-list').innerHTML = '<div class="empty-state">Error loading memory.</div>';
-  }
-}
-
-function updateTurnCount(count) {
-  if (count !== undefined) {
-    document.getElementById('s-turns').textContent = count;
-  }
-}
-
-// ── Boot sequence ─────────────────────────────────────────────────────────────
-async function boot() {
-  // Poll until runtime is ready
-  const dot = document.getElementById('status-dot');
-  const label = document.getElementById('status-label');
-
-  for (let i = 0; i < 60; i++) {
-    await new Promise(r => setTimeout(r, 2000));
-    try {
-      const r = await fetch('/api/status');
-      const data = await r.json();
-      if (data.ok) {
-        dot.className = 'online';
-        label.textContent = 'online';
-        document.getElementById('msg-input').disabled = false;
-        document.getElementById('send-btn').disabled = false;
-        document.getElementById('ptt-btn').disabled = !pttSupported;
-        document.getElementById('tts-btn').disabled = false;
-
-        const name = data.identity?.name || 'EOS';
-        appendMessage('mcore', `${name} is online. Session started.`);
-
-        // Check vision capability and sync enabled state from server
-        await checkVisionCapability(data);
-
-        loadStatus();
-        connectWS();
-        return;
-      } else {
-        label.textContent = 'booting... ' + (data.error ? '(' + data.error.slice(0, 40) + ')' : '');
-      }
-    } catch (e) {
-      label.textContent = 'waiting for server...';
-    }
-  }
-
-  // Timeout
-  dot.className = 'error';
-  label.textContent = 'boot failed';
-  appendSystemMessage('⚠ Runtime failed to boot. Check the server logs.');
-}
-
-// ── Utilities ─────────────────────────────────────────────────────────────────
-function escapeHtml(str) {
-  return String(str)
-    .replace(/&/g,'&amp;')
-    .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;');
-}
-
-function autoResize(el) {
-  el.style.height = 'auto';
-  el.style.height = Math.min(el.scrollHeight, 140) + 'px';
-}
-
-
-function normalizeAssistantText(text) {
-  if (typeof text !== 'string') return 'I hit an empty model response. Please try again.';
-  const trimmed = text.trim();
-  return trimmed || 'I hit an empty model response. Please try again.';
-}
-
-function initSpeechControls() {
-  const pttBtn = document.getElementById('ptt-btn');
-  const ttsBtn = document.getElementById('tts-btn');
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  pttSupported = Boolean(SpeechRecognition);
-
-  if (pttSupported) {
-    recognition = new SpeechRecognition();
-    recognition.lang = 'en-US';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-    recognition.continuous = false;
-
-    recognition.onresult = (event) => {
-      const transcript = event.results?.[0]?.[0]?.transcript?.trim();
-      if (!transcript) return;
-      const input = document.getElementById('msg-input');
-      input.value = transcript;
-      autoResize(input);
-      input.focus();
-      // Don't auto-send — let the user review and edit before pressing Enter or Send
-    };
-
-    recognition.onerror = () => {
-      pttActive = false;
-      pttBtn.classList.remove('active');
-      appendSystemMessage('⚠ Microphone error. Check browser permissions.');
-    };
-
-    recognition.onend = () => {
-      // If still marked active but recognition ended on its own, keep visual state
-      // but don't auto-restart — user must click again
-      if (pttActive) {
-        pttBtn.classList.remove('active');
-        pttActive = false;
-      }
-    };
-
-    const togglePtt = (event) => {
-      event.preventDefault();
-      if (!recognition) return;
-      if (!pttActive) {
-        // Start recording
-        pttActive = true;
-        pttBtn.classList.add('active');
-        try { recognition.start(); } catch (e) { pttActive = false; pttBtn.classList.remove('active'); }
-      } else {
-        // Stop recording
-        pttActive = false;
-        pttBtn.classList.remove('active');
-        recognition.stop();
-      }
-    };
-
-    pttBtn.addEventListener('click', togglePtt);
-    pttBtn.addEventListener('touchend', togglePtt, { passive: false });
-  } else {
-    pttBtn.title = 'Voice input not supported in this browser';
-  }
-
-  const ttsSupported = 'speechSynthesis' in window;
-  if (!ttsSupported) {
-    ttsBtn.title = 'Text-to-speech not supported in this browser';
-  }
-
-  ttsBtn.addEventListener('click', () => {
-    if (!ttsSupported) return;
-    ttsEnabled = !ttsEnabled;
-    ttsBtn.classList.toggle('on', ttsEnabled);
-    ttsBtn.setAttribute('aria-pressed', String(ttsEnabled));
-    if (!ttsEnabled) window.speechSynthesis.cancel();
-  });
-}
-
-let _ttsAudio = null;  // current playing audio element
-
-async function maybeSpeak(text) {
-  if (!ttsEnabled) return;
-  const clean = normalizeAssistantText(text);
-
-  // Stop any currently playing audio
-  if (_ttsAudio) {
-    _ttsAudio.pause();
-    _ttsAudio = null;
-  }
-  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-
-  // Try Piper backend first
-  try {
-    const resp = await fetch('/api/tts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: clean }),
-    });
-    if (resp.ok) {
-      const blob = await resp.blob();
-      const url = URL.createObjectURL(blob);
-      _ttsAudio = new Audio(url);
-      _ttsAudio.onended = () => { URL.revokeObjectURL(url); _ttsAudio = null; };
-      _ttsAudio.play();
-      return;
-    } else {
-      // Log the actual error from the server so it shows in DevTools console
-      const errBody = await resp.json().catch(() => ({}));
-      console.warn('Piper TTS error:', errBody.error || resp.status, errBody.trace || '');
-    }
-  } catch (err) {
-    console.warn('Piper TTS fetch failed:', err);
-  }
-
-  // Fallback: browser Web Speech API
-  if ('speechSynthesis' in window) {
-    const utterance = new SpeechSynthesisUtterance(clean);
-    utterance.rate = 1;
-    utterance.pitch = 1;
-    window.speechSynthesis.speak(utterance);
-  }
-}
-
-// ── Vision capability + settings ──────────────────────────────────────────────
-async function checkVisionCapability(statusData) {
-  // The frontend model is the only vision-capable role (llama_cpp_vision_server).
-  // Treat vision as capable unless the model entry explicitly marks enabled=false.
-  const frontendInfo = statusData?.model_status?.frontend;
-  visionCapable = frontendInfo ? frontendInfo.enabled !== false : true;
-
-  const visionBtn = document.getElementById('vision-btn');
-  visionBtn.disabled = false;
-
-  if (!visionCapable) {
-    visionEnabled = false;
-    visionBtn.disabled = true;
-    visionBtn.title = 'Vision unavailable — frontend model is disabled';
-    appendSystemMessage('ℹ Vision is unavailable (frontend model disabled). Image inputs will not be processed.');
-    updateVisionUI();
-    // File attach is still useful for document/text — always enable
-    document.getElementById('attach-btn').disabled = false;
-    return;
-  }
-
-  // Sync with server-side enabled state for this tab's token
-  try {
-    const r = await fetch('/api/vision/settings', {
-      headers: { 'X-Vision-Session': VISION_SESSION_TOKEN },
-    });
-    const d = await r.json();
-    if (d.ok) visionEnabled = Boolean(d.enabled);
-  } catch (_) {
-    visionEnabled = true;
-  }
-
-  document.getElementById('attach-btn').disabled = false;
-  updateVisionUI();
-}
-
-function updateVisionUI() {
-  const visionBtn = document.getElementById('vision-btn');
-  const webcamBtn = document.getElementById('webcam-btn');
-
-  visionBtn.classList.toggle('on', visionEnabled);
-  visionBtn.title = visionEnabled
-    ? 'Vision enabled — click to disable'
-    : 'Vision disabled — click to enable';
-
-  // Webcam only makes sense when vision is on
-  webcamBtn.disabled = !visionEnabled || !visionCapable;
-  webcamBtn.classList.toggle('vision-off', !visionEnabled || !visionCapable);
-
-  // If vision just turned off and there is a pending image OR document
-  // attachment, clear it — both require vision to be processed on the backend.
-  if (!visionEnabled && currentAttachment &&
-      (currentAttachment.kind === 'image' || currentAttachment.kind === 'document')) {
-    clearAttachment();
-    appendSystemMessage('ℹ Vision disabled — attached file cleared (images and PDFs require vision).');
-  }
-}
-
-async function toggleVision() {
-  if (!visionCapable) return;
-  visionEnabled = !visionEnabled;
-  try {
-    await fetch('/api/vision/settings', {
-      method: 'POST',
-      headers: {
-        'Content-Type':    'application/json',
-        'X-Vision-Session': VISION_SESSION_TOKEN,
-      },
-      body: JSON.stringify({ enabled: visionEnabled }),
-    });
-  } catch (_) { /* non-fatal; in-memory state is the source of truth for this tab */ }
-  updateVisionUI();
-}
-
-// ── File attachment ───────────────────────────────────────────────────────────
-function triggerFileInput() {
-  if (document.getElementById('attach-btn').disabled) return;
-  document.getElementById('file-input').click();
-}
-
-async function handleFileSelected(evt) {
-  const file = evt.target.files && evt.target.files[0];
-  if (!file) return;
-  // Reset the input so the same file can be selected again
-  evt.target.value = '';
-  await uploadAndAttach(file);
-}
-
-async function uploadAndAttach(file) {
-  const attachBtn = document.getElementById('attach-btn');
-  attachBtn.disabled = true;
-
-  try {
-    // Read the file as base64 so we can POST JSON (server no longer accepts multipart).
-    const base64Data = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload  = () => {
-        // readAsDataURL returns "data:<mime>;base64,<b64>" — strip the prefix.
-        const result = reader.result;
-        const comma  = result.indexOf(',');
-        resolve(comma >= 0 ? result.slice(comma + 1) : result);
-      };
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(file);
-    });
-
-    const resp = await fetch('/api/upload', {
-      method:  'POST',
-      headers: {
-        'Content-Type':     'application/json',
-        'X-Vision-Session': VISION_SESSION_TOKEN,
-      },
-      body: JSON.stringify({
-        filename:     file.name,
-        content_type: file.type || '',
-        data:         base64Data,
-      }),
-    });
-    const data = await resp.json();
-
-    if (!data.ok) {
-      appendSystemMessage('⚠ Upload failed: ' + (data.error || 'Unknown error'));
-      return;
-    }
-
-    // Both images and PDFs/documents require vision processing on the backend.
-    // Text files (.txt/.csv/.md) arrive as modality="text" and are always allowed.
-    if (!visionEnabled && (data.kind === 'image' || data.kind === 'document')) {
-      appendSystemMessage('ℹ Vision is disabled. Enable vision (👁 button) to attach images or PDFs.');
-      return;
-    }
-
-    // Build a local preview URL for images small enough to display inline
-    let previewUrl = null;
-    if (data.kind === 'image' && file.size < 5 * 1024 * 1024) {
-      previewUrl = URL.createObjectURL(file);
-    }
-
-    currentAttachment = {
-      file_id:      data.file_id,
-      filename:     data.filename,
-      content_type: data.content_type,
-      kind:         data.kind,
-      previewUrl,
-    };
-
-    renderAttachmentPreview();
-  } catch (err) {
-    appendSystemMessage('⚠ Upload error: ' + err.message);
-  } finally {
-    attachBtn.disabled = false;
-  }
-}
-
-function renderAttachmentPreview() {
-  const strip = document.getElementById('attach-strip');
-  strip.innerHTML = '';
-
-  if (!currentAttachment) {
-    strip.classList.remove('visible');
-    return;
-  }
-
-  strip.classList.add('visible');
-  const chip = document.createElement('div');
-  chip.className = 'attach-chip';
-
-  // Thumbnail for image attachments
-  if (currentAttachment.previewUrl) {
-    const thumb = document.createElement('img');
-    thumb.className = 'attach-thumb';
-    thumb.src = currentAttachment.previewUrl;
-    thumb.alt = '';
-    chip.appendChild(thumb);
-  }
-
-  const kindSpan = document.createElement('span');
-  kindSpan.className = 'attach-chip-kind';
-  kindSpan.textContent = currentAttachment.kind;
-  chip.appendChild(kindSpan);
-
-  const nameSpan = document.createElement('span');
-  nameSpan.className = 'attach-chip-name';
-  nameSpan.title = currentAttachment.filename;
-  nameSpan.textContent = currentAttachment.filename;
-  chip.appendChild(nameSpan);
-
-  const removeBtn = document.createElement('button');
-  removeBtn.className = 'attach-remove';
-  removeBtn.title = 'Remove attachment';
-  removeBtn.textContent = '×';
-  removeBtn.addEventListener('click', clearAttachment);
-  chip.appendChild(removeBtn);
-
-  strip.appendChild(chip);
-}
-
-function clearAttachment() {
-  if (currentAttachment && currentAttachment.previewUrl) {
-    URL.revokeObjectURL(currentAttachment.previewUrl);
-  }
-  currentAttachment = null;
-  renderAttachmentPreview();
-}
-
-// ── Webcam capture ────────────────────────────────────────────────────────────
-async function openWebcam() {
-  if (!visionEnabled || !visionCapable) return;
-
-  const modal   = document.getElementById('webcam-modal');
-  const video   = document.getElementById('webcam-video');
-  const errDiv  = document.getElementById('webcam-error');
-  const capBtn  = document.getElementById('webcam-capture-btn');
-
-  errDiv.style.display = 'none';
-  errDiv.textContent   = '';
-  capBtn.disabled      = false;
-  modal.classList.add('open');
-
-  try {
-    webcamStream = await navigator.mediaDevices.getUserMedia({
-      video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
-      audio: false,
-    });
-    video.srcObject = webcamStream;
-  } catch (err) {
-    errDiv.textContent   = 'Camera error: ' + (err.message || err);
-    errDiv.style.display = 'block';
-    capBtn.disabled      = true;
-  }
-}
-
-function closeWebcam() {
-  const modal  = document.getElementById('webcam-modal');
-  const video  = document.getElementById('webcam-video');
-  const capBtn = document.getElementById('webcam-capture-btn');
-
-  modal.classList.remove('open');
-  video.srcObject = null;
-  capBtn.disabled = false;
-  document.getElementById('webcam-error').style.display = 'none';
-
-  if (webcamStream) {
-    webcamStream.getTracks().forEach(t => t.stop());
-    webcamStream = null;
-  }
-}
-
-async function captureWebcam() {
-  const video  = document.getElementById('webcam-video');
-  const canvas = document.getElementById('webcam-canvas');
-
-  if (!video.srcObject || !webcamStream) {
-    closeWebcam();
-    return;
-  }
-
-  // Draw current frame to the hidden canvas
-  canvas.width  = video.videoWidth  || 640;
-  canvas.height = video.videoHeight || 480;
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(video, 0, 0);
-
-  // Release camera before the async upload so the indicator light turns off
-  closeWebcam();
-
-  canvas.toBlob(async (blob) => {
-    if (!blob) {
-      appendSystemMessage('⚠ Webcam capture produced no image data.');
-      return;
-    }
-    const file = new File([blob], `webcam_${Date.now()}.jpg`, { type: 'image/jpeg' });
-    await uploadAndAttach(file);
-  }, 'image/jpeg', 0.88);
-}
-
-// ── Input handling ────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  const input = document.getElementById('msg-input');
-  initSpeechControls();
-
-  input.addEventListener('input', () => autoResize(input));
-
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  });
-
-  boot();
+// Restore tab from hash on load
+const initTab = (location.hash || '').replace('#','') || 'workspace';
+if (initTab !== 'workspace') switchTab(initTab);
+
+window.addEventListener('popstate', e => {
+  const tab = (e.state && e.state.tab) || (location.hash||'').replace('#','') || 'workspace';
+  switchTab(tab);
 });
-</script>
 
-<!-- ── Webcam capture modal ── -->
-<div id="webcam-modal">
-  <div id="webcam-box">
-    <div id="webcam-title">Webcam Capture</div>
-    <video id="webcam-video" autoplay playsinline muted></video>
-    <canvas id="webcam-canvas"></canvas>
-    <div id="webcam-error"></div>
-    <div class="webcam-actions">
-      <button class="wc-btn-secondary" onclick="closeWebcam()">Cancel</button>
-      <button class="wc-btn-primary" id="webcam-capture-btn" onclick="captureWebcam()">📸 Capture</button>
-    </div>
-  </div>
-</div>
+// Listen for cross-frame tab switch messages from docs/admin
+window.addEventListener('message', e => {
+  if (e.data && e.data.type === 'eos-switch-tab') {
+    switchTab(e.data.tab);
+  }
+});
+
+// Poll workspace iframe for status to update the shell status dot
+function syncStatus() {
+  try {
+    const frame = document.getElementById('frame-workspace');
+    const fdoc = frame.contentDocument || frame.contentWindow.document;
+    const dot = fdoc.getElementById('status-dot');
+    const label = fdoc.getElementById('status-label');
+    const appDot = document.getElementById('app-status-dot');
+    const appLabel = document.getElementById('app-status-label');
+    if (dot) {
+      appDot.className = dot.className;
+    }
+    if (label) appLabel.textContent = label.textContent;
+  } catch(_) {}
+}
+setInterval(syncStatus, 2000);
+</script>
 </body>
 </html>

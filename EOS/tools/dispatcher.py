@@ -114,9 +114,14 @@ def get_tool_status(topology: "RuntimeTopology | None" = None) -> list[dict]:
     Each dict: {name, permission, description, available, reason}
     Used by core/entity.py to build the runtime status block.
     """
-    tool_server_ready = True
-    if topology is not None:
+    from runtime.on_demand import get_on_demand_manager
+    manager = get_on_demand_manager()
+    if manager is not None:
+        tool_server_ready = True  # on-demand: will start when needed
+    elif topology is not None:
         tool_server_ready = topology.tool_endpoint() is not None
+    else:
+        tool_server_ready = True
 
     result = []
     for name, entry in TOOL_REGISTRY.items():
@@ -155,7 +160,12 @@ async def extract_tool_call(
     Returns structured {tool, args} dict or None if extraction fails or no tool needed.
     Falls back to None (no tool) if the tool server is unavailable.
     """
-    endpoint = topology.tool_endpoint()
+    from runtime.on_demand import get_on_demand_manager
+    manager = get_on_demand_manager()
+    if manager is not None:
+        endpoint = await manager.ensure("tool")
+    else:
+        endpoint = topology.tool_endpoint()
     if not endpoint:
         logger.debug("Tool server unavailable — skipping extraction")
         return None

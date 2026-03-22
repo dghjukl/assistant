@@ -1,5 +1,4 @@
 @echo off
 cd /d "%~dp0"
-echo [EOS] Launching full backend bundle (main + tools + thinking + creativity)
-call "%~dp0start-standard.bat"
-start "EOS creativity (CPU)" cmd /k "\"%~dp0start-creativity-cpu.bat\""
+echo [EOS] Launching full mode (main model only — all helpers start on-demand)
+call "%~dp0start-minimal.bat"
