@@ -48,6 +48,24 @@ from core.memory import (
     get_relational_model,
     search_memory,
 )
+from core.auth import AdminAuthMiddleware, load_or_create_token, get_admin_token, get_token_file_path
+from core.access_control import (
+    AccessControlMiddleware,
+    init_access_controller, get_access_controller,
+    classify_origin, extract_client_ip,
+    TIER_LOCALHOST, TIER_LAN, TIER_EXTERNAL,
+)
+from webui.schemas import (
+    ChatRequest, TtsRequest, VisionSettingsRequest, AutonomyRequest,
+    CapabilityRequest, ComputerUseModeRequest, ComputerUseHaltRequest,
+    InitiativeTriggerRequest, InitiativeFeedbackRequest,
+    InvestigationCreateRequest, InvestigationRunPassRequest, InvestigationResolveRequest,
+    SecretSetRequest, ForceToolRequest, ForceRetrievalRequest,
+    GoalCreateRequest, GoalNoteRequest, GoalAbandonRequest,
+    AccessTierUpdateRequest, LanPairRequest, LanSessionRevokeRequest,
+)
+from core.audit import init_audit_store, get_audit_store
+from core.secrets import init_secrets, secrets_manager as _secrets_manager_ref
 from runtime.service_discovery import discover_runtime
 from runtime.orchestrator import startup, process_turn
 from runtime.topology import RuntimeTopology
@@ -153,6 +171,17 @@ async def _broadcast_log_to_admins(entry: dict) -> None:
             _admin_ws_clients.remove(ws)
 
 
+def _get_request_origin(request: Request) -> tuple[str, str]:
+    """Return (origin_tier, client_ip) from request state (set by AccessControlMiddleware).
+    Falls back to live classification if state is not yet set (early startup)."""
+    tier = getattr(request.state, "origin_tier", None)
+    ip   = getattr(request.state, "client_ip",   None)
+    if tier is None or ip is None:
+        ip   = ip   or extract_client_ip(request)
+        tier = tier or classify_origin(ip)
+    return tier, ip
+
+
 def _sanitize_config(cfg: dict) -> dict:
     """Remove sensitive fields from config for admin API."""
     safe = {}
@@ -167,10 +196,23 @@ def _sanitize_config(cfg: dict) -> dict:
 
 
 def _group_tools_by_category() -> dict[str, list[str]]:
-    """Group tools from TOOL_SCHEMA by category."""
+    """Group registered tools by their pack name.
+
+    Uses the live ToolRegistry when available (authoritative source).
+    Falls back to the legacy TOOL_SCHEMA dispatcher only when the registry
+    has not yet been initialised (e.g. very early startup).
+    """
+    # Prefer the live registry — it is the single source of truth
+    if _tool_registry is not None:
+        groups: dict[str, list[str]] = {}
+        for spec in _tool_registry.all_tools():
+            groups.setdefault(spec.pack, []).append(spec.name)
+        return groups
+
+    # Legacy fallback: derive from old TOOL_SCHEMA dispatcher
     try:
         from tools.dispatcher import TOOL_SCHEMA
-        groups = {
+        legacy_groups = {
             "perception": ["screen_capture", "webcam_capture"],
             "memory": ["query_memory", "save_memory"],
             "calendar": ["list_events", "create_event"],
@@ -178,10 +220,8 @@ def _group_tools_by_category() -> dict[str, list[str]]:
             "files": ["read_file", "write_file", "list_dir"],
             "web": ["web_search"],
         }
-        result = {}
-        for pack, tools in groups.items():
-            result[pack] = [t for t in tools if t in TOOL_SCHEMA]
-        return result
+        return {pack: [t for t in tools if t in TOOL_SCHEMA]
+                for pack, tools in legacy_groups.items()}
     except Exception:
         return {}
 
@@ -360,6 +400,13 @@ async def _bus_poll_loop() -> None:
 
 app = FastAPI(title="EOS WebUI", version="1.0", docs_url=None, redoc_url=None)
 
+# Admin auth middleware — must be added before any routes are registered
+app.add_middleware(AdminAuthMiddleware)
+
+# Access control middleware — origin classification, tier policy, rate limiting, LAN auth
+# Added after AdminAuthMiddleware so admin routes are already gated when it runs
+app.add_middleware(AccessControlMiddleware)
+
 
 # ── Signal bus subscriber wiring ─────────────────────────────────────────────
 
@@ -463,6 +510,49 @@ def _wire_signal_subscribers() -> None:
     logger.info("[signal_wire] Signal subscriber wiring complete.")
 
 
+# ── Runtime scaffolding ───────────────────────────────────────────────────
+
+_DEFAULT_APP_POLICY = {
+    "_schema": "eos_app_policy_v1",
+    "_description": "Per-application action policy for the EOS Computer Use subsystem.",
+    "apps": {},
+}
+
+
+def _ensure_runtime_dirs(root: Path) -> None:
+    """Ensure all required runtime directories and seed files exist.
+
+    Safe to call on every boot — uses exist_ok=True throughout and only
+    writes seed files when they are genuinely absent.
+    """
+    required_dirs = [
+        root / "data",
+        root / "data" / "computer_use",
+        root / "data" / "computer_use" / "approved_shortcuts",
+        root / "data" / "backups",
+        root / "data" / "workspace",
+        root / "logs",
+        root / "config" / "google",
+    ]
+    for d in required_dirs:
+        try:
+            d.mkdir(parents=True, exist_ok=True)
+        except Exception as exc:
+            logger.debug("[scaffold] Could not create dir %s: %s", d, exc)
+
+    # Seed app_policy.json if missing (Computer Use will warn without it)
+    policy_path = root / "data" / "computer_use" / "app_policy.json"
+    if not policy_path.is_file():
+        try:
+            policy_path.write_text(
+                json.dumps(_DEFAULT_APP_POLICY, indent=2),
+                encoding="utf-8",
+            )
+            logger.info("[scaffold] Seeded default app_policy.json at %s", policy_path)
+        except Exception as exc:
+            logger.warning("[scaffold] Could not seed app_policy.json: %s", exc)
+
+
 # ── Startup & Shutdown ────────────────────────────────────────────────────
 
 @app.on_event("startup")
@@ -486,6 +576,56 @@ async def startup_event():
         with config_path.open(encoding="utf-8") as f:
             _cfg = json.load(f)
         _emit_log("info", "startup", f"Config loaded: {config_file}")
+
+        # 1b. Ensure all required runtime directories and seed files exist
+        _ensure_runtime_dirs(config_path.parent)
+
+        # 2a. Security: load or generate admin token
+        try:
+            db_dir = Path(_cfg.get("db_path", "data/entity_state.db")).parent
+            if not db_dir.is_absolute():
+                db_dir = config_path.parent / db_dir
+            token = load_or_create_token(data_dir=db_dir)
+            _emit_log(
+                "info", "startup",
+                f"Admin token ready — stored at: {get_token_file_path()}",
+            )
+            logger.info("[auth] Admin token file: %s", get_token_file_path())
+        except Exception as exc:
+            _emit_log("error", "startup", "Admin token init failed", {"error": str(exc)})
+            logger.error("Admin token init failed: %s", exc)
+
+        # 2b. Audit store
+        try:
+            audit_db = db_dir / "audit.db"
+            init_audit_store(audit_db)
+            _emit_log("info", "startup", f"Audit store ready: {audit_db}")
+        except Exception as exc:
+            _emit_log("error", "startup", "Audit store init failed", {"error": str(exc)})
+            logger.error("Audit store init failed: %s", exc)
+
+        # 2b2. Access controller (origin classification, tier policies, rate limiting, LAN sessions)
+        try:
+            init_access_controller(data_dir=db_dir, cfg=_cfg)
+            _emit_log("info", "startup", "Access controller ready")
+        except Exception as exc:
+            _emit_log("error", "startup", "Access controller init failed", {"error": str(exc)})
+            logger.error("Access controller init failed: %s", exc)
+
+        # 2c. Secrets manager (re-init with resolved data dir)
+        try:
+            init_secrets(data_dir=db_dir)
+            _emit_log("info", "startup", "Secrets manager ready")
+        except Exception as exc:
+            logger.warning("Secrets manager init failed: %s", exc)
+
+        # 2d. Google OAuth manager (configure token/secret paths from loaded config)
+        try:
+            from core.google_oauth import configure as google_oauth_configure
+            google_oauth_configure(_cfg)
+            _emit_log("info", "startup", "Google OAuth manager configured")
+        except Exception as exc:
+            logger.warning("Google OAuth configure failed: %s", exc)
 
         # 2. Init memory/db
         try:
@@ -616,7 +756,29 @@ async def startup_event():
         except Exception as exc:
             logger.warning("BackupService init failed: %s", exc)
 
-        # 3i. Computer Use subsystem — layered, supervised computer-use capability
+        # 4. Init CognitionTracer if available
+        if CognitionTracer is not None:
+            try:
+                trace_cfg = _cfg.get("cognition", {})
+                if trace_cfg.get("enable_cognition_trace", True):
+                    _tracer = CognitionTracer(
+                        turn_ring_size=trace_cfg.get("turn_ring_size", 200),
+                        reflection_ring_size=trace_cfg.get("reflection_ring_size", 100),
+                        state_ring_size=trace_cfg.get("state_ring_size", 100),
+                    )
+                    _emit_log("info", "startup", "CognitionTracer initialized")
+            except Exception as exc:
+                logger.warning("CognitionTracer init failed: %s", exc)
+
+        # 4b. Init SignalBus if available
+        if SignalBus is not None:
+            try:
+                _bus = SignalBus()
+                _emit_log("info", "startup", "SignalBus initialized")
+            except Exception as exc:
+                logger.warning("SignalBus init failed: %s", exc)
+
+        # 4b2. Computer Use subsystem — must init after SignalBus so bus= is live
         try:
             cu_cfg = _cfg.get("computer_use", {})
             if cu_cfg.get("enabled", False):
@@ -641,28 +803,6 @@ async def startup_event():
                 logger.info("[computer_use] Disabled in config (computer_use.enabled=false). Subsystem not loaded.")
         except Exception as exc:
             logger.warning("ComputerUseService init failed: %s", exc)
-
-        # 4. Init CognitionTracer if available
-        if CognitionTracer is not None:
-            try:
-                trace_cfg = _cfg.get("cognition", {})
-                if trace_cfg.get("enable_cognition_trace", True):
-                    _tracer = CognitionTracer(
-                        turn_ring_size=trace_cfg.get("turn_ring_size", 200),
-                        reflection_ring_size=trace_cfg.get("reflection_ring_size", 100),
-                        state_ring_size=trace_cfg.get("state_ring_size", 100),
-                    )
-                    _emit_log("info", "startup", "CognitionTracer initialized")
-            except Exception as exc:
-                logger.warning("CognitionTracer init failed: %s", exc)
-
-        # 4b. Init SignalBus if available
-        if SignalBus is not None:
-            try:
-                _bus = SignalBus()
-                _emit_log("info", "startup", "SignalBus initialized")
-            except Exception as exc:
-                logger.warning("SignalBus init failed: %s", exc)
 
         # 4c. Init CapabilityRegistry
         try:
@@ -750,6 +890,14 @@ async def startup_event():
             failed  = manifest["summary"]["failed"]
             _emit_log("info", "startup", f"Toolpacks: {loaded}/{total} loaded, {failed} failed",
                       manifest["summary"])
+
+            # Wire the ToolExecutor into the orchestrator now that the registry is ready
+            try:
+                from runtime.orchestrator import wire_executor
+                wire_executor(_tool_registry, get_audit_store())
+                _emit_log("info", "startup", "ToolExecutor wired to orchestrator")
+            except Exception as _wexc:
+                logger.warning("ToolExecutor wiring failed: %s", _wexc)
         except Exception as exc:
             logger.warning("Toolpack init failed — falling back to legacy tool states: %s", exc)
             # Fallback: seed _tool_states from old dispatcher
@@ -776,6 +924,66 @@ async def startup_event():
             toolpacks = _group_tools_by_category()
             for pack_name in toolpacks:
                 _toolpack_states[pack_name] = True
+
+        # 7b. Reconcile capability statuses — mark each subsystem ENABLED/OFFLINE/DISABLED
+        #     based on actual init outcome.  Replaces the UNKNOWN seeds from build_default_registry.
+        try:
+            if _capability_registry is not None:
+                from runtime.capability_registry import CapabilityStatus, CapabilityEntry, CapabilityKind
+
+                # Memory stores: if orchestrator init succeeded they are available
+                _capability_registry.set_status("sqlite_memory", CapabilityStatus.ENABLED, "init complete")
+                _capability_registry.set_status("vector_memory", CapabilityStatus.ENABLED, "init complete")
+
+                # TTS: probe Piper binary
+                tts_cfg = _cfg.get("tts", {})
+                if tts_cfg:
+                    _piper = Path(tts_cfg.get("binary", "Piper/piper/piper.exe"))
+                    if not _piper.is_absolute():
+                        _piper = config_path.parent / _piper
+                    _tts_ok = _piper.is_file()
+                    _capability_registry.set_status(
+                        "tts",
+                        CapabilityStatus.ENABLED if _tts_ok else CapabilityStatus.OFFLINE,
+                        "binary found" if _tts_ok else f"binary not found: {_piper}",
+                    )
+                    if not _tts_ok:
+                        _emit_log("warn", "startup", "TTS offline — Piper binary not found", {"path": str(_piper)})
+
+                # Cognitive subsystems: mark ENABLED if object was created
+                _subsystem_caps = [
+                    (_initiative_engine,    "initiative_engine"),
+                    (_idle_cognition,       "idle_cognition"),
+                    (_investigation_engine, "investigation_engine"),
+                    (_identity_continuity,  "identity_continuity"),
+                ]
+                for _obj, _cap_name in _subsystem_caps:
+                    if _obj is not None:
+                        _capability_registry.set_status(_cap_name, CapabilityStatus.ENABLED)
+
+                # Tool catalog: register each tool as a TOOL capability (enabled or disabled)
+                if _tool_registry is not None:
+                    for _spec in _tool_registry.all_tools():
+                        _cap_name = f"tool:{_spec.name}"
+                        if _capability_registry.get(_cap_name) is None:
+                            _capability_registry.register(CapabilityEntry(
+                                name=_cap_name,
+                                kind=CapabilityKind.TOOL,
+                                status=CapabilityStatus.ENABLED if _spec.enabled else CapabilityStatus.DISABLED,
+                                healthy=_spec.enabled,
+                                policy="optional",
+                                version=getattr(_spec, "pack", ""),
+                                metadata={
+                                    "pack":  getattr(_spec, "pack", ""),
+                                    "risk":  str(getattr(_spec, "risk_level", "")),
+                                    "trust": str(getattr(_spec, "trust_level", "")),
+                                },
+                            ))
+
+                _emit_log("info", "startup", "Capability statuses reconciled",
+                          {"total": len(_capability_registry.all())})
+        except Exception as exc:
+            logger.warning("Capability reconciliation failed: %s", exc)
 
         # 8. Start background tasks
         task1 = asyncio.create_task(_server_health_loop())
@@ -1060,7 +1268,7 @@ async def get_initiative():
 
 
 @app.post("/api/chat")
-async def post_chat(body: dict):
+async def post_chat(body: ChatRequest):
     """Process chat turn synchronously."""
     if not _topology:
         return JSONResponse(
@@ -1082,7 +1290,7 @@ async def post_chat(body: dict):
         import time as _time
         _last_interaction_monotonic = _time.monotonic()
 
-        user_input = body.get("message", "").strip()
+        user_input = body.message.strip()
         if not user_input:
             return JSONResponse(
                 {"ok": False, "error": "Empty message"},
@@ -1171,21 +1379,27 @@ async def websocket_chat(websocket: WebSocket):
 
 
 @app.post("/api/tts")
-async def post_tts(body: dict):
+async def post_tts(body: TtsRequest):
     """Text-to-speech via Piper."""
     try:
-        text = body.get("text", "").strip()
+        text = body.text.strip()
         if not text:
             return JSONResponse(
                 {"ok": False, "error": "Empty text"},
                 status_code=400
             )
 
-        # Stub: just return a placeholder response
-        # Real implementation would invoke Piper TTS service
+        from services.tts import synthesize_to_wav
+        wav_bytes = synthesize_to_wav(text, _cfg)
+        if wav_bytes is None:
+            return JSONResponse(
+                {"ok": False, "error": "TTS unavailable — Piper binary not found or synthesis failed"},
+                status_code=503
+            )
         return StreamingResponse(
-            BytesIO(b"[TTS audio would be here]"),
-            media_type="audio/wav"
+            BytesIO(wav_bytes),
+            media_type="audio/wav",
+            headers={"Content-Length": str(len(wav_bytes))},
         )
     except Exception as exc:
         logger.error("TTS endpoint error: %s", exc)
@@ -1241,10 +1455,10 @@ async def get_vision_settings(session_id: str | None = None):
 
 
 @app.post("/api/vision/settings")
-async def post_vision_settings(body: dict, session_id: str | None = None):
+async def post_vision_settings(body: VisionSettingsRequest, session_id: str | None = None):
     """Update vision toggle for session."""
     try:
-        enabled = body.get("enabled", False)
+        enabled = body.enabled
         if session_id:
             _vision_sessions[session_id] = enabled
         return JSONResponse({"ok": True, "data": {"enabled": enabled}})
@@ -1277,19 +1491,10 @@ async def get_autonomy():
 
 
 @app.post("/api/autonomy")
-async def post_autonomy(body: dict):
+async def post_autonomy(body: AutonomyRequest):
     """Update autonomy dimension."""
     try:
-        dimension = body.get("dimension", "")
-        enabled = body.get("enabled", False)
-
-        if not dimension:
-            return JSONResponse(
-                {"ok": False, "error": "Missing dimension"},
-                status_code=400
-            )
-
-        set_dimension(dimension, enabled)
+        set_dimension(body.dimension, body.enabled)
         profile = get_full_profile()
         return JSONResponse({"ok": True, "data": profile})
     except Exception as exc:
@@ -1472,13 +1677,18 @@ async def admin_tools_audit(limit: int = 50):
 
 
 @app.post("/admin/tools/{tool_name}/enable")
-async def admin_enable_tool(tool_name: str):
+async def admin_enable_tool(tool_name: str, request: Request):
     """Enable a tool."""
     try:
         if _tool_registry:
             _tool_registry.set_enabled(tool_name, True)
         _tool_states[tool_name] = True
         _emit_log("info", "admin", f"Tool enabled: {tool_name}")
+        _audit = get_audit_store()
+        if _audit:
+            _ot, _ip = _get_request_origin(request)
+            _audit.record_admin_action("tool_toggle", target=tool_name, details={"enabled": True},
+                                       origin_tier=_ot, client_ip=_ip)
         return JSONResponse({"ok": True, "data": {"enabled": True}})
     except KeyError:
         return JSONResponse({"ok": False, "error": f"Unknown tool: {tool_name}"}, status_code=404)
@@ -1487,13 +1697,18 @@ async def admin_enable_tool(tool_name: str):
 
 
 @app.post("/admin/tools/{tool_name}/disable")
-async def admin_disable_tool(tool_name: str):
+async def admin_disable_tool(tool_name: str, request: Request):
     """Disable a tool."""
     try:
         if _tool_registry:
             _tool_registry.set_enabled(tool_name, False)
         _tool_states[tool_name] = False
         _emit_log("info", "admin", f"Tool disabled: {tool_name}")
+        _audit = get_audit_store()
+        if _audit:
+            _ot, _ip = _get_request_origin(request)
+            _audit.record_admin_action("tool_toggle", target=tool_name, details={"enabled": False},
+                                       origin_tier=_ot, client_ip=_ip)
         return JSONResponse({"ok": True, "data": {"enabled": False}})
     except KeyError:
         return JSONResponse({"ok": False, "error": f"Unknown tool: {tool_name}"}, status_code=404)
@@ -1520,22 +1735,32 @@ async def admin_get_permissions():
 
 
 @app.post("/admin/permissions/{perm_class}/allow")
-async def admin_allow_permission(perm_class: str):
+async def admin_allow_permission(perm_class: str, request: Request):
     """Add permission to allowlist."""
     try:
         _perm_allowlist.add(perm_class)
         _emit_log("info", "admin", f"Permission allowed: {perm_class}")
+        _audit = get_audit_store()
+        if _audit:
+            _ot, _ip = _get_request_origin(request)
+            _audit.record_admin_action("permission_change", target=perm_class, details={"allowed": True},
+                                       origin_tier=_ot, client_ip=_ip)
         return JSONResponse({"ok": True, "data": {"allowed": True}})
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
 
 @app.post("/admin/permissions/{perm_class}/deny")
-async def admin_deny_permission(perm_class: str):
+async def admin_deny_permission(perm_class: str, request: Request):
     """Remove permission from allowlist."""
     try:
         _perm_allowlist.discard(perm_class)
         _emit_log("info", "admin", f"Permission denied: {perm_class}")
+        _audit = get_audit_store()
+        if _audit:
+            _ot, _ip = _get_request_origin(request)
+            _audit.record_admin_action("permission_change", target=perm_class, details={"allowed": False},
+                                       origin_tier=_ot, client_ip=_ip)
         return JSONResponse({"ok": True, "data": {"allowed": False}})
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
@@ -1625,34 +1850,42 @@ async def admin_get_toolpacks():
 
 
 @app.post("/admin/toolpacks/{pack_name}/enable")
-async def admin_enable_toolpack(pack_name: str):
+async def admin_enable_toolpack(pack_name: str, request: Request):
     """Enable a toolpack and all its tools."""
     try:
         _toolpack_states[pack_name] = True
-        # Enable all tools in the pack via the registry
         if _tool_registry:
             for spec in _tool_registry.all_tools():
                 if spec.pack == pack_name:
                     _tool_registry.set_enabled(spec.name, True)
                     _tool_states[spec.name] = True
         _emit_log("info", "admin", f"Toolpack enabled: {pack_name}")
+        _audit = get_audit_store()
+        if _audit:
+            _ot, _ip = _get_request_origin(request)
+            _audit.record_admin_action("toolpack_toggle", target=pack_name, details={"enabled": True},
+                                       origin_tier=_ot, client_ip=_ip)
         return JSONResponse({"ok": True, "data": {"enabled": True}})
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
 
 @app.post("/admin/toolpacks/{pack_name}/disable")
-async def admin_disable_toolpack(pack_name: str):
+async def admin_disable_toolpack(pack_name: str, request: Request):
     """Disable a toolpack and all its tools."""
     try:
         _toolpack_states[pack_name] = False
-        # Disable all tools in the pack via the registry
         if _tool_registry:
             for spec in _tool_registry.all_tools():
                 if spec.pack == pack_name:
                     _tool_registry.set_enabled(spec.name, False)
                     _tool_states[spec.name] = False
         _emit_log("info", "admin", f"Toolpack disabled: {pack_name}")
+        _audit = get_audit_store()
+        if _audit:
+            _ot, _ip = _get_request_origin(request)
+            _audit.record_admin_action("toolpack_toggle", target=pack_name, details={"enabled": False},
+                                       origin_tier=_ot, client_ip=_ip)
         return JSONResponse({"ok": True, "data": {"enabled": False}})
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
@@ -1681,28 +1914,30 @@ async def admin_cu_state():
 
 
 @app.post("/admin/computer_use/mode")
-async def admin_cu_set_mode(body: dict):
+async def admin_cu_set_mode(body: ComputerUseModeRequest, request: Request):
     """Set computer-use mode (off | command_only | supervised_session)."""
     if _computer_use_service is None:
         return _cu_not_available()
     try:
-        mode = body.get("mode", "")
-        reason = body.get("reason", "admin panel")
-        if not mode:
-            return JSONResponse({"ok": False, "error": "Missing 'mode'"}, status_code=400)
         from runtime.computer_use_service import ComputerUseMode
-        if mode not in ComputerUseMode.ALL_MODES:
+        if body.mode not in ComputerUseMode.ALL_MODES:
             return JSONResponse(
-                {"ok": False, "error": f"Invalid mode '{mode}'. Valid: {ComputerUseMode.ALL_MODES}"},
+                {"ok": False, "error": f"Invalid mode '{body.mode}'. Valid: {ComputerUseMode.ALL_MODES}"},
                 status_code=400,
             )
-        changed = _computer_use_service.set_mode(mode, reason=reason)
+        changed = _computer_use_service.set_mode(body.mode, reason=body.reason)
         _emit_log(
-            "info" if mode != "off" else "warn",
+            "info" if body.mode != "off" else "warn",
             "computer_use",
-            f"Mode set to '{mode}' (reason={reason})",
-            {"mode": mode, "changed": changed},
+            f"Mode set to '{body.mode}' (reason={body.reason})",
+            {"mode": body.mode, "changed": changed},
         )
+        _audit = get_audit_store()
+        if _audit:
+            _ot, _ip = _get_request_origin(request)
+            _audit.record_admin_action("computer_use_mode", target=body.mode,
+                                       details={"reason": body.reason, "changed": changed},
+                                       origin_tier=_ot, client_ip=_ip)
         state = _computer_use_service.get_state()
         return JSONResponse({"ok": True, "data": state.to_dict()})
     except ValueError as exc:
@@ -1712,14 +1947,19 @@ async def admin_cu_set_mode(body: dict):
 
 
 @app.post("/admin/computer_use/halt")
-async def admin_cu_halt(body: dict = None):
+async def admin_cu_halt(request: Request, body: ComputerUseHaltRequest = None):
     """Emergency halt: immediately disable all computer use."""
     if _computer_use_service is None:
         return _cu_not_available()
     try:
-        reason = (body or {}).get("reason", "admin halt")
+        reason = body.reason if body else "admin halt"
         result = _computer_use_service.halt(reason=reason)
         _emit_log("warn", "computer_use", f"HALT issued (reason={reason})", result)
+        _audit = get_audit_store()
+        if _audit:
+            _ot, _ip = _get_request_origin(request)
+            _audit.record_admin_action("computer_use_halt", details={"reason": reason},
+                                       origin_tier=_ot, client_ip=_ip)
         return JSONResponse({"ok": True, "data": result})
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
@@ -2183,16 +2423,16 @@ async def admin_autonomy_status():
 
 
 @app.post("/admin/autonomy/status")
-async def admin_autonomy_status_update(body: dict):
+async def admin_autonomy_status_update(body: AutonomyRequest, request: Request):
     """Update autonomy dimension."""
     try:
-        dimension = body.get("dimension", "")
-        enabled = body.get("enabled", False)
-
-        if dimension:
-            set_dimension(dimension, enabled)
-            _emit_log("info", "admin", f"Autonomy update: {dimension}={enabled}")
-
+        set_dimension(body.dimension, body.enabled)
+        _emit_log("info", "admin", f"Autonomy update: {body.dimension}={body.enabled}")
+        _audit = get_audit_store()
+        if _audit:
+            _ot, _ip = _get_request_origin(request)
+            _audit.record_admin_action("autonomy_change", target=body.dimension, details={"enabled": body.enabled},
+                                       origin_tier=_ot, client_ip=_ip)
         profile = get_full_profile()
         return JSONResponse({"ok": True, "data": profile})
     except Exception as exc:
@@ -2283,15 +2523,12 @@ async def admin_get_capabilities():
 
 
 @app.post("/admin/capabilities")
-async def admin_set_capability(body: dict):
+async def admin_set_capability(body: CapabilityRequest):
     """Update a capability flag in memory (runtime only — does not write config.json)."""
     try:
-        group = body.get("group", "")
-        key   = body.get("key", "")
-        value = body.get("value")
-
-        if not group or not key or value is None:
-            return JSONResponse({"ok": False, "error": "Missing group, key, or value"}, status_code=400)
+        group = body.group
+        key   = body.key
+        value = body.value
 
         if group == "autonomy":
             set_dimension(key, bool(value))
@@ -2315,9 +2552,6 @@ async def admin_set_capability(body: dict):
         elif group == "google":
             _cfg.setdefault("google", {})[key] = value
             _emit_log("info", "admin", f"Capability update: google.{key}={value}")
-
-        else:
-            return JSONResponse({"ok": False, "error": f"Unknown capability group: {group}"}, status_code=400)
 
         return JSONResponse({"ok": True})
     except Exception as exc:
@@ -2352,7 +2586,7 @@ async def admin_initiative_queue():
 
 
 @app.post("/admin/initiative/trigger")
-async def admin_initiative_trigger(body: dict):
+async def admin_initiative_trigger(body: InitiativeTriggerRequest):
     """Manually trigger an initiative evaluation cycle."""
     try:
         if _initiative_engine is None:
@@ -2360,7 +2594,7 @@ async def admin_initiative_trigger(body: dict):
                 {"ok": False, "error": "InitiativeEngine not available"},
                 status_code=503,
             )
-        rationale = body.get("rationale", "manual admin trigger")
+        rationale = body.rationale
         result = _initiative_engine.trigger_eval(rationale=rationale)
         _emit_log("info", "initiative", "Manual trigger", result)
         return JSONResponse({"ok": True, "data": result})
@@ -2369,7 +2603,7 @@ async def admin_initiative_trigger(body: dict):
 
 
 @app.post("/admin/initiative/feedback")
-async def admin_initiative_feedback(body: dict):
+async def admin_initiative_feedback(body: InitiativeFeedbackRequest):
     """Apply accept / defer / dismiss to a queued initiative."""
     try:
         if _initiative_engine is None:
@@ -2377,16 +2611,9 @@ async def admin_initiative_feedback(body: dict):
                 {"ok": False, "error": "InitiativeEngine not available"},
                 status_code=503,
             )
-        initiative_id = body.get("initiative_id", "")
-        feedback = body.get("feedback", "")
-        if not initiative_id or not feedback:
-            return JSONResponse(
-                {"ok": False, "error": "initiative_id and feedback are required"},
-                status_code=400,
-            )
-        result = _initiative_engine.apply_feedback(initiative_id, feedback)
+        result = _initiative_engine.apply_feedback(body.initiative_id, body.feedback)
         if result.get("ok"):
-            _emit_log("info", "initiative", f"Feedback '{feedback}' → {initiative_id}")
+            _emit_log("info", "initiative", f"Feedback '{body.feedback}' → {body.initiative_id}")
         return JSONResponse(result)
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
@@ -2442,7 +2669,7 @@ async def admin_investigation_list(status: str = "", limit: int = 20):
 
 
 @app.post("/admin/investigation/create")
-async def admin_investigation_create(body: dict):
+async def admin_investigation_create(body: InvestigationCreateRequest):
     """Create a new investigation."""
     try:
         if _investigation_engine is None:
@@ -2450,20 +2677,14 @@ async def admin_investigation_create(body: dict):
                 {"ok": False, "error": "InvestigationEngine not available"},
                 status_code=503,
             )
-        title = body.get("title", "").strip()
-        if not title:
-            return JSONResponse(
-                {"ok": False, "error": "title is required"},
-                status_code=400,
-            )
         inv = _investigation_engine.create(
-            title=title,
-            description=body.get("description", ""),
-            category=body.get("category", "general"),
-            priority=int(body.get("priority", 3)),
+            title=body.title,
+            description=body.description,
+            category=body.category,
+            priority=body.priority,
             created_by="admin",
         )
-        _emit_log("info", "investigation", f"Created: {title}", {"id": inv["investigation_id"]})
+        _emit_log("info", "investigation", f"Created: {body.title}", {"id": inv["investigation_id"]})
         return JSONResponse({"ok": True, "data": inv})
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
@@ -2490,7 +2711,7 @@ async def admin_investigation_get(investigation_id: str):
 
 
 @app.post("/admin/investigation/{investigation_id}/run-pass")
-async def admin_investigation_run_pass(investigation_id: str, body: dict):
+async def admin_investigation_run_pass(investigation_id: str, body: InvestigationRunPassRequest):
     """Run an investigation pass."""
     try:
         if _investigation_engine is None or _topology is None:
@@ -2498,8 +2719,8 @@ async def admin_investigation_run_pass(investigation_id: str, body: dict):
                 {"ok": False, "error": "InvestigationEngine or topology not available"},
                 status_code=503,
             )
-        task_type = body.get("task_type", "evidence_review")
-        objective = body.get("objective", "")
+        task_type = body.task_type
+        objective = body.objective
         _emit_log("info", "investigation", f"Running pass: {task_type}", {"id": investigation_id})
         result = await _investigation_engine.run_pass(
             _topology,
@@ -2517,7 +2738,7 @@ async def admin_investigation_run_pass(investigation_id: str, body: dict):
 
 
 @app.post("/admin/investigation/{investigation_id}/resolve")
-async def admin_investigation_resolve(investigation_id: str, body: dict):
+async def admin_investigation_resolve(investigation_id: str, body: InvestigationResolveRequest):
     """Resolve an investigation with a summary."""
     try:
         if _investigation_engine is None:
@@ -2525,13 +2746,7 @@ async def admin_investigation_resolve(investigation_id: str, body: dict):
                 {"ok": False, "error": "InvestigationEngine not available"},
                 status_code=503,
             )
-        summary = body.get("resolution_summary", "").strip()
-        if not summary:
-            return JSONResponse(
-                {"ok": False, "error": "resolution_summary is required"},
-                status_code=400,
-            )
-        inv = _investigation_engine.resolve(investigation_id, summary)
+        inv = _investigation_engine.resolve(investigation_id, body.resolution_summary)
         if inv is None:
             return JSONResponse({"ok": False, "error": "Not found"}, status_code=404)
         _emit_log("info", "investigation", f"Resolved: {investigation_id}")
@@ -2590,42 +2805,26 @@ async def admin_investigation_diagnostics():
 # ── Admin: Diagnostics (force calls) ───────────────────────────────────────
 
 @app.post("/admin/diagnostic/force-tool")
-async def admin_force_tool(body: dict):
+async def admin_force_tool(body: ForceToolRequest):
     """Force-run a tool directly."""
     try:
-        tool = body.get("tool", "")
-        args = body.get("args", {})
-
-        if not tool:
-            return JSONResponse(
-                {"ok": False, "error": "Missing tool name"},
-                status_code=400
-            )
-
         # Stub: return placeholder
         return JSONResponse({
             "ok": True,
-            "data": {"tool": tool, "result": "[Tool execution stub]"}
+            "data": {"tool": body.tool_name, "result": "[Tool execution stub]"}
         })
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
 
 @app.post("/admin/diagnostic/force-retrieval")
-async def admin_force_retrieval(body: dict):
+async def admin_force_retrieval(body: ForceRetrievalRequest):
     """Force memory search."""
     try:
-        query = body.get("query", "")
-        if not query:
-            return JSONResponse(
-                {"ok": False, "error": "Missing query"},
-                status_code=400
-            )
-
-        results = search_memory(query, top_k=5)
+        results = search_memory(body.query, top_k=body.n)
         return JSONResponse({
             "ok": True,
-            "data": {"query": query, "results": results}
+            "data": {"query": body.query, "results": results}
         })
     except Exception as exc:
         logger.error("Force retrieval error: %s", exc)
@@ -2661,7 +2860,11 @@ async def admin_connectivity():
 async def websocket_admin(websocket: WebSocket):
     """Admin WebSocket: bi-directional log stream + command channel.
 
+    Requires ?token=<admin_token> in the URL — the WS API does not
+    support custom headers, so auth is via query parameter.
+
     On connect:
+      - Validates token; closes with code 4401 if invalid
       - Sends a 'hello' message with server status
       - Replays the last 50 log entries so the admin panel gets context
     Ongoing:
@@ -2669,6 +2872,13 @@ async def websocket_admin(websocket: WebSocket):
       - Pings are echoed as pongs
       - 'clear_log' command clears the ring
     """
+    # Token check before accepting — middleware can't gate WS at the right layer
+    token = websocket.query_params.get("token", "")
+    admin_token = get_admin_token()
+    if not token or not admin_token or token != admin_token:
+        await websocket.close(code=4401)
+        return
+
     await websocket.accept()
     _admin_ws_clients.append(websocket)
 
@@ -2724,116 +2934,441 @@ async def websocket_admin(websocket: WebSocket):
             _admin_ws_clients.remove(websocket)
 
 
+# ── Auth verify ────────────────────────────────────────────────────────────
+
+@app.get("/api/auth/verify")
+async def auth_verify(request: Request):
+    """Check whether the X-Admin-Token in the request is valid.
+
+    Returns {"ok": true, "valid": true} on success or {"ok": true, "valid": false}.
+    This endpoint is intentionally exempt from the AdminAuthMiddleware so the
+    admin UI can probe before redirecting.
+    """
+    token = request.headers.get("X-Admin-Token", "")
+    if not token:
+        auth = request.headers.get("Authorization", "")
+        if auth.lower().startswith("bearer "):
+            token = auth[7:].strip()
+    admin_token = get_admin_token()
+    valid = bool(token and admin_token and token == admin_token)
+    return JSONResponse({"ok": True, "valid": valid})
+
+
+# ── Admin: Durable audit query ──────────────────────────────────────────────
+
+@app.get("/admin/audit/actions")
+async def admin_audit_actions(
+    action_type: str = "",
+    target: str = "",
+    since: float = 0.0,
+    until: float = 0.0,
+    limit: int = 100,
+):
+    """Query durable admin action history."""
+    try:
+        _audit = get_audit_store()
+        if not _audit:
+            return JSONResponse({"ok": False, "error": "Audit store not available"}, status_code=503)
+        rows = _audit.query_admin_actions(
+            action_type=action_type or None,
+            target=target or None,
+            since=since or None,
+            until=until or None,
+            limit=min(limit, 500),
+        )
+        return JSONResponse({"ok": True, "data": rows})
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+@app.get("/admin/audit/tools")
+async def admin_audit_tools(
+    tool_name: str = "",
+    pack: str = "",
+    since: float = 0.0,
+    until: float = 0.0,
+    limit: int = 100,
+):
+    """Query durable tool execution history."""
+    try:
+        _audit = get_audit_store()
+        if not _audit:
+            return JSONResponse({"ok": False, "error": "Audit store not available"}, status_code=503)
+        rows = _audit.query_tool_executions(
+            tool_name=tool_name or None,
+            pack=pack or None,
+            since=since or None,
+            until=until or None,
+            limit=min(limit, 500),
+        )
+        return JSONResponse({"ok": True, "data": rows})
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+@app.get("/admin/audit/summary")
+async def admin_audit_summary():
+    """Get aggregate audit statistics."""
+    try:
+        _audit = get_audit_store()
+        if not _audit:
+            return JSONResponse({"ok": False, "error": "Audit store not available"}, status_code=503)
+        return JSONResponse({"ok": True, "data": _audit.summary()})
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+# ── Admin: Secrets management ───────────────────────────────────────────────
+
+@app.get("/admin/secrets")
+async def admin_secrets_list():
+    """List secret key names stored in the system keyring (no values returned)."""
+    try:
+        from core.secrets import secrets_manager
+        return JSONResponse({"ok": True, "data": secrets_manager.status()})
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+@app.post("/admin/secrets/{key}")
+async def admin_secrets_set(key: str, body: SecretSetRequest, request: Request):
+    """Store a secret in the system keyring.
+
+    Body: {"value": "<secret value>"}
+    The value is never logged or returned.
+    """
+    try:
+        from core.secrets import secrets_manager
+        ok = secrets_manager.set(key, body.value)
+        if ok:
+            _emit_log("info", "secrets", f"Secret stored: {key}")
+            _audit = get_audit_store()
+            if _audit:
+                _ot, _ip = _get_request_origin(request)
+                _audit.record_admin_action("secret_set", target=key, origin_tier=_ot, client_ip=_ip)
+        return JSONResponse({"ok": ok, "data": {"key": key, "stored": ok}})
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+@app.delete("/admin/secrets/{key}")
+async def admin_secrets_delete(key: str, request: Request):
+    """Delete a secret from the system keyring."""
+    try:
+        from core.secrets import secrets_manager
+        ok = secrets_manager.delete(key)
+        if ok:
+            _emit_log("info", "secrets", f"Secret deleted: {key}")
+            _audit = get_audit_store()
+            if _audit:
+                _ot, _ip = _get_request_origin(request)
+                _audit.record_admin_action("secret_delete", target=key, origin_tier=_ot, client_ip=_ip)
+        return JSONResponse({"ok": True, "data": {"key": key, "deleted": ok}})
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+# ── Admin: Pending tool confirmations ───────────────────────────────────────
+
+@app.get("/admin/tools/pending")
+async def admin_tools_pending():
+    """List tool calls waiting for HARD_CONFIRM approval."""
+    try:
+        from runtime.orchestrator import _tool_executor as _exec
+        if _exec is None:
+            return JSONResponse({"ok": True, "data": []})
+        return JSONResponse({"ok": True, "data": _exec.list_pending()})
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+@app.post("/admin/tools/confirm/{confirmation_id}")
+async def admin_tool_confirm(confirmation_id: str, request: Request):
+    """Approve a HARD_CONFIRM-gated tool call and execute it."""
+    try:
+        from runtime.orchestrator import _tool_executor as _exec
+        if _exec is None:
+            return JSONResponse({"ok": False, "error": "Tool executor not available"}, status_code=503)
+        result = _exec.confirm_pending(confirmation_id)
+        _emit_log("info", "admin", f"Tool confirmed: {confirmation_id}")
+        _audit = get_audit_store()
+        if _audit:
+            _ot, _ip = _get_request_origin(request)
+            _audit.record_admin_action("tool_confirm", target=confirmation_id,
+                                       details={"success": result.success, "error": result.error},
+                                       origin_tier=_ot, client_ip=_ip)
+        return JSONResponse({
+            "ok": True,
+            "data": {
+                "confirmed": True,
+                "success": result.success,
+                "output": result.output,
+                "error": result.error,
+            }
+        })
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+@app.post("/admin/tools/deny/{confirmation_id}")
+async def admin_tool_deny(confirmation_id: str, request: Request):
+    """Deny a HARD_CONFIRM-gated tool call."""
+    try:
+        from runtime.orchestrator import _tool_executor as _exec
+        if _exec is None:
+            return JSONResponse({"ok": False, "error": "Tool executor not available"}, status_code=503)
+        denied = _exec.deny_pending(confirmation_id)
+        if not denied:
+            return JSONResponse(
+                {"ok": False, "error": f"Confirmation ID '{confirmation_id}' not found"},
+                status_code=404,
+            )
+        _emit_log("info", "admin", f"Tool denied: {confirmation_id}")
+        _audit = get_audit_store()
+        if _audit:
+            _ot, _ip = _get_request_origin(request)
+            _audit.record_admin_action("tool_deny", target=confirmation_id,
+                                       origin_tier=_ot, client_ip=_ip)
+        return JSONResponse({"ok": True, "data": {"denied": True, "confirmation_id": confirmation_id}})
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
 # ── Google Workspace ───────────────────────────────────────────────────────
+
+def _google_base_url(request: Request) -> str:
+    """Derive the server's base URL from the incoming request."""
+    scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
+    host   = request.headers.get("x-forwarded-host", request.url.netloc)
+    return f"{scheme}://{host}"
+
 
 @app.get("/api/google_workspace/status")
 async def google_status():
-    """Check if Google creds configured."""
+    """Return Google Workspace status: whether authorized, account info, scopes."""
     try:
-        enabled = _cfg.get("google", {}).get("enabled", False)
+        from core.google_oauth import configure as oauth_cfg, is_authorized, get_account_info
+        oauth_cfg(_cfg)
+        authorized = is_authorized()
+        account    = get_account_info() if authorized else {}
         return JSONResponse({
             "ok": True,
-            "data": {"enabled": enabled}
+            "data": {
+                "enabled":    _cfg.get("google", {}).get("enabled", False),
+                "authorized": authorized,
+                "account":    account,
+            }
         })
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
 
 @app.get("/api/google_workspace/authorize")
-async def google_authorize():
-    """OAuth authorization stub."""
-    return JSONResponse({
-        "ok": True,
-        "data": {"note": "Run OAuth flow locally"}
-    })
+async def google_authorize(request: Request):
+    """Begin the Google OAuth web flow.
+
+    Returns {"ok": True, "data": {"auth_url": "https://accounts.google.com/..."}}
+    The frontend should open auth_url in a new tab.  After the user grants
+    access, Google redirects to /api/google_workspace/callback which finalises
+    the flow automatically.
+    """
+    try:
+        from core.google_oauth import configure as oauth_cfg, build_authorize_url
+        oauth_cfg(_cfg)
+        redirect_uri = _google_base_url(request) + "/api/google_workspace/callback"
+        auth_url, state = build_authorize_url(redirect_uri=redirect_uri)
+        return JSONResponse({
+            "ok": True,
+            "data": {"auth_url": auth_url, "state": state}
+        })
+    except FileNotFoundError as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=503)
+    except Exception as exc:
+        logger.error("Google authorize error: %s", exc)
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+@app.get("/api/google_workspace/callback")
+async def google_oauth_callback(request: Request, code: str = "", state: str = "", error: str = ""):
+    """Handle the Google OAuth2 redirect callback.
+
+    Google redirects here after the user grants (or denies) access.
+    On success, stores the token and redirects the browser to /admin with
+    a status message.  On failure, returns a plain JSON error.
+    """
+    from fastapi.responses import RedirectResponse
+
+    if error:
+        logger.warning("[google_oauth] User denied access or error: %s", error)
+        return RedirectResponse(
+            url=f"/admin?google_auth=error&reason={error}",
+            status_code=302,
+        )
+
+    if not code or not state:
+        return JSONResponse(
+            {"ok": False, "error": "Missing code or state in callback"},
+            status_code=400,
+        )
+
+    try:
+        from core.google_oauth import configure as oauth_cfg, exchange_code
+        oauth_cfg(_cfg)
+        redirect_uri = _google_base_url(request) + "/api/google_workspace/callback"
+        result = exchange_code(code=code, state=state, redirect_uri=redirect_uri)
+
+        if result.get("ok"):
+            email = result.get("account", {}).get("email", "unknown")
+            _emit_log("info", "google_oauth", f"Authorized: {email}")
+            return RedirectResponse(
+                url=f"/admin?google_auth=success&email={email}",
+                status_code=302,
+            )
+        else:
+            logger.error("[google_oauth] Callback exchange failed: %s", result.get("error"))
+            return JSONResponse({"ok": False, "error": result.get("error")}, status_code=400)
+
+    except Exception as exc:
+        logger.error("Google OAuth callback error: %s", exc)
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
 
 @app.post("/api/google_workspace/revoke")
 async def google_revoke():
-    """Revoke Google token stub."""
-    return JSONResponse({
-        "ok": True,
-        "data": {"revoked": True}
-    })
+    """Revoke Google OAuth access and delete the local token."""
+    try:
+        from core.google_oauth import configure as oauth_cfg, revoke
+        oauth_cfg(_cfg)
+        result = revoke()
+        if result.get("ok"):
+            _emit_log("info", "google_oauth", "Access revoked")
+        return JSONResponse({"ok": True, "data": result})
+    except Exception as exc:
+        logger.error("Google revoke error: %s", exc)
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
 
 @app.get("/api/google_workspace/account")
 async def google_account():
-    """Get Google account info stub."""
-    return JSONResponse({
-        "ok": True,
-        "data": {"account": "[Account info stub]"}
-    })
+    """Return the authenticated Google account's profile (email, name, picture)."""
+    try:
+        from core.google_oauth import configure as oauth_cfg, is_authorized, get_account_info
+        oauth_cfg(_cfg)
+        if not is_authorized():
+            return JSONResponse(
+                {"ok": False, "error": "Not authorized — call /api/google_workspace/authorize first"},
+                status_code=401,
+            )
+        return JSONResponse({"ok": True, "data": {"account": get_account_info()}})
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
 
 @app.get("/api/google_workspace/calendar/today")
 async def google_calendar_today():
-    """Get today's events."""
+    """Return today's Google Calendar events."""
     try:
         from tools.calendar import list_events
-        events = list_events(1, _cfg)
-        return JSONResponse({
-            "ok": True,
-            "data": {"events": events}
-        })
-    except Exception:
-        return JSONResponse({
-            "ok": True,
-            "data": {"events": [], "note": "Calendar not available"}
-        })
+        events = await list_events(1, _cfg)
+        return JSONResponse({"ok": True, "data": {"events": events}})
+    except PermissionError as exc:
+        return JSONResponse({"ok": False, "error": str(exc), "needs_auth": True}, status_code=401)
+    except Exception as exc:
+        logger.warning("google_calendar_today error: %s", exc)
+        return JSONResponse({"ok": True, "data": {"events": [], "error": str(exc)}})
 
 
 @app.get("/api/google_workspace/calendar/upcoming")
 async def google_calendar_upcoming(days: int = 7):
-    """Get upcoming events."""
+    """Return upcoming Google Calendar events."""
     try:
         from tools.calendar import list_events
-        events = list_events(days, _cfg)
-        return JSONResponse({
-            "ok": True,
-            "data": {"events": events}
-        })
-    except Exception:
-        return JSONResponse({
-            "ok": True,
-            "data": {"events": [], "note": "Calendar not available"}
-        })
+        events = await list_events(days, _cfg)
+        return JSONResponse({"ok": True, "data": {"events": events}})
+    except PermissionError as exc:
+        return JSONResponse({"ok": False, "error": str(exc), "needs_auth": True}, status_code=401)
+    except Exception as exc:
+        logger.warning("google_calendar_upcoming error: %s", exc)
+        return JSONResponse({"ok": True, "data": {"events": [], "error": str(exc)}})
 
 
 @app.get("/api/google_workspace/gmail/inbox")
-async def google_gmail_inbox():
-    """Gmail inbox stub."""
-    return JSONResponse({
-        "ok": True,
-        "data": {
-            "available": False,
-            "note": "Gmail coming in Phase 4"
-        }
-    })
+async def google_gmail_inbox(max_results: int = 10):
+    """Return recent Gmail inbox messages (subject, from, date)."""
+    try:
+        from core.google_oauth import configure as oauth_cfg, build_service
+        oauth_cfg(_cfg)
+        svc = build_service("gmail", "v1",
+                            scopes=["https://www.googleapis.com/auth/gmail.readonly"])
+        response = svc.users().messages().list(
+            userId="me", labelIds=["INBOX"], maxResults=max_results
+        ).execute()
+        messages = []
+        for msg_ref in response.get("messages", []):
+            msg = svc.users().messages().get(
+                userId="me", id=msg_ref["id"], format="metadata",
+                metadataHeaders=["Subject", "From", "Date"],
+            ).execute()
+            headers = {h["name"]: h["value"] for h in msg.get("payload", {}).get("headers", [])}
+            messages.append({
+                "id":      msg_ref["id"],
+                "subject": headers.get("Subject", ""),
+                "from":    headers.get("From", ""),
+                "date":    headers.get("Date", ""),
+                "snippet": msg.get("snippet", ""),
+            })
+        return JSONResponse({"ok": True, "data": {"messages": messages}})
+    except PermissionError as exc:
+        return JSONResponse({"ok": False, "error": str(exc), "needs_auth": True}, status_code=401)
+    except Exception as exc:
+        logger.warning("google_gmail_inbox error: %s", exc)
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
 
 @app.get("/api/google_workspace/drive/recent")
-async def google_drive_recent():
-    """Recent Drive files stub."""
-    return JSONResponse({
-        "ok": True,
-        "data": {
-            "available": False,
-            "note": "Drive stub"
-        }
-    })
+async def google_drive_recent(max_results: int = 10):
+    """Return recently modified Google Drive files."""
+    try:
+        from core.google_oauth import configure as oauth_cfg, build_service
+        oauth_cfg(_cfg)
+        svc = build_service("drive", "v3",
+                            scopes=["https://www.googleapis.com/auth/drive.readonly"])
+        response = svc.files().list(
+            pageSize=max_results,
+            orderBy="modifiedTime desc",
+            fields="files(id,name,mimeType,modifiedTime,webViewLink)",
+        ).execute()
+        files = response.get("files", [])
+        return JSONResponse({"ok": True, "data": {"files": files}})
+    except PermissionError as exc:
+        return JSONResponse({"ok": False, "error": str(exc), "needs_auth": True}, status_code=401)
+    except Exception as exc:
+        logger.warning("google_drive_recent error: %s", exc)
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
 
 @app.get("/api/google_workspace/drive/search")
-async def google_drive_search(query: str = ""):
-    """Drive search stub."""
-    return JSONResponse({
-        "ok": True,
-        "data": {
-            "available": False,
-            "note": "Drive stub"
-        }
-    })
+async def google_drive_search(query: str = "", max_results: int = 10):
+    """Search Google Drive files by name/content."""
+    if not query:
+        return JSONResponse({"ok": False, "error": "query parameter required"}, status_code=400)
+    try:
+        from core.google_oauth import configure as oauth_cfg, build_service
+        oauth_cfg(_cfg)
+        svc = build_service("drive", "v3",
+                            scopes=["https://www.googleapis.com/auth/drive.readonly"])
+        response = svc.files().list(
+            q=f"fullText contains '{query}'",
+            pageSize=max_results,
+            fields="files(id,name,mimeType,modifiedTime,webViewLink)",
+        ).execute()
+        files = response.get("files", [])
+        return JSONResponse({"ok": True, "data": {"query": query, "files": files}})
+    except PermissionError as exc:
+        return JSONResponse({"ok": False, "error": str(exc), "needs_auth": True}, status_code=401)
+    except Exception as exc:
+        logger.warning("google_drive_search error: %s", exc)
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
 
 # ── Discord ────────────────────────────────────────────────────────────────
@@ -3082,23 +3617,19 @@ async def admin_goals_list():
 
 
 @app.post("/admin/entity/goals")
-async def admin_goals_create(request: Request):
-    """Create a new goal. Body: {description, priority?, context?, source?}"""
+async def admin_goals_create(body: GoalCreateRequest):
+    """Create a new goal."""
     try:
         if _goal_store is None:
             return JSONResponse(
                 {"ok": False, "error": "GoalStore not initialized"},
                 status_code=503,
             )
-        body = await request.json()
-        description = body.get("description", "").strip()
-        if not description:
-            return JSONResponse({"ok": False, "error": "description is required"}, status_code=400)
         goal_id = _goal_store.add_goal(
-            description = description,
-            priority    = body.get("priority", "normal"),
-            context     = body.get("context", ""),
-            source      = body.get("source", "admin"),
+            description = body.description,
+            priority    = body.priority,
+            context     = body.context,
+            source      = body.source,
         )
         return JSONResponse({"ok": True, "goal_id": goal_id})
     except Exception as exc:
@@ -3106,17 +3637,12 @@ async def admin_goals_create(request: Request):
 
 
 @app.post("/admin/entity/goals/{goal_id}/complete")
-async def admin_goals_complete(goal_id: str, request: Request):
+async def admin_goals_complete(goal_id: str, body: GoalNoteRequest = None):
     """Mark a goal as completed. Optional body: {note}"""
     try:
         if _goal_store is None:
             return JSONResponse({"ok": False, "error": "GoalStore not initialized"}, status_code=503)
-        body = {}
-        try:
-            body = await request.json()
-        except Exception:
-            pass
-        found = _goal_store.complete_goal(goal_id, note=body.get("note", ""))
+        found = _goal_store.complete_goal(goal_id, note=body.note if body else "")
         if not found:
             return JSONResponse({"ok": False, "error": "Goal not found"}, status_code=404)
         return JSONResponse({"ok": True, "goal_id": goal_id, "status": "completed"})
@@ -3125,17 +3651,12 @@ async def admin_goals_complete(goal_id: str, request: Request):
 
 
 @app.post("/admin/entity/goals/{goal_id}/abandon")
-async def admin_goals_abandon(goal_id: str, request: Request):
+async def admin_goals_abandon(goal_id: str, body: GoalAbandonRequest = None):
     """Mark a goal as abandoned. Optional body: {reason}"""
     try:
         if _goal_store is None:
             return JSONResponse({"ok": False, "error": "GoalStore not initialized"}, status_code=503)
-        body = {}
-        try:
-            body = await request.json()
-        except Exception:
-            pass
-        found = _goal_store.abandon_goal(goal_id, reason=body.get("reason", ""))
+        found = _goal_store.abandon_goal(goal_id, reason=body.reason if body else "")
         if not found:
             return JSONResponse({"ok": False, "error": "Goal not found"}, status_code=404)
         return JSONResponse({"ok": True, "goal_id": goal_id, "status": "abandoned"})
@@ -3353,6 +3874,179 @@ async def admin_integrity_check():
             )
         report = _backup_service.integrity_check()
         return JSONResponse({"ok": True, "data": report.to_dict()})
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+# ── Access Tiers ──────────────────────────────────────────────────────────
+
+
+@app.get("/admin/access-tiers")
+async def admin_access_tiers_list():
+    """Get current policy for all access tiers (localhost, lan, external)."""
+    try:
+        ctrl = get_access_controller()
+        if ctrl is None:
+            return JSONResponse({"ok": False, "error": "Access controller not initialised"}, status_code=503)
+        return JSONResponse({"ok": True, "data": ctrl.status()})
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+@app.patch("/admin/access-tiers/{tier}")
+async def admin_access_tier_update(tier: str, body: AccessTierUpdateRequest, request: Request):
+    """Partially update a tier's policy.  Only fields present in the body are changed.
+
+    tier: localhost | lan | external
+    """
+    try:
+        ctrl = get_access_controller()
+        if ctrl is None:
+            return JSONResponse({"ok": False, "error": "Access controller not initialised"}, status_code=503)
+        updates = body.model_dump(exclude_none=True)
+        if not updates:
+            return JSONResponse({"ok": False, "error": "No fields provided"}, status_code=400)
+        updated = ctrl.policies.update(tier, updates)
+        _emit_log("info", "access_ctrl", f"Tier '{tier}' policy updated", updates)
+        _audit = get_audit_store()
+        if _audit:
+            _ot, _ip = _get_request_origin(request)
+            _audit.record_admin_action("access_tier_update", target=tier, details=updates,
+                                       origin_tier=_ot, client_ip=_ip)
+        return JSONResponse({"ok": True, "data": {"tier": tier, "policy": updated.to_dict()}})
+    except KeyError as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=404)
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+@app.post("/admin/access-tiers/lan/pairing-code")
+async def admin_lan_generate_pairing_code(request: Request):
+    """Generate a one-time pairing code for a new LAN device.
+
+    The code expires in 5 minutes and can only be used once.
+    Share it with the LAN device which then calls POST /api/auth/lan/pair.
+    """
+    try:
+        ctrl = get_access_controller()
+        if ctrl is None:
+            return JSONResponse({"ok": False, "error": "Access controller not initialised"}, status_code=503)
+        code = ctrl.pairing.generate()
+        _emit_log("info", "access_ctrl", "LAN pairing code generated")
+        _audit = get_audit_store()
+        if _audit:
+            _ot, _ip = _get_request_origin(request)
+            _audit.record_admin_action("lan_pairing_code_generated", origin_tier=_ot, client_ip=_ip)
+        return JSONResponse({"ok": True, "data": {"code": code, "expires_in_seconds": 300}})
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+@app.get("/admin/access-tiers/lan/sessions")
+async def admin_lan_sessions_list():
+    """List all active LAN sessions (token values are never returned)."""
+    try:
+        ctrl = get_access_controller()
+        if ctrl is None:
+            return JSONResponse({"ok": False, "error": "Access controller not initialised"}, status_code=503)
+        return JSONResponse({"ok": True, "data": {"sessions": ctrl.sessions.list_sessions()}})
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+@app.delete("/admin/access-tiers/lan/sessions/{token_prefix}")
+async def admin_lan_session_revoke(token_prefix: str, request: Request):
+    """Revoke a LAN session by its token prefix (first 8 characters shown in session list)."""
+    try:
+        ctrl = get_access_controller()
+        if ctrl is None:
+            return JSONResponse({"ok": False, "error": "Access controller not initialised"}, status_code=503)
+        # Find session by prefix
+        sessions = ctrl.sessions._sessions
+        match = next((t for t in sessions if t.startswith(token_prefix)), None)
+        if match is None:
+            return JSONResponse({"ok": False, "error": "Session not found"}, status_code=404)
+        ctrl.sessions.revoke(match)
+        _emit_log("info", "access_ctrl", f"LAN session revoked: {token_prefix}…")
+        _audit = get_audit_store()
+        if _audit:
+            _ot, _ip = _get_request_origin(request)
+            _audit.record_admin_action("lan_session_revoked", target=token_prefix,
+                                       origin_tier=_ot, client_ip=_ip)
+        return JSONResponse({"ok": True, "data": {"revoked": True}})
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+# ── LAN Auth (public, non-admin) ───────────────────────────────────────────
+
+
+@app.post("/api/auth/lan/pair")
+async def api_lan_pair(body: LanPairRequest, request: Request):
+    """Exchange a one-time pairing code (from admin panel) for a LAN session token.
+
+    Body: {"code": "<pairing-code>", "label": "optional device name"}
+    Returns: {"token": "<session-token>", "expires_at": <unix-timestamp>}
+
+    The returned token should be included as  X-Lan-Token: <token>  on
+    subsequent requests.  Tokens expire per the LAN tier's session_ttl_sec setting.
+    """
+    try:
+        ctrl = get_access_controller()
+        if ctrl is None:
+            return JSONResponse({"ok": False, "error": "Access controller not initialised"}, status_code=503)
+
+        client_ip = extract_client_ip(request)
+        tier = classify_origin(client_ip)
+
+        if not ctrl.pairing.consume(body.code):
+            return JSONResponse(
+                {"ok": False, "error": "Invalid or expired pairing code"},
+                status_code=401,
+            )
+
+        policy = ctrl.policies.get(tier)
+        session = ctrl.sessions.create(
+            client_ip=client_ip,
+            ttl_sec=policy.session_ttl_sec,
+            label=body.label or "",
+        )
+        _emit_log("info", "access_ctrl", f"LAN session created for {client_ip}",
+                  {"label": body.label, "tier": tier})
+        return JSONResponse({
+            "ok": True,
+            "data": {
+                "token":      session.token,
+                "expires_at": session.expires_at,
+                "tier":       tier,
+            },
+        })
+    except Exception as exc:
+        logger.error("LAN pair error: %s", exc)
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+@app.get("/api/auth/lan/status")
+async def api_lan_status(request: Request):
+    """Return the caller's origin tier and session validity."""
+    try:
+        ctrl = get_access_controller()
+        client_ip = extract_client_ip(request)
+        tier = classify_origin(client_ip)
+        lan_token = request.headers.get("X-Lan-Token", "").strip() or None
+        session_valid = False
+        if ctrl and lan_token:
+            session_valid = ctrl.sessions.validate(lan_token) is not None
+        policy = ctrl.policies.get(tier) if ctrl else None
+        return JSONResponse({
+            "ok": True,
+            "data": {
+                "origin_tier":   tier,
+                "client_ip":     client_ip,
+                "session_valid": session_valid,
+                "policy": policy.to_dict() if policy else None,
+            },
+        })
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 

@@ -170,7 +170,7 @@
 
   "google": {
     "enabled": true,
-    "client_secret_glob": "AI personal files/client_secret_*.json",
+    "client_secret_path": "AI personal files/client_secret_*.json",
     "token_path": "data/google_token.json",
     "calendar_enabled": true,
     "gmail_enabled": true,
@@ -245,10 +245,6 @@
     "required_packs": [],
     "notifications_tools": {
       "discord_credential_file": "AI personal files/Discord.txt"
-    },
-    "google_tools": {
-      "client_secret_glob": "AI personal files/client_secret_*.json",
-      "token_path": "data/google_token.json"
     }
   }
 }

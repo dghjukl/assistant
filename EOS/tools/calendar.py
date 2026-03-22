@@ -1,54 +1,21 @@
 """Tool: Google Calendar — read and create events via Google Calendar API."""
 from __future__ import annotations
 
-import glob
 from datetime import datetime, timedelta
-from pathlib import Path
 
-_service = None
-_cfg_ref: dict = {}
+_CALENDAR_SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
 
 def _get_service(cfg: dict):
-    global _service, _cfg_ref
-    if _service is not None and cfg is _cfg_ref:
-        return _service
+    """Return an authenticated Google Calendar v3 service client.
 
-    try:
-        from google.oauth2.credentials import Credentials
-        from google.auth.transport.requests import Request
-        from google_auth_oauthlib.flow import InstalledAppFlow
-        from googleapiclient.discovery import build
-    except ImportError:
-        raise ImportError(
-            "Run: pip install google-auth google-auth-oauthlib google-api-python-client"
-        )
-
-    gcfg       = cfg.get("google", {})
-    token_path = Path(gcfg.get("token_path", "data/google_token.json"))
-    creds_glob = gcfg.get("client_secret_glob", "AI personal files/client_secret_*.json")
-    creds_file = next(iter(glob.glob(creds_glob)), None)
-
-    SCOPES = ["https://www.googleapis.com/auth/calendar"]
-    creds  = None
-
-    if token_path.exists():
-        creds = Credentials.from_authorized_user_file(str(token_path), SCOPES)
-
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            if not creds_file:
-                raise FileNotFoundError("Google OAuth2 credentials file not found.")
-            flow  = InstalledAppFlow.from_client_secrets_file(creds_file, SCOPES)
-            creds = flow.run_local_server(port=0)
-        token_path.parent.mkdir(parents=True, exist_ok=True)
-        token_path.write_text(creds.to_json())
-
-    _service = build("calendar", "v3", credentials=creds)
-    _cfg_ref = cfg
-    return _service
+    Uses core.google_oauth for credential management so that the same
+    token file is shared across all Google tools and the web OAuth flow
+    initiated via /api/google_workspace/authorize works correctly.
+    """
+    from core.google_oauth import configure as oauth_configure, build_service
+    oauth_configure(cfg)
+    return build_service("calendar", "v3", scopes=_CALENDAR_SCOPES)
 
 
 async def list_events(days_ahead: int = 7, cfg: dict = {}) -> str:

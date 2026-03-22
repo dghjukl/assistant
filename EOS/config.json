@@ -142,6 +142,36 @@
     "host": "127.0.0.1",
     "port": 7860
   },
+  "access_tiers": {
+    "_comment": "Per-origin access policies. Overrides can be set at runtime from the Access Tiers admin panel (persisted to data/access_tiers.json).",
+    "localhost": {
+      "enabled": true,
+      "chat_enabled": true,
+      "admin_enabled": true,
+      "require_auth": false,
+      "rate_limit_rpm": 0,
+      "rate_limit_burst": 0,
+      "session_ttl_sec": 86400
+    },
+    "lan": {
+      "enabled": true,
+      "chat_enabled": true,
+      "admin_enabled": true,
+      "require_auth": true,
+      "rate_limit_rpm": 60,
+      "rate_limit_burst": 15,
+      "session_ttl_sec": 86400
+    },
+    "external": {
+      "enabled": false,
+      "chat_enabled": false,
+      "admin_enabled": false,
+      "require_auth": true,
+      "rate_limit_rpm": 20,
+      "rate_limit_burst": 5,
+      "session_ttl_sec": 3600
+    }
+  },
   "retrieval": {
     "embed_model": "models/embedding/all-MiniLM-L6-v2",
     "chroma_path": "data/memory_store",
@@ -198,7 +228,7 @@
   },
   "google": {
     "enabled": true,
-    "client_secret_glob": "AI personal files/client_secret_*.json",
+    "client_secret_path": "AI personal files/client_secret_*.json",
     "token_path": "data/google_token.json",
     "calendar_enabled": true,
     "gmail_enabled": true,
@@ -268,10 +298,6 @@
     "required_packs": [],
     "notifications_tools": {
       "discord_credential_file": "AI personal files/Discord.txt"
-    },
-    "google_tools": {
-      "client_secret_glob": "AI personal files/client_secret_*.json",
-      "token_path": "data/google_token.json"
     }
   },
   "deployment_mode": "standard"

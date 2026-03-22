@@ -55,7 +55,7 @@ def get_db() -> sqlite3.Connection:
 
 
 def init_db() -> None:
-    """Create all tables and seed defaults if empty."""
+    """Create all tables, seed defaults, and run pending migrations."""
     defaults = _cfg.get("autonomy_defaults", {
         "perception": True,
         "cognition":  True,
@@ -121,6 +121,17 @@ def init_db() -> None:
                 (dim, int(enabled), time.time())
             )
         conn.commit()
+
+    # Run any pending schema migrations for this database
+    try:
+        from core.db_migrations import apply_migrations
+        with get_db() as mconn:
+            apply_migrations(mconn, "entity_state")
+    except Exception as exc:
+        import logging as _logging
+        _logging.getLogger(__name__).warning(
+            "[memory] Migration runner failed (non-fatal): %s", exc
+        )
 
 
 # ── Interaction log ───────────────────────────────────────────────────────────

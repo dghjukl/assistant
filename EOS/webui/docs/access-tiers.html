@@ -1,0 +1,230 @@
+<div class="page-header">
+  <div class="page-eyebrow">Capabilities</div>
+  <h1 class="page-title">Access Tiers &amp; LAN Access</h1>
+  <p class="page-lead">EOS classifies every incoming request by its network origin and enforces a distinct policy for each tier — localhost, LAN, and external. This lets you safely connect phones, tablets, and other LAN devices without giving them the same unlimited trust as the machine running EOS.</p>
+</div>
+
+<div class="callout important">
+  <div class="callout-icon">&#9432;</div>
+  <div class="callout-title">Default posture</div>
+  <div class="callout-body">
+    Out of the box: <strong>localhost</strong> is fully open (no auth, no rate limit), <strong>LAN</strong> is enabled but requires a session token, and <strong>external</strong> is fully disabled.
+    You can change any of this from the <strong>Access Tiers</strong> tab in the admin panel — no restart required.
+  </div>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="tiers">
+  <div class="section-eyebrow">How It Works</div>
+  <h2 class="section-title">The Three Tiers</h2>
+  <p class="section-lead">Every request is tagged with its origin tier before any other processing occurs. The tier determines what the caller can do.</p>
+
+  <table class="ref-table" style="margin-top:16px;">
+    <thead><tr><th>Tier</th><th>Addresses</th><th>Default policy</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>localhost</code></td>
+        <td>127.0.0.0/8, ::1</td>
+        <td>Fully open — no auth required, no rate limit, all paths accessible.</td>
+      </tr>
+      <tr>
+        <td><code>lan</code></td>
+        <td>10.x, 172.16–31.x, 192.168.x, 169.254.x, fc00::/7, fe80::/10</td>
+        <td>Chat &amp; admin accessible, requires LAN session token, 60 req/min limit.</td>
+      </tr>
+      <tr>
+        <td><code>external</code></td>
+        <td>All other routable addresses</td>
+        <td>Fully disabled — all requests are rejected with 403.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p style="margin-top:14px;">Tier detection uses the direct TCP connection address. If EOS is behind a reverse proxy on the same machine you can set <code>EOS_TRUST_PROXY=1</code> to read <code>X-Real-IP</code> / <code>X-Forwarded-For</code> instead.</p>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="policy-fields">
+  <div class="section-eyebrow">Configuration</div>
+  <h2 class="section-title">Policy Fields</h2>
+  <p class="section-lead">Each tier has these configurable fields. Defaults come from <code>config.json</code>; runtime changes are written to <code>data/access_tiers.json</code> and survive restarts.</p>
+
+  <table class="ref-table">
+    <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>enabled</code></td><td>bool</td><td>If false, every request from this tier is rejected with 403.</td></tr>
+      <tr><td><code>chat_enabled</code></td><td>bool</td><td>Whether <code>/api/chat</code> and other public API routes are accessible.</td></tr>
+      <tr><td><code>admin_enabled</code></td><td>bool</td><td>Whether <code>/admin/*</code> paths can be reached (admin token still required on top).</td></tr>
+      <tr><td><code>require_auth</code></td><td>bool</td><td>Whether a LAN session token is required for non-admin, non-exempt routes.</td></tr>
+      <tr><td><code>rate_limit_rpm</code></td><td>int</td><td>Requests per minute per client IP (0 = unlimited).</td></tr>
+      <tr><td><code>rate_limit_burst</code></td><td>int</td><td>Extra requests allowed above the steady rate before the limit kicks in.</td></tr>
+      <tr><td><code>session_ttl_sec</code></td><td>int</td><td>How long a LAN session token remains valid (minimum 60 seconds).</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="lan-setup">
+  <div class="section-eyebrow">Step-by-Step</div>
+  <h2 class="section-title">Connecting a LAN Device</h2>
+  <p class="section-lead">Follow these steps to pair a phone, tablet, or second computer on your local network.</p>
+
+  <ol class="step-list">
+    <li class="step-card">
+      <div class="step-num green">1</div>
+      <div class="step-body">
+        <div class="step-title">Open the Access Tiers tab</div>
+        <div class="step-desc">In the admin panel, click the <strong>Access Tiers</strong> tab. Confirm the <code>lan</code> tier shows <strong>ENABLED</strong>. If it shows DISABLED, click <strong>Edit</strong> and toggle it on.</div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num green">2</div>
+      <div class="step-body">
+        <div class="step-title">Generate a pairing code</div>
+        <div class="step-desc">Click <strong>Generate Pairing Code</strong>. A 22-character random code appears — it is valid for 5 minutes and can only be used once. Keep this browser tab open.</div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num green">3</div>
+      <div class="step-body">
+        <div class="step-title">Send the pairing request from the device</div>
+        <div class="step-desc">On the LAN device, make a <code>POST</code> request to EOS:
+          <div class="code-wrap"><pre>POST http://&lt;EOS-IP&gt;:7860/api/auth/lan/pair
+Content-Type: application/json
+
+{"code": "&lt;paste-code-here&gt;", "label": "My Phone"}</pre></div>
+          EOS returns a session token:
+          <div class="code-wrap"><pre>{"ok": true, "data": {"token": "aBcD…", "expires_at": 1740000000, "tier": "lan"}}</pre></div>
+          Save the <code>token</code> value — you will send it with every subsequent request.
+        </div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num green">4</div>
+      <div class="step-body">
+        <div class="step-title">Include the token in API requests</div>
+        <div class="step-desc">Add the header <code>X-Lan-Token: &lt;token&gt;</code> to every request:
+          <div class="code-wrap"><pre>POST http://&lt;EOS-IP&gt;:7860/api/chat
+Content-Type: application/json
+X-Lan-Token: aBcD…
+
+{"message": "Hello from my phone!"}</pre></div>
+          Without this header, LAN requests to the chat API will receive a <code>401</code> response.
+        </div>
+      </div>
+    </li>
+    <li class="step-card">
+      <div class="step-num green">5</div>
+      <div class="step-body">
+        <div class="step-title">Verify the session</div>
+        <div class="step-desc">Check your session is recognised:
+          <div class="code-wrap"><pre>GET http://&lt;EOS-IP&gt;:7860/api/auth/lan/status
+X-Lan-Token: aBcD…</pre></div>
+          Returns <code>{"origin_tier": "lan", "session_valid": true, …}</code>. The session is also listed in the <strong>Active LAN Sessions</strong> section of the Access Tiers tab.
+        </div>
+      </div>
+    </li>
+  </ol>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="admin-panel">
+  <div class="section-eyebrow">Operator Controls</div>
+  <h2 class="section-title">Managing Tiers from the Admin Panel</h2>
+
+  <h3 style="font-size:14px;font-weight:600;margin:18px 0 6px;">Viewing tier status</h3>
+  <p>The <strong>Access Tiers</strong> tab shows three cards — one per tier — with every policy field and a colour-coded enabled/disabled badge. Click <strong>↻ Refresh</strong> to reload live data.</p>
+
+  <h3 style="font-size:14px;font-weight:600;margin:18px 0 6px;">Editing a tier</h3>
+  <p>Click <strong>Edit</strong> on any tier card (or the tier button in the Edit Tier Policy section). A form pre-fills with current values. Change what you need and click <strong>Save Changes</strong>. Changes take effect immediately — no restart required.</p>
+
+  <h3 style="font-size:14px;font-weight:600;margin:18px 0 6px;">Revoking a session</h3>
+  <p>The <strong>Active LAN Sessions</strong> table lists every paired device (IP, label, expiry). Click <strong>Revoke</strong> next to any session to immediately invalidate that token. The device will need to re-pair.</p>
+
+  <h3 style="font-size:14px;font-weight:600;margin:18px 0 6px;">Disabling LAN access entirely</h3>
+  <p>Click <strong>Edit</strong> on the <code>lan</code> tier, uncheck <strong>Tier enabled</strong>, and save. All LAN requests will receive <code>403 Forbidden</code> until you re-enable the tier.</p>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="audit">
+  <div class="section-eyebrow">Observability</div>
+  <h2 class="section-title">Audit Visibility</h2>
+  <p>Every admin action and tool execution now records <code>origin_tier</code> and <code>client_ip</code> in the audit log. You can see these fields in the <strong>Audit</strong> tab of the admin panel. This makes it immediately visible whether a sensitive action was taken locally or from a LAN device.</p>
+  <p style="margin-top:10px;">The <strong>Live Logs</strong> tab also shows origin classification events (pairing code generated, session created, rate limit triggered).</p>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="rate-limiting">
+  <div class="section-eyebrow">Protection</div>
+  <h2 class="section-title">Rate Limiting</h2>
+  <p>Rate limiting is enforced per client IP using a 60-second sliding window. The limit is applied independently per tier, before any authentication check.</p>
+
+  <table class="ref-table">
+    <thead><tr><th>Tier</th><th>Default limit</th><th>Default burst</th></tr></thead>
+    <tbody>
+      <tr><td>localhost</td><td>unlimited</td><td>—</td></tr>
+      <tr><td>lan</td><td>60 req/min</td><td>15</td></tr>
+      <tr><td>external</td><td>20 req/min</td><td>5</td></tr>
+    </tbody>
+  </table>
+
+  <p style="margin-top:12px;">When a client exceeds the limit, EOS responds with <code>429 Too Many Requests</code> and a <code>Retry-After: 60</code> header. Adjust limits in the Edit Tier Policy form or directly in <code>config.json</code> under <code>access_tiers.&lt;tier&gt;.rate_limit_rpm</code>.</p>
+</div>
+
+<hr class="doc-rule">
+
+<div class="doc-section" id="config">
+  <div class="section-eyebrow">Reference</div>
+  <h2 class="section-title">Configuration Reference</h2>
+  <p>The <code>access_tiers</code> block in <code>config.json</code> sets the baseline for each tier. Runtime overrides written from the admin panel are stored in <code>data/access_tiers.json</code> (runtime file wins on startup).</p>
+
+  <div class="code-wrap"><pre>"access_tiers": {
+  "localhost": {
+    "enabled": true,
+    "chat_enabled": true,
+    "admin_enabled": true,
+    "require_auth": false,
+    "rate_limit_rpm": 0,
+    "rate_limit_burst": 0,
+    "session_ttl_sec": 86400
+  },
+  "lan": {
+    "enabled": true,
+    "chat_enabled": true,
+    "admin_enabled": true,
+    "require_auth": true,
+    "rate_limit_rpm": 60,
+    "rate_limit_burst": 15,
+    "session_ttl_sec": 86400
+  },
+  "external": {
+    "enabled": false,
+    "chat_enabled": false,
+    "admin_enabled": false,
+    "require_auth": true,
+    "rate_limit_rpm": 20,
+    "rate_limit_burst": 5,
+    "session_ttl_sec": 3600
+  }
+}</pre></div>
+
+  <h3 style="font-size:14px;font-weight:600;margin:18px 0 8px;">API endpoints added</h3>
+  <table class="ref-table">
+    <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td>GET</td><td><code>/admin/access-tiers</code></td><td>Get all tier policies and session stats</td></tr>
+      <tr><td>PATCH</td><td><code>/admin/access-tiers/{tier}</code></td><td>Partially update a tier's policy</td></tr>
+      <tr><td>POST</td><td><code>/admin/access-tiers/lan/pairing-code</code></td><td>Generate a one-time pairing code</td></tr>
+      <tr><td>GET</td><td><code>/admin/access-tiers/lan/sessions</code></td><td>List active LAN sessions</td></tr>
+      <tr><td>DELETE</td><td><code>/admin/access-tiers/lan/sessions/{prefix}</code></td><td>Revoke a session by token prefix</td></tr>
+      <tr><td>POST</td><td><code>/api/auth/lan/pair</code></td><td>Exchange pairing code for session token (LAN device calls this)</td></tr>
+      <tr><td>GET</td><td><code>/api/auth/lan/status</code></td><td>Check caller's tier and session validity</td></tr>
+    </tbody>
+  </table>
+</div>

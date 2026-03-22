@@ -1,5 +1,15 @@
 {
-  "_comment": "EOS Base+Thinking Mode — Primary (GPU) + Tool (CPU) + Thinking (CPU). No creativity, no vision. Background deep reasoning enabled; system degrades gracefully if thinking model is absent.",
+  "_comment": "EOS Hardened Profile — locked-down baseline for public/untrusted deployment. All external integrations off. Only safe, read-only toolpacks loaded. No autonomous action or initiative. Operator must explicitly re-enable features after review.",
+  "_hardening_notes": [
+    "discord.enabled = false — no outbound Discord messaging without explicit opt-in",
+    "google.enabled = false — no OAuth or Google API access without explicit opt-in",
+    "autonomy_defaults.action = false — entity cannot execute tools autonomously",
+    "autonomy_defaults.initiative = false — entity does not self-initiate tasks",
+    "computer_use.enabled = false — no desktop/GUI access",
+    "toolpacks: only deterministic, text, diff, event_journal, workspace (no-delete/no-exec), telemetry, ingestion loaded",
+    "workspace_tools.allow_delete = false — workspace files cannot be deleted",
+    "workspace_tools.allow_exec = false — workspace cannot execute code"
+  ],
   "deployment_mode": "standard",
 
   "servers": {
@@ -16,7 +26,7 @@
       "required": true
     },
     "vision": {
-      "_role": "Perception only. Not active in this profile.",
+      "_role": "Perception only. Not active in hardened profile.",
       "enabled": false,
       "binary_gpu": "llama-b8149-bin-win-cuda-13.1-x64/llama-server.exe",
       "model_path": "models/vision/",
@@ -28,8 +38,8 @@
       "required": false
     },
     "tool": {
-      "_role": "Extracts structured function calls from Qwen3 output. Does not generate responses.",
-      "enabled": true,
+      "_role": "Structured function call extraction. Not active in hardened profile (no external tools loaded).",
+      "enabled": false,
       "binary_cpu": "llama-CPU/llama-server.exe",
       "model_path": "models/tool/",
       "host": "127.0.0.1",
@@ -39,8 +49,8 @@
       "required": false
     },
     "thinking": {
-      "_role": "Background thinking worker. Non-blocking. Dispatched to by idle cognition, initiative, investigation, identity eval. NOT an escalation target — Qwen3 uses /think for inline reasoning.",
-      "enabled": true,
+      "_role": "Background thinking worker. Not active in hardened profile.",
+      "enabled": false,
       "binary_cpu": "llama-CPU/llama-server.exe",
       "model_path": "models/thinking/",
       "host": "127.0.0.1",
@@ -50,7 +60,7 @@
       "required": false
     },
     "creativity": {
-      "_role": "Controlled divergence subsystem. Not active in this profile.",
+      "_role": "Controlled divergence subsystem. Not active in hardened profile.",
       "enabled": false,
       "binary_cpu": "llama-CPU/llama-server.exe",
       "model_path": "models/creativity/",
@@ -63,23 +73,23 @@
   },
 
   "creativity": {
-    "_comment": "Creativity subsystem not active in base-thinking profile.",
+    "_comment": "Creativity subsystem disabled in hardened profile.",
     "enabled": false,
-    "injection_frequency": "medium",
+    "injection_frequency": "off",
     "_injection_frequency_options": ["off", "low", "medium", "high"],
-    "intensity": "balanced",
+    "intensity": "conservative",
     "_intensity_options": ["conservative", "balanced", "exploratory", "aggressive"],
     "invocation_domains": {
-      "reasoning_assistance": true,
+      "reasoning_assistance": false,
       "autonomous_idle": false,
-      "explanation_generation": true,
-      "brainstorming_design": true,
-      "stuck_state_recovery": true
+      "explanation_generation": false,
+      "brainstorming_design": false,
+      "stuck_state_recovery": false
     },
     "output_structure_mode": "structured",
     "_output_structure_options": ["structured", "semi-structured", "loose"],
     "advanced": {
-      "_comment": "Advanced overrides. When set, these take precedence over preset intensity modes.",
+      "_comment": "Advanced overrides. Not active in hardened profile.",
       "temperature": null,
       "top_p": null,
       "top_k": null,
@@ -129,6 +139,7 @@
   },
 
   "autonomy_defaults": {
+    "_comment": "Hardened: all autonomous action disabled. Operator must explicitly enable.",
     "perception": true,
     "cognition": true,
     "action": false,
@@ -162,24 +173,26 @@
   },
 
   "discord": {
-    "enabled": true,
+    "_comment": "Hardened: Discord disabled. Enable only after reviewing credential security.",
+    "enabled": false,
     "credential_file": "AI personal files/Discord.txt",
     "respond_only_to_mentions": true,
     "ignore_bots": true
   },
 
   "google": {
-    "enabled": true,
+    "_comment": "Hardened: Google OAuth disabled. Enable only after reviewing credential security.",
+    "enabled": false,
     "client_secret_path": "AI personal files/client_secret_*.json",
     "token_path": "data/google_token.json",
-    "calendar_enabled": true,
-    "gmail_enabled": true,
+    "calendar_enabled": false,
+    "gmail_enabled": false,
     "gmail_send_enabled": false,
-    "drive_enabled": true
+    "drive_enabled": false
   },
 
   "workspace_tools": {
-    "_comment": "Sandboxed workspace available to the entity as its persistent file environment.",
+    "_comment": "Sandboxed workspace. Delete and exec permanently off in hardened profile.",
     "enabled": true,
     "workspace_root": "data/workspace",
     "allow_delete": false,
@@ -187,21 +200,21 @@
   },
 
   "worldview": {
-    "_comment": "Passive partner orientation subsystem. Sources are processed on demand (never automatically). Receiving a source document requires no acknowledgment. The profile shapes interpretation, not conversational content.",
+    "_comment": "Passive partner orientation subsystem. Sources processed on demand only.",
     "enabled": true,
     "worldview_path": "data/worldview",
     "max_profile_lines_in_prompt": 10
   },
 
   "backup": {
-    "_comment": "Automatic state snapshots. Covers DB, vector memory, workspace, and JSON state files.",
+    "_comment": "Automatic state snapshots.",
     "backup_path": "data/backups",
     "max_backups": 10,
     "auto_backup_interval_hours": 24
   },
 
   "computer_use": {
-    "_comment": "Supervised computer-use subsystem. Layered access: mode → shortcut allowlist → per-app action policy.",
+    "_comment": "Hardened: computer use permanently off. Enable only after explicit operator review.",
     "_doc": "Enabling this does NOT grant the entity unrestricted computer access. The entity may only use applications present in approved_shortcuts_path, and only the actions listed in app_policy_path. The operator sets the mode. Halt is always available.",
     "enabled": false,
     "default_mode": "off",
@@ -216,35 +229,17 @@
   },
 
   "toolpacks": {
-    "_comment": "All packs are loaded into the registry at startup. The admin panel controls which are enabled. Add pack names here to make them available to the entity.",
+    "_comment": "Hardened: only safe read-only and sandboxed packs loaded. Network, process, privileged, system, scheduler, secrets, Google, Discord packs excluded.",
     "enabled": true,
     "packs": [
       "deterministic_tools",
       "text_tools",
       "diff_tools",
       "event_journal_tools",
-      "web_tools",
       "workspace_tools",
-      "network_tools",
-      "http_diag_tools",
-      "fs_tools",
-      "git_tools",
-      "package_tools",
       "telemetry_tools",
-      "ingestion_tools",
-      "ca_tools",
-      "notifications_tools",
-      "google_tools",
-      "scheduler_tools",
-      "process_tools",
-      "recovery_tools",
-      "secrets_tools",
-      "service_control_tools",
-      "system_cmd_tools"
+      "ingestion_tools"
     ],
-    "required_packs": [],
-    "notifications_tools": {
-      "discord_credential_file": "AI personal files/Discord.txt"
-    }
+    "required_packs": []
   }
 }

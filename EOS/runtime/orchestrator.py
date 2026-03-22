@@ -91,6 +91,25 @@ from runtime.creativity_service import (
 logger = logging.getLogger("eos.orchestrator")
 
 
+# ── Tool executor (wired by WebUI server after ToolRegistry loads) ──────────────
+
+_tool_executor = None  # ToolExecutor | None
+
+
+def wire_executor(registry: Any, audit_store: Any = None) -> None:
+    """Wire the ToolExecutor with the live registry and audit store.
+
+    Called once by the WebUI server after the ToolRegistry has been fully
+    loaded.  Must be called before any governed tool execution can occur.
+    Subsequent calls replace the executor (e.g. after a registry reload).
+    """
+    global _tool_executor
+    from runtime.tool_executor import ToolExecutor
+    _tool_executor = ToolExecutor(registry=registry, audit_store=audit_store)
+    tool_count = len(registry.all_tools()) if registry and hasattr(registry, "all_tools") else 0
+    logger.info("[orchestrator] ToolExecutor wired with %d registered tool(s).", tool_count)
+
+
 # ── Epistemic mode ─────────────────────────────────────────────────────────────
 
 class EpistemicMode(str, Enum):

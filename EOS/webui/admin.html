@@ -1289,6 +1289,20 @@
     <span>Turns: <strong id="sh-turns">—</strong></span>
     <span>Session: <strong id="sh-session">—</strong></span>
   </div>
+  <button
+    title="Lock — clear stored token"
+    onclick="clearToken(); if(_ws) _ws.close(); showAuthGate('Locked');"
+    style="
+      margin-left:12px;
+      padding:4px 10px;
+      background:transparent;
+      border:1px solid var(--border);
+      border-radius:5px;
+      color:var(--muted);
+      font-size:12px;
+      cursor:pointer;
+    "
+  >🔒 Lock</button>
 </header>
 
 <nav>
@@ -1308,6 +1322,7 @@
   <div class="tab" data-panel="cognition">Cognition</div>
   <div class="tab-separator"></div>
   <div class="tab" data-panel="computer-use">Computer Use</div>
+  <div class="tab" data-panel="access-tiers">Access Tiers</div>
   <div class="tab-separator"></div>
   <div class="tab" data-panel="integrations">Integrations</div>
   <div class="tab" data-panel="config">Config</div>
@@ -1851,6 +1866,109 @@
     </div>
   </div>
 
+  <!-- ── ACCESS TIERS PANEL ── -->
+  <div class="panel" id="panel-access-tiers">
+    <div class="panel-body" style="max-width:900px;">
+
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">
+        <h2 style="font-size:15px;font-weight:600;">Access Tiers</h2>
+        <button class="action-btn" onclick="loadAccessTiers()" style="padding:4px 10px;font-size:12px;">↻ Refresh</button>
+        <span style="font-size:12px;color:var(--muted);">Origin-aware policy enforcement for localhost, LAN, and external access.</span>
+      </div>
+
+      <!-- Tier cards -->
+      <div id="at-tier-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:24px;">
+        <div class="info-card" style="color:var(--muted);font-size:12px;">Loading tier policies…</div>
+      </div>
+
+      <!-- Current origin status -->
+      <div class="ctrl-section" style="margin-bottom:20px;">
+        <div class="ctrl-section-header">
+          <span class="ctrl-section-title">Your Connection</span>
+          <span class="ctrl-section-sub">Origin classification for this browser session.</span>
+        </div>
+        <div id="at-origin-status" style="padding:10px 0;font-size:13px;color:var(--muted);">—</div>
+      </div>
+
+      <!-- LAN Pairing -->
+      <div class="ctrl-section" style="margin-bottom:20px;">
+        <div class="ctrl-section-header">
+          <span class="ctrl-section-title">LAN Device Pairing</span>
+          <span class="ctrl-section-sub">Generate a one-time pairing code for a phone, tablet, or other LAN device.</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+          <button class="action-btn primary" onclick="atGeneratePairingCode()">Generate Pairing Code</button>
+          <span style="font-size:12px;color:var(--muted);">Codes expire in 5 minutes and can only be used once.</span>
+        </div>
+        <div id="at-pairing-code-box" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:14px;margin-top:8px;">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Pairing code — share this with the LAN device:</div>
+          <div id="at-pairing-code" style="font-family:var(--mono);font-size:20px;letter-spacing:4px;color:var(--accent);word-break:break-all;"></div>
+          <div style="font-size:11px;color:var(--muted);margin-top:8px;">On the device, run:<br>
+            <code style="color:var(--yellow);">POST /api/auth/lan/pair  {"code": "&lt;code&gt;", "label": "My Phone"}</code><br>
+            The returned <code>token</code> must be sent as <code>X-Lan-Token: &lt;token&gt;</code> on all API requests.</div>
+        </div>
+      </div>
+
+      <!-- Active LAN sessions -->
+      <div class="ctrl-section" style="margin-bottom:20px;">
+        <div class="ctrl-section-header">
+          <span class="ctrl-section-title">Active LAN Sessions</span>
+          <span class="ctrl-section-sub">Devices that have paired and hold a valid session token.</span>
+        </div>
+        <div id="at-sessions-list">
+          <div style="color:var(--muted);font-size:12px;">No active sessions.</div>
+        </div>
+      </div>
+
+      <!-- Edit tier policy -->
+      <div class="ctrl-section">
+        <div class="ctrl-section-header">
+          <span class="ctrl-section-title">Edit Tier Policy</span>
+          <span class="ctrl-section-sub">Select a tier to modify its settings.</span>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:14px;">
+          <button class="action-btn" id="at-edit-localhost" onclick="atShowEdit('localhost')" style="border-color:var(--green);color:var(--green);">localhost</button>
+          <button class="action-btn" id="at-edit-lan" onclick="atShowEdit('lan')" style="border-color:var(--accent);color:var(--accent);">lan</button>
+          <button class="action-btn" id="at-edit-external" onclick="atShowEdit('external')" style="border-color:var(--red);color:var(--red);">external</button>
+        </div>
+        <div id="at-edit-form" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:14px;">
+          <div style="font-size:12px;font-weight:600;margin-bottom:12px;">Editing tier: <span id="at-edit-tier-label" style="color:var(--accent);"></span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 18px;font-size:13px;">
+            <label style="display:flex;align-items:center;gap:8px;">
+              <input type="checkbox" id="at-f-enabled"> Tier enabled
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;">
+              <input type="checkbox" id="at-f-chat"> Chat API accessible
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;">
+              <input type="checkbox" id="at-f-admin"> Admin panel accessible
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;">
+              <input type="checkbox" id="at-f-auth"> Require session token
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;">
+              <span>Rate limit (req/min, 0=off)</span>
+              <input type="number" id="at-f-rpm" min="0" style="width:90px;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;font-size:13px;">
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;">
+              <span>Burst tolerance</span>
+              <input type="number" id="at-f-burst" min="0" style="width:90px;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;font-size:13px;">
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;">
+              <span>Session TTL (seconds)</span>
+              <input type="number" id="at-f-ttl" min="60" style="width:110px;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;font-size:13px;">
+            </label>
+          </div>
+          <div style="margin-top:14px;display:flex;gap:8px;">
+            <button class="action-btn primary" onclick="atSaveEdit()">Save Changes</button>
+            <button class="action-btn" onclick="document.getElementById('at-edit-form').style.display='none'">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
 </main>
 
 <div id="toast"></div>
@@ -1867,11 +1985,79 @@ function toast(msg, ok = true) {
   el._t = setTimeout(() => el.classList.remove('show'), 2400);
 }
 
+// ── Admin token storage ──────────────────────────────────────────────────
+function getToken() {
+  return localStorage.getItem('eos_admin_token') || '';
+}
+function setToken(t) {
+  localStorage.setItem('eos_admin_token', t.trim());
+}
+function clearToken() {
+  localStorage.removeItem('eos_admin_token');
+}
+
 async function api(method, path, body) {
-  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  const opts = {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Admin-Token': getToken(),
+    },
+  };
   if (body !== undefined) opts.body = JSON.stringify(body);
   const r = await fetch(path, opts);
+  if (r.status === 401) {
+    clearToken();
+    showAuthGate('Session expired — enter admin token');
+    return { ok: false, error: 'Unauthenticated' };
+  }
   return r.json();
+}
+
+// ── Auth gate modal ──────────────────────────────────────────────────────
+function showAuthGate(msg) {
+  document.getElementById('auth-overlay').style.display = 'flex';
+  if (msg) document.getElementById('auth-error').textContent = msg;
+}
+function hideAuthGate() {
+  document.getElementById('auth-overlay').style.display = 'none';
+  document.getElementById('auth-error').textContent = '';
+  document.getElementById('auth-token-input').value = '';
+}
+async function submitAuthToken() {
+  const input = document.getElementById('auth-token-input');
+  const token = input.value.trim();
+  if (!token) return;
+  // Probe the verify endpoint
+  const r = await fetch('/api/auth/verify', {
+    headers: { 'X-Admin-Token': token },
+  });
+  const d = await r.json();
+  if (d.valid) {
+    setToken(token);
+    hideAuthGate();
+    // Reinitialise the page now that we're authenticated
+    loadOverview();
+    loadShortHeader();
+    connectWS();
+  } else {
+    document.getElementById('auth-error').textContent = 'Invalid token — check data/admin_token.txt';
+    input.value = '';
+    input.focus();
+  }
+}
+
+// Check token on load
+async function checkInitialAuth() {
+  const token = getToken();
+  if (!token) { showAuthGate(''); return false; }
+  const r = await fetch('/api/auth/verify', {
+    headers: { 'X-Admin-Token': token },
+  }).catch(() => null);
+  if (!r || !r.ok) { showAuthGate('Could not reach server'); return false; }
+  const d = await r.json();
+  if (!d.valid) { clearToken(); showAuthGate('Token invalid or expired'); return false; }
+  return true;
 }
 
 function escHtml(s) {
@@ -1908,6 +2094,7 @@ document.querySelectorAll('.tab').forEach(tab => {
     if (tab.dataset.panel === 'cognition')     loadCognition();
     if (tab.dataset.panel === 'integrations')  loadIntegrations();
     if (tab.dataset.panel === 'computer-use')  loadComputerUse();
+    if (tab.dataset.panel === 'access-tiers')  loadAccessTiers();
   });
 });
 
@@ -3168,7 +3355,8 @@ let _ws, _wsReconnectTimeout, _wsHeartbeatInterval;
 
 function connectWS() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  _ws = new WebSocket(`${proto}://${location.host}/admin/ws`);
+  const token = encodeURIComponent(getToken());
+  _ws = new WebSocket(`${proto}://${location.host}/admin/ws?token=${token}`);
 
   _ws.onopen = () => {
     wsDot.classList.add('live');
@@ -3920,6 +4108,229 @@ async function cuDeny(confirmationId) {
 // Load policies once on page load (they change rarely)
 loadComputerUsePolicies();
 
+// ── Startup auth gate ────────────────────────────────────────────────────
+(async () => {
+  const authed = await checkInitialAuth();
+  if (!authed) return; // modal shown; page loads after successful token entry
+  // All auto-running calls that were at module level are guarded here
+  // (loadOverview, loadShortHeader, connectWS already run via inline calls
+  // above — they will retry once the user provides a valid token)
+})();
+
 </script>
+
+<!-- Auth gate overlay -->
+<div id="auth-overlay" style="
+  display:none;
+  position:fixed;inset:0;
+  background:rgba(0,0,0,0.85);
+  z-index:9999;
+  align-items:center;
+  justify-content:center;
+  font-family:var(--font);
+">
+  <div style="
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:32px 36px;
+    min-width:360px;
+    max-width:440px;
+    box-shadow:0 8px 32px rgba(0,0,0,0.6);
+  ">
+    <div style="font-size:16px;font-weight:700;color:var(--accent);margin-bottom:6px;">EOS Admin</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:20px;">
+      Enter the admin token from <code style="color:var(--text);">data/admin_token.txt</code>
+    </div>
+    <input
+      id="auth-token-input"
+      type="password"
+      placeholder="Admin token"
+      autocomplete="off"
+      style="
+        width:100%;
+        padding:9px 12px;
+        background:var(--bg);
+        border:1px solid var(--border);
+        border-radius:6px;
+        color:var(--text);
+        font-size:14px;
+        font-family:var(--mono);
+        margin-bottom:10px;
+      "
+      onkeydown="if(event.key==='Enter') submitAuthToken()"
+    />
+    <div id="auth-error" style="color:var(--red);font-size:12px;min-height:16px;margin-bottom:12px;"></div>
+    <button
+      onclick="submitAuthToken()"
+      style="
+        width:100%;
+        padding:9px;
+        background:var(--accent-dk);
+        color:#fff;
+        border:none;
+        border-radius:6px;
+        font-size:14px;
+        font-weight:600;
+        cursor:pointer;
+      "
+    >Authenticate</button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  Access Tiers
+// ═══════════════════════════════════════════════════════════
+
+const AT_TIER_COLORS = { localhost: 'var(--green)', lan: 'var(--accent)', external: 'var(--red)' };
+let _atEditingTier = null;
+
+async function loadAccessTiers() {
+  try {
+    const d = await api('GET', '/admin/access-tiers');
+    if (!d.ok) { document.getElementById('at-tier-cards').innerHTML = `<div style="color:var(--red)">Error: ${d.error}</div>`; return; }
+    _renderTierCards(d.data.policies);
+    _renderSessions(d.data.active_sessions);
+  } catch(e) {
+    document.getElementById('at-tier-cards').innerHTML = `<div style="color:var(--red)">Failed: ${e.message}</div>`;
+  }
+  // Also load origin status
+  try {
+    const s = await api('GET', '/api/auth/lan/status');
+    if (s.ok) {
+      const tier = s.data.origin_tier;
+      const color = AT_TIER_COLORS[tier] || 'var(--text)';
+      document.getElementById('at-origin-status').innerHTML =
+        `Your connection is classified as <strong style="color:${color}">${tier}</strong> (IP: <code>${s.data.client_ip}</code>). ` +
+        (s.data.session_valid ? '<span style="color:var(--green)">LAN session: valid</span>' : '<span style="color:var(--muted)">No LAN session</span>');
+    }
+  } catch(e) { /* ignore */ }
+  // Load sessions list
+  _loadAtSessions();
+}
+
+function _renderTierCards(policies) {
+  const container = document.getElementById('at-tier-cards');
+  if (!policies) { container.innerHTML = '<div style="color:var(--muted);font-size:12px;">No policy data.</div>'; return; }
+  container.innerHTML = Object.entries(policies).map(([tier, p]) => {
+    const color = AT_TIER_COLORS[tier] || 'var(--text)';
+    const badge = p.enabled
+      ? `<span style="color:var(--green);font-size:11px;font-weight:600;">ENABLED</span>`
+      : `<span style="color:var(--red);font-size:11px;font-weight:600;">DISABLED</span>`;
+    const rows = [
+      ['Chat API', p.chat_enabled ? '✓' : '✗'],
+      ['Admin panel', p.admin_enabled ? '✓' : '✗'],
+      ['Require auth', p.require_auth ? '✓' : '✗'],
+      ['Rate limit (rpm)', p.rate_limit_rpm === 0 ? 'unlimited' : p.rate_limit_rpm],
+      ['Burst', p.rate_limit_burst],
+      ['Session TTL', `${p.session_ttl_sec}s (${Math.round(p.session_ttl_sec/3600)}h)`],
+    ].map(([k,v]) => `<tr><td style="color:var(--muted);padding:2px 8px 2px 0;font-size:12px;">${k}</td><td style="font-size:12px;">${v}</td></tr>`).join('');
+    return `
+      <div style="background:var(--surface);border:1px solid var(--border);border-left:3px solid ${color};border-radius:6px;padding:14px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+          <span style="font-weight:700;color:${color};font-size:14px;">${tier}</span>
+          ${badge}
+          <button class="action-btn" onclick="atShowEdit('${tier}')" style="margin-left:auto;padding:2px 8px;font-size:11px;">Edit</button>
+        </div>
+        <table>${rows}</table>
+      </div>`;
+  }).join('');
+}
+
+async function _loadAtSessions() {
+  try {
+    const d = await api('GET', '/admin/access-tiers/lan/sessions');
+    if (!d.ok) return;
+    const sessions = d.data.sessions || [];
+    const el = document.getElementById('at-sessions-list');
+    if (!sessions.length) {
+      el.innerHTML = '<div style="color:var(--muted);font-size:12px;">No active LAN sessions.</div>';
+      return;
+    }
+    el.innerHTML = `<table style="width:100%;font-size:12px;border-collapse:collapse;">
+      <thead><tr style="color:var(--muted);">
+        <th style="text-align:left;padding:4px 8px;">Token prefix</th>
+        <th style="text-align:left;padding:4px 8px;">IP</th>
+        <th style="text-align:left;padding:4px 8px;">Label</th>
+        <th style="text-align:left;padding:4px 8px;">Expires</th>
+        <th></th>
+      </tr></thead>
+      <tbody>${sessions.map(s => `
+        <tr style="border-top:1px solid var(--border);">
+          <td style="padding:5px 8px;font-family:var(--mono);">${s.token_prefix}</td>
+          <td style="padding:5px 8px;">${s.client_ip}</td>
+          <td style="padding:5px 8px;">${s.label || '—'}</td>
+          <td style="padding:5px 8px;">${new Date(s.expires_at * 1000).toLocaleString()}</td>
+          <td style="padding:5px 8px;">
+            <button class="action-btn" style="color:var(--red);border-color:var(--red);padding:2px 7px;font-size:11px;"
+              onclick="atRevokeSession('${s.token_prefix}')">Revoke</button>
+          </td>
+        </tr>`).join('')}
+      </tbody></table>`;
+  } catch(e) { /* ignore */ }
+}
+
+async function atGeneratePairingCode() {
+  try {
+    const d = await api('POST', '/admin/access-tiers/lan/pairing-code', {});
+    if (!d.ok) { alert(d.error || 'Failed'); return; }
+    document.getElementById('at-pairing-code').textContent = d.data.code;
+    document.getElementById('at-pairing-code-box').style.display = 'block';
+    // Auto-hide after 5 minutes
+    setTimeout(() => { document.getElementById('at-pairing-code-box').style.display = 'none'; }, 300_000);
+  } catch(e) { alert(`Error: ${e.message}`); }
+}
+
+async function atRevokeSession(prefix) {
+  if (!confirm(`Revoke LAN session ${prefix}…?`)) return;
+  try {
+    const d = await api('DELETE', `/admin/access-tiers/lan/sessions/${prefix}`);
+    if (!d.ok) { alert(d.error || 'Failed'); return; }
+    _loadAtSessions();
+  } catch(e) { alert(`Error: ${e.message}`); }
+}
+
+function atShowEdit(tier) {
+  _atEditingTier = tier;
+  document.getElementById('at-edit-tier-label').textContent = tier;
+  document.getElementById('at-edit-form').style.display = 'block';
+  // Populate from current cards data (re-fetch)
+  api('GET', '/admin/access-tiers').then(d => {
+    if (!d.ok) return;
+    const p = d.data.policies[tier];
+    if (!p) return;
+    document.getElementById('at-f-enabled').checked = p.enabled;
+    document.getElementById('at-f-chat').checked    = p.chat_enabled;
+    document.getElementById('at-f-admin').checked   = p.admin_enabled;
+    document.getElementById('at-f-auth').checked    = p.require_auth;
+    document.getElementById('at-f-rpm').value       = p.rate_limit_rpm;
+    document.getElementById('at-f-burst').value     = p.rate_limit_burst;
+    document.getElementById('at-f-ttl').value       = p.session_ttl_sec;
+  });
+  document.getElementById('at-edit-form').scrollIntoView({ behavior: 'smooth' });
+}
+
+async function atSaveEdit() {
+  if (!_atEditingTier) return;
+  const body = {
+    enabled:          document.getElementById('at-f-enabled').checked,
+    chat_enabled:     document.getElementById('at-f-chat').checked,
+    admin_enabled:    document.getElementById('at-f-admin').checked,
+    require_auth:     document.getElementById('at-f-auth').checked,
+    rate_limit_rpm:   parseInt(document.getElementById('at-f-rpm').value, 10),
+    rate_limit_burst: parseInt(document.getElementById('at-f-burst').value, 10),
+    session_ttl_sec:  parseInt(document.getElementById('at-f-ttl').value, 10),
+  };
+  try {
+    const d = await api('PATCH', `/admin/access-tiers/${_atEditingTier}`, body);
+    if (!d.ok) { alert(d.error || 'Save failed'); return; }
+    document.getElementById('at-edit-form').style.display = 'none';
+    toast(`Tier '${_atEditingTier}' updated`);
+    loadAccessTiers();
+  } catch(e) { alert(`Error: ${e.message}`); }
+}
+</script>
+
 </body>
 </html>
