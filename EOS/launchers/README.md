@@ -1,0 +1,18 @@
+# Launchers
+
+The files in this directory are the supported release launch surface.
+
+## Supported entry points
+
+- `Launch EOS.bat` — interactive Windows launcher UI
+- `start-standard.bat` — recommended backend bundle
+- `start-minimal.bat` — smallest supported backend bundle
+- `start-full.bat` — expanded backend bundle
+- `start-vision-gpu.bat` — additive advanced helper
+- `start-eos.bat` — WebUI bootstrap after backends are already running
+
+## Archived legacy launchers
+
+`launchers/legacy/` is archived and deprecated.
+
+Those scripts remain only as compatibility shims for older shortcuts and operator habits. Do not add new launch behavior there, and do not treat it as a second release surface.

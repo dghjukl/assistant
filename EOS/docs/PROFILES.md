@@ -2,6 +2,8 @@
 
 EOS uses a single canonical config file: `config.json`. There are no separate live profile configs.
 
+The files under `configs/profiles/` are shipped reference variants. `config.base.json` is the shared baseline, and release-surface changes must be synchronized across every profile variant before release.
+
 The canonical launch hierarchy is:
 
 1. **Recommended Windows launcher:** `launchers\Launch EOS.bat`

@@ -621,6 +621,20 @@
     opacity: 0.38;
     pointer-events: none;
   }
+
+  #startup-guidance {
+    display: none;
+    margin: 16px 20px 0;
+    padding: 12px 14px;
+    border: 1px solid rgba(245, 197, 66, 0.35);
+    background: rgba(245, 197, 66, 0.08);
+    color: var(--yellow);
+    border-radius: var(--radius);
+    font-size: 13px;
+  }
+  #startup-guidance.visible {
+    display: block;
+  }
 </style>
 <script>
 if (new URLSearchParams(location.search).get('embed') === '1') {
@@ -647,6 +661,7 @@ if (new URLSearchParams(location.search).get('embed') === '1') {
 
   <!-- Chat column -->
   <div id="chat-col">
+    <div id="startup-guidance" role="status" aria-live="polite"></div>
     <div id="messages"></div>
     <!-- Attachment preview strip — visible when a file is pending -->
     <div id="attach-strip"></div>
@@ -777,6 +792,25 @@ let visionCapable = false;   // determined at boot from /api/status
 let visionEnabled = true;    // user toggle, synced to /api/vision/settings
 let currentAttachment = null; // {file_id, filename, content_type, kind, previewUrl}
 let webcamStream = null;      // active MediaStream or null
+
+function setInputsEnabled(enabled) {
+  document.getElementById('msg-input').disabled = !enabled;
+  document.getElementById('send-btn').disabled = !enabled;
+  document.getElementById('attach-btn').disabled = !enabled;
+  document.getElementById('tts-btn').disabled = !enabled;
+  document.getElementById('ptt-btn').disabled = !(enabled && pttSupported);
+}
+
+function renderStartupGuidance(message) {
+  const el = document.getElementById('startup-guidance');
+  if (!message) {
+    el.textContent = '';
+    el.classList.remove('visible');
+    return;
+  }
+  el.textContent = message;
+  el.classList.add('visible');
+}
 
 // ── Panel toggle ─────────────────────────────────────────────────────────────
 function togglePanel(name) {
@@ -1160,12 +1194,18 @@ async function boot() {
       const r = await fetch('/api/status');
       const data = await r.json();
       if (data.ok) {
+        renderStartupGuidance(data.startup_guidance || '');
+        if (data.startup_guidance) {
+          dot.className = 'error';
+          label.textContent = 'backends offline';
+          setInputsEnabled(false);
+          appendSystemMessage(data.startup_guidance);
+          return;
+        }
+
         dot.className = 'online';
         label.textContent = 'online';
-        document.getElementById('msg-input').disabled = false;
-        document.getElementById('send-btn').disabled = false;
-        document.getElementById('ptt-btn').disabled = !pttSupported;
-        document.getElementById('tts-btn').disabled = false;
+        setInputsEnabled(true);
 
         const name = data.identity?.name || 'EOS';
         appendMessage('mcore', `${name} is online. Session started.`);

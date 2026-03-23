@@ -236,6 +236,24 @@ async def test_runtime_discovery_reports_fake_backends_and_local_service_degrada
     assert discovery.capabilities["voice"] == "unavailable"
 
 
+@pytest.mark.asyncio
+async def test_startup_event_sets_user_guidance_when_no_backends_are_running(monkeypatch, tmp_path):
+    import webui.app_runtime as app_runtime
+    from webui.app_state import app_state
+
+    config_path = _write_runtime_config(
+        tmp_path,
+        primary_port=28080,
+        tool_port=28082,
+        thinking_port=28083,
+    )
+    _patch_lightweight_startup(monkeypatch)
+
+    await app_runtime.startup_event(config_path=config_path)
+
+    assert app_state.startup_guidance == "Start backend services before using UI"
+
+
 
 
 def test_runtime_discovery_degrades_vision_and_optional_tool_helpers(tmp_path, backend_server_factory):

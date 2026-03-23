@@ -1,5 +1,7 @@
 # Legacy launchers
 
+This directory is an archived, deprecated launcher surface.
+
 These scripts are **deprecated compatibility shims**.
 
 They still exist so older shortcuts and operator habits do not break, but they are no longer the place where launch policy should evolve.

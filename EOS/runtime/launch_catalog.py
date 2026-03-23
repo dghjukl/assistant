@@ -88,24 +88,6 @@ LAUNCH_BUNDLES: tuple[LaunchBundle, ...] = (
 BUNDLE_BY_KEY = {bundle.key: bundle for bundle in LAUNCH_BUNDLES}
 BUNDLE_KEYS = tuple(bundle.key for bundle in LAUNCH_BUNDLES)
 
-LEGACY_SURFACES = {
-    "launchers/legacy": {
-        "tier": "deprecated",
-        "replacement": "launchers/Launch EOS.bat or the start-*.bat launchers",
-        "note": "Legacy launchers remain as compatibility shims and should not encode new launch behavior.",
-    },
-    "eos.py --profile": {
-        "tier": "deprecated",
-        "replacement": "launchers/start-*.bat or python -m runtime.launch_profile",
-        "note": "Runtime bootstrap no longer owns backend launch decisions.",
-    },
-    "eos.py --no-boot": {
-        "tier": "deprecated",
-        "replacement": "start-eos.bat or python eos.py --status",
-        "note": "The runtime bootstrap no longer launches model servers.",
-    },
-}
-
 
 def normalize_role_name(role: str) -> str:
     key = role.strip().lower()
@@ -148,7 +130,6 @@ def export_catalog() -> dict[str, object]:
             for role in LAUNCH_ROLES
         ],
         "bundles": [asdict(bundle) for bundle in LAUNCH_BUNDLES],
-        "legacy_surfaces": LEGACY_SURFACES,
     }
 
 

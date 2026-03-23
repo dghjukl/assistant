@@ -21,6 +21,8 @@ from __future__ import annotations
 import json
 from typing import Any, Dict
 
+from runtime.startup_health import google_unavailable_payload
+
 
 def _jdump(x: Any) -> str:
     try:
@@ -37,13 +39,7 @@ def _not_authorized() -> str:
 
 
 def _not_configured() -> str:
-    return _jdump({
-        "error": "Google Workspace tools not configured",
-        "hint": (
-            "Set google.enabled=true in config.json and place your "
-            "OAuth client secret in config/google/*.json"
-        ),
-    })
+    return _jdump(google_unavailable_payload(reason="not_configured"))
 
 
 def register(registry: Any, config: Dict[str, Any]) -> None:
@@ -69,10 +65,9 @@ def register(registry: Any, config: Dict[str, Any]) -> None:
     if not google_available or not enabled:
 
         def _placeholder(_params: Dict[str, Any]) -> str:
-            return _not_configured() if not enabled else _jdump({
-                "error": "Google auth libraries not installed",
-                "hint": "pip install google-auth google-auth-oauthlib google-api-python-client",
-            })
+            return _not_configured() if not enabled else _jdump(
+                google_unavailable_payload(reason="not_configured")
+            )
 
         registry.register(ToolSpec(
             name="list_calendar_events",

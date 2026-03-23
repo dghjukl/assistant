@@ -17,7 +17,6 @@ import os
 import sys
 from pathlib import Path
 
-from runtime.launch_catalog import LEGACY_SURFACES
 from runtime.service_discovery import discover_runtime, format_runtime_summary
 from webui.server import create_app
 
@@ -27,6 +26,9 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 logger = logging.getLogger("eos")
+
+PROFILE_REPLACEMENT = "launchers/start-*.bat or python -m runtime.launch_profile"
+NO_BOOT_REPLACEMENT = "start-eos.bat or python eos.py --status"
 
 ROOT = Path(__file__).parent.resolve()
 
@@ -75,9 +77,9 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.profile:
-        logger.warning("--profile is deprecated and ignored. Use %s.", LEGACY_SURFACES["eos.py --profile"]["replacement"])
+        logger.warning("--profile is deprecated and ignored. Use %s.", PROFILE_REPLACEMENT)
     if args.no_boot:
-        logger.warning("--no-boot is deprecated and ignored. Use %s.", LEGACY_SURFACES["eos.py --no-boot"]["replacement"])
+        logger.warning("--no-boot is deprecated and ignored. Use %s.", NO_BOOT_REPLACEMENT)
 
     config_path = _find_config(args.config)
     discovery = discover_runtime(config_path, root=ROOT)
