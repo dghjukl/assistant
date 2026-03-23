@@ -29,6 +29,7 @@ import logging
 import os
 import time
 import uuid
+from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -377,6 +378,65 @@ def _signal_bus_health_summary() -> dict[str, Any]:
             logger.warning("Signal bus health summary failed: %s", exc)
             return {"available": True, "healthy": False, "error": str(exc)}
     return {"available": True, "healthy": None}
+
+def _backup_health_summary() -> dict[str, Any]:
+    """Return compact backup health for admin APIs from BackupService diagnostics."""
+    if app_state.backup_service is None:
+        return {"available": False}
+    try:
+        diagnostics = app_state.backup_service.diagnostics()
+        return {"available": True, **diagnostics}
+    except Exception as exc:
+        logger.warning("Backup diagnostics failed: %s", exc)
+        return {"available": True, "healthy": False, "error": str(exc)}
+
+
+def _iso_utc_after_seconds(seconds: float) -> str:
+    return datetime.fromtimestamp(time.time() + max(seconds, 0.0), timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+async def _run_auto_backup_cycle() -> None:
+    """Run one auto-backup scheduler cycle and update diagnostics/logging."""
+    if app_state.backup_service is None:
+        return
+
+    backup_cfg = app_state.cfg.get("backup", {})
+    interval_hours = float(backup_cfg.get("auto_backup_interval_hours", 24))
+    next_run_at = _iso_utc_after_seconds(interval_hours * 3600)
+
+    try:
+        should_backup = app_state.backup_service.needs_auto_backup()
+        if should_backup:
+            manifest = app_state.backup_service.create_backup(
+                label="auto",
+                trigger="auto_interval",
+                notes="Background auto-backup scheduler",
+            )
+            _emit_log(
+                "info",
+                "backup",
+                "Background auto-backup complete",
+                {"backup_id": manifest.backup_id, "size_bytes": manifest.total_size_bytes},
+            )
+        else:
+            _emit_log("info", "backup", "Background auto-backup check skipped; no backup needed")
+        app_state.backup_service.mark_auto_backup_run(next_run_at=next_run_at)
+    except Exception as exc:
+        app_state.backup_service.mark_auto_backup_failure(exc, next_run_at=next_run_at)
+        _emit_log("error", "backup", f"Background auto-backup failed: {exc}")
+        logger.error("Background auto-backup failed: %s", exc)
+
+
+async def _backup_loop() -> None:
+    """Periodic backup scheduler driven by backup.auto_backup_interval_hours."""
+    while True:
+        try:
+            backup_cfg = app_state.cfg.get("backup", {})
+            interval_hours = float(backup_cfg.get("auto_backup_interval_hours", 24))
+            await asyncio.sleep(interval_hours * 3600)
+            await _run_auto_backup_cycle()
+        except Exception as exc:
+            logger.error("Backup loop error: %s", exc)
 
 
 def _get_current_focus_dict() -> dict[str, Any]:
@@ -1086,21 +1146,9 @@ async def startup_event():
                 _emit_log("warn", "startup", "Integrity issues detected",
                           {"issues": integrity.findings})
                 logger.warning("[backup] Integrity issues: %s", integrity.findings)
-            if app_state.backup_service.needs_auto_backup():
-                _emit_log("info", "startup", "Auto-backup triggered (>24h since last snapshot)")
-                try:
-                    manifest = app_state.backup_service.create_backup(
-                        label="auto", trigger="auto_startup"
-                    )
-                    _emit_log("info", "startup", "Auto-backup complete",
-                              {"backup_id": manifest.backup_id, "size_bytes": manifest.total_size_bytes})
-                except Exception as _bexc:
-                    _emit_log("warn", "startup", f"Auto-backup failed: {_bexc}")
-                    logger.warning("[backup] Auto-backup failed: %s", _bexc)
-            else:
-                backups = app_state.backup_service.list_backups()
-                _emit_log("info", "startup", "BackupService initialized",
-                          {"total_backups": len(backups)})
+            backups = app_state.backup_service.list_backups()
+            _emit_log("info", "startup", "BackupService initialized",
+                      {"total_backups": len(backups)})
         except Exception as exc:
             logger.warning("BackupService init failed: %s", exc)
 
@@ -1405,6 +1453,10 @@ async def startup_event():
         task5 = asyncio.create_task(_memory_maintenance_loop())
         app_state.background_tasks.add(task5)
         task5.add_done_callback(app_state.background_tasks.discard)
+
+        task6 = asyncio.create_task(_backup_loop())
+        app_state.background_tasks.add(task6)
+        task6.add_done_callback(app_state.background_tasks.discard)
 
         # Reflection pipeline (identity eval on schedule)
         try:
@@ -2152,6 +2204,7 @@ async def admin_get_status():
                 "capabilities": app_state.runtime_discovery.capabilities if app_state.runtime_discovery else {},
                 "services": app_state.runtime_discovery.to_dict().get("services", {}) if app_state.runtime_discovery else {},
                 "signal_bus": _signal_bus_health_summary(),
+                "backup": _backup_health_summary(),
                 "tracer": tracer_summary,
             }
         })
@@ -2773,6 +2826,7 @@ async def admin_runtime_diagnostics():
             "behavior_mode": getattr(latest_snapshot, "behavior_mode", None),
             "behavior": getattr(latest_snapshot, "behavior_summary", None),
             "signal_bus": _signal_bus_health_summary(),
+            "backup": _backup_health_summary(),
         }
         return JSONResponse({"ok": True, "data": diagnostics})
     except Exception as exc:

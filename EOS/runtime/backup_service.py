@@ -56,7 +56,7 @@ import sqlite3
 import time
 from collections import deque
 from dataclasses import dataclass, asdict, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -188,6 +188,11 @@ class BackupService:
         )
         self._cfg = cfg
         self._recent_failures: deque[dict] = deque(maxlen=20)
+        self._auto_last_run_at: str | None = None
+        self._auto_next_run_at: str | None = (
+            datetime.now(UTC) + timedelta(hours=self._auto_interval_hours)
+        ).isoformat().replace("+00:00", "Z")
+        self._auto_recent_failure: dict | None = None
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -652,11 +657,42 @@ class BackupService:
                     diagnostics=self._recent_failures,
                 )
 
+    def mark_auto_backup_run(self, *, next_run_at: str | None = None) -> None:
+        """Record that the background auto-backup scheduler completed a cycle."""
+        self._auto_last_run_at = _now_iso()
+        self._auto_next_run_at = next_run_at
+        self._auto_recent_failure = None
+
+    def mark_auto_backup_failure(self, exc: Exception, *, next_run_at: str | None = None) -> None:
+        """Record the most recent background auto-backup failure."""
+        failure = {
+            "at": _now_iso(),
+            "error": str(exc),
+        }
+        self._auto_last_run_at = failure["at"]
+        self._auto_next_run_at = next_run_at
+        self._auto_recent_failure = failure
+
     def diagnostics(self) -> dict:
+        backups = self.list_backups()
+        latest = backups[0] if backups else None
         return {
             "backup_root": str(self._backup_root),
             "max_backups": self._max_backups,
             "auto_interval_hours": self._auto_interval_hours,
+            "last_run_at": self._auto_last_run_at,
+            "next_run_at": self._auto_next_run_at,
+            "recent_failure": dict(self._auto_recent_failure) if self._auto_recent_failure else None,
+            "latest_backup": (
+                {
+                    "backup_id": latest.backup_id,
+                    "created_at": latest.created_at,
+                    "trigger": latest.trigger,
+                    "total_size_bytes": latest.total_size_bytes,
+                    "label": latest.label,
+                }
+                if latest is not None else None
+            ),
             "recent_failures": list(self._recent_failures),
         }
 

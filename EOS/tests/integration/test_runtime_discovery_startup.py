@@ -73,6 +73,15 @@ def _patch_lightweight_startup(monkeypatch):
         def list_backups(self):
             return []
 
+        def diagnostics(self):
+            return {"last_run_at": None, "next_run_at": None, "recent_failure": None, "recent_failures": []}
+
+        def mark_auto_backup_run(self, **kwargs):
+            self.marked_auto_backup = ("run", kwargs)
+
+        def mark_auto_backup_failure(self, exc, **kwargs):
+            self.marked_auto_backup = ("failure", str(exc), kwargs)
+
         def lifecycle_summary(self):
             return SimpleNamespace(boot_count=1, boot_reason="startup", entity_id="entity-1", compact=lambda: "boot=1")
 
@@ -134,6 +143,7 @@ def _patch_lightweight_startup(monkeypatch):
     monkeypatch.setattr(app_runtime, "_bus_poll_loop", _noop_forever)
     monkeypatch.setattr(app_runtime, "_initiative_loop", _noop_forever)
     monkeypatch.setattr(app_runtime, "_memory_maintenance_loop", _noop_forever)
+    monkeypatch.setattr(app_runtime, "_backup_loop", _noop_forever)
     monkeypatch.setattr(app_runtime, "_wire_signal_subscribers", lambda: None)
     monkeypatch.setattr(app_runtime, "shutdown_event", _noop_forever)
 
