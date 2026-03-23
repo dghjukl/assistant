@@ -97,6 +97,28 @@ def test_worldview_extraction_detects_changed_files_and_noops_when_clean(tmp_pat
     assert log["processed_files"][0]["sha256"] == changed[0]["sha256"]
 
 
+def test_worldview_block_pending_sources_is_internal_only(tmp_path):
+    service = WorldviewService(_make_cfg(tmp_path))
+    _write_source(service, "values.md", "I value truth, patience, and careful reasoning.")
+
+    block = service.worldview_block().lower()
+
+    assert "pending extraction" in block
+    assert "should not trigger unprompted acknowledgment" in block
+    assert "only mention pending material if explicitly asked" in block
+    assert "ask your partner" not in block
+    assert "would like you to run extraction" not in block
+
+
+def test_worldview_block_without_sources_preserves_human_triggered_extraction(tmp_path):
+    service = WorldviewService(_make_cfg(tmp_path))
+
+    block = service.worldview_block().lower()
+
+    assert "ask for extraction" in block
+    assert "ask your partner" not in block
+
+
 def test_execute_worldview_extraction_uses_runtime_workflow(monkeypatch):
     import runtime.orchestrator as orch
 
