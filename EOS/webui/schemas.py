@@ -7,16 +7,52 @@ endpoint.  Import from this module — do not declare inline body dicts.
 """
 from __future__ import annotations
 
-from typing import Any, Literal, Optional
+from typing import Any, Dict, Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, model_validator
 
 
 # ── Chat ──────────────────────────────────────────────────────────────────────
 
 class ChatRequest(BaseModel):
-    message: str = Field(..., min_length=1, max_length=32_000,
-                         description="User message text.")
+    """Canonical chat request.
+
+    Accepts either ``text`` (sent by the WebSocket/HTTP frontend) or the legacy
+    ``message`` field so that both the JS frontend and direct API callers work.
+    Exactly one of the two must be non-empty.
+    """
+
+    text: Optional[str] = Field(None, min_length=1, max_length=32_000,
+                                description="User message text (preferred field name).")
+    message: Optional[str] = Field(None, min_length=1, max_length=32_000,
+                                   description="User message text (legacy alias for text).")
+    text_attachment: Optional[Dict[str, Any]] = Field(None, description="Text-file attachment metadata (file_id + filename).")
+
+    @model_validator(mode="after")
+    def require_text_or_message(self) -> "ChatRequest":
+        if not (self.text or self.message):
+            raise ValueError("Either 'text' or 'message' must be provided and non-empty.")
+        return self
+
+    @property
+    def user_message(self) -> str:
+        """Return the canonical message string."""
+        return (self.text or self.message or "").strip()
+
+
+# ── Upload ────────────────────────────────────────────────────────────────────
+
+class UploadRequest(BaseModel):
+    """JSON-based file upload.
+
+    The frontend encodes file content as base64 and posts JSON (not multipart).
+    """
+    filename: str = Field(..., min_length=1, max_length=512,
+                          description="Original file name.")
+    content_type: str = Field("application/octet-stream",
+                              description="MIME type of the file.")
+    data: str = Field(..., min_length=1,
+                      description="Base64-encoded file content.")
 
 
 class TtsRequest(BaseModel):

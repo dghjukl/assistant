@@ -210,11 +210,10 @@ python eos.py --config config.json</pre></div>
 }</pre></div>
 
   <h3 class="sub-title" id="config-google">google block</h3>
-  <p class="doc-p">Controls which Google Workspace services EOS uses. <code>calendar_enabled</code>, <code>gmail_read_enabled</code>, and <code>drive_enabled</code> gate each service independently — set any to <code>false</code> to disable that service even when credentials are present. <code>gmail_send_enabled</code> is a separate sensitive flag that must be explicitly set to <code>true</code> before EOS can send email on your behalf.</p>
+  <p class="doc-p">Controls which Google Workspace services EOS uses. <code>calendar_enabled</code>, <code>gmail_enabled</code>, and <code>drive_enabled</code> gate each service independently — set any to <code>false</code> to disable that service even when credentials are present.</p>
   <div class="code-wrap"><pre>"google": {
   "calendar_enabled": true,
-  "gmail_read_enabled": true,
-  "gmail_send_enabled": false,
+  "gmail_enabled": true,
   "drive_enabled": true
 }</pre></div>
 </div>

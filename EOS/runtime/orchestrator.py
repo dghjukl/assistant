@@ -581,18 +581,6 @@ async def process_turn(
         elif mode == EpistemicMode.TOOL_OR_EXTERNAL:
             tool_result = await _run_registry_tool_intent(user_input, topology)
 
-            if tool_result is None:
-                # Compatibility fallback while the legacy dispatcher still exists.
-                tool_intent_prompt = (
-                    f"The user said: '{user_input}'\n"
-                    "In one sentence, what tool action should be taken to help?"
-                )
-                tool_intent = await call_qwen3(
-                    topology, tool_intent_prompt, cfg, use_think=False
-                )
-                from tools.dispatcher import run_tool_intent
-                tool_result = await run_tool_intent(tool_intent, topology, cfg)
-
             if tool_result:
                 followup = (
                     f"Tool result:\n{tool_result}\n\n"

@@ -114,11 +114,8 @@
 <div class="doc-section" id="google-caps">
   <div class="section-eyebrow">Capabilities</div>
   <h2 class="section-title">Google</h2>
-  <p class="doc-p">When Google Workspace is connected, Calendar, Gmail read, and Drive access are always enabled. Only outbound email sending requires an extra permission toggle:</p>
-  <ul class="doc-list">
-    <li><strong>Gmail Send</strong> — off by default. Enable only if you want EOS to send emails on your behalf. Marked as a sensitive permission.</li>
-  </ul>
-  <p class="doc-p">If Google is not connected or the credential file is missing, all Google capabilities are unavailable regardless of these settings. See the <a onclick="nav('integrations')">Integrations</a> page for setup details.</p>
+  <p class="doc-p">When Google Workspace is connected, Calendar (read), Gmail (read), and Drive (read) are enabled. No additional capability toggles are required for these services.</p>
+  <p class="doc-p">If Google is not connected or the credential file is missing, all Google capabilities are unavailable. See the <a onclick="nav('integrations')">Integrations</a> page for setup details.</p>
 </div>
 
 <hr class="doc-rule">
@@ -160,13 +157,6 @@
   "enabled": true,
   "frequency": "medium",
   "autonomous_idle": false
-}</pre>
-  </div>
-
-  <h3 class="sub-title" id="permanent-google">Google</h3>
-  <div class="code-wrap">
-    <pre>"google": {
-  "gmail_send_enabled": false
 }</pre>
   </div>
 

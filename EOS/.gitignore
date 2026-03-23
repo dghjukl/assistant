@@ -9,6 +9,7 @@ AI personal files/
 
 # ── Runtime auth tokens ───────────────────────────────────────────────────────
 data/google_token.json
+data/admin_token.txt
 
 # ── Runtime state (generated at first run) ────────────────────────────────────
 data/entity_state.db
@@ -18,7 +19,10 @@ data/documents.db
 data/event_journal.db
 data/scheduler.db
 data/entity_lifecycle.json
+data/session_continuity.json
+data/uploads/
 data/shutdown_ledger.json
+data/audit.db
 data/memory_store/
 data/backups/
 data/workspace/

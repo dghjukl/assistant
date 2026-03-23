@@ -237,7 +237,6 @@
     "token_path": "data/google_token.json",
     "calendar_enabled": true,
     "gmail_enabled": true,
-    "gmail_send_enabled": true,
     "drive_enabled": true
   },
   "workspace_tools": {

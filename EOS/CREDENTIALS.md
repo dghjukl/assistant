@@ -80,7 +80,7 @@ Set `"enabled": false` if you want Discord loaded but silent.
 
 ### What it enables
 
-EOS can read your Google Calendar events, read Gmail messages, search Google Drive files, and — when enabled — send email. By default, sending is **off** (`gmail_send_enabled: false`). You can toggle it at runtime in the admin panel under **Control & Permissions → Capabilities → Google**.
+EOS can read your Google Calendar events, read Gmail messages, and search Google Drive files.
 
 ### Where the credential goes
 
@@ -169,7 +169,6 @@ In `config.json`, confirm:
     "token_path": "data/google_token.json",
     "calendar_enabled": true,
     "gmail_enabled": true,
-    "gmail_send_enabled": true,
     "drive_enabled": true
 }
 ```

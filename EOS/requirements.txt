@@ -37,7 +37,6 @@ python-multipart>=0.0.9      # file upload support for FastAPI
 websockets>=12.0             # WebSocket support
 psutil>=5.9.0                # hardware sensors (CPU, RAM, disk)
 PyNaCl>=1.5.0                # Discord voice encryption (required by discord.py)
-davey>=0.1.0                 # Discord DAVE E2EE voice protocol (required by discord.py 2.4+)
 
 # Security & governance
 keyring>=25.0.0              # System credential store (Windows Credential Manager / macOS Keychain)

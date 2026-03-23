@@ -1,7 +1,7 @@
 <div class="page-header">
   <div class="page-eyebrow">Capabilities</div>
   <h1 class="page-title">Voice</h1>
-  <p class="page-lead">EOS supports voice input (speech-to-text) and voice output (text-to-speech), both running locally with no cloud API.</p>
+  <p class="page-lead">EOS supports voice input (speech-to-text) and voice output (text-to-speech). The voice loop mode uses local Whisper (STT) and Piper (TTS) with no cloud dependency. The web UI uses the browser's built-in speech APIs as the STT path and Piper for TTS output (with browser TTS as fallback when Piper is unavailable).</p>
 </div>
 
 <div class="doc-section" id="requirements">
@@ -30,8 +30,8 @@
 <div class="doc-section" id="stt">
   <div class="section-eyebrow">Capabilities</div>
   <h2 class="section-title">Voice Input (STT)</h2>
-  <p class="doc-p">When STT is active, a microphone button appears in the chat interface. Hold the button to speak, then release to send your voice as a message. EOS transcribes the audio locally using Whisper (<code>ggml-small</code>).</p>
-  <p class="doc-p">No audio ever leaves your machine. The entire transcription pipeline runs on your local hardware.</p>
+  <p class="doc-p">When STT is active, a microphone button appears in the chat interface. Click the button to start recording; click again to stop and insert the transcript into the message box.</p>
+  <p class="doc-p">The web UI uses the browser's built-in Web Speech API for transcription. In most desktop browsers (Chrome, Edge) this sends audio to the browser vendor's cloud transcription service. If local-only transcription is required, use the command-line voice loop (<code>--voice</code> flag), which uses a local Whisper model and never transmits audio externally.</p>
 </div>
 
 <hr class="doc-rule">

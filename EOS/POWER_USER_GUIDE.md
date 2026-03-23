@@ -168,12 +168,11 @@ Intensity presets control sampling parameters. `temperature`, `top_p`, `top_k` i
     "token_path": "data/google_token.json",
     "calendar_enabled": true,
     "gmail_enabled": true,
-    "gmail_send_enabled": true,
     "drive_enabled": true
 }
 ```
 
-`gmail_send_enabled` can be toggled live from **Capabilities → Google**. For individual service flags (`calendar_enabled`, etc.), edit `config.json` and restart.
+Individual service flags (`calendar_enabled`, `gmail_enabled`, `drive_enabled`) can be set to `false` to disable a service even when credentials are present. Edit `config.json` and restart to apply.
 
 ---
 

@@ -34,7 +34,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, UploadFile, File
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -56,7 +56,7 @@ from core.access_control import (
     TIER_LOCALHOST, TIER_LAN, TIER_EXTERNAL,
 )
 from webui.schemas import (
-    ChatRequest, TtsRequest, VisionSettingsRequest, AutonomyRequest,
+    ChatRequest, UploadRequest, TtsRequest, VisionSettingsRequest, AutonomyRequest,
     CapabilityRequest, ComputerUseModeRequest, ComputerUseHaltRequest,
     InitiativeTriggerRequest, InitiativeFeedbackRequest,
     InvestigationCreateRequest, InvestigationRunPassRequest, InvestigationResolveRequest,
@@ -909,6 +909,15 @@ async def startup_event():
                 _emit_log("info", "startup", "ToolExecutor wired to orchestrator")
             except Exception as _wexc:
                 logger.warning("ToolExecutor wiring failed: %s", _wexc)
+
+            # Wire the live ToolRegistry into entity.py so system prompts show
+            # actual registered tools instead of the legacy dispatcher list.
+            try:
+                from core.entity import wire_tool_registry as _wire_entity_registry
+                _wire_entity_registry(_tool_registry)
+                _emit_log("info", "startup", "ToolRegistry wired to entity system prompt")
+            except Exception as _wexc:
+                logger.warning("Entity tool registry wiring failed: %s", _wexc)
         except Exception as exc:
             logger.warning("Toolpack init failed — falling back to legacy tool states: %s", exc)
             # Fallback: seed _tool_states from old dispatcher
@@ -1235,20 +1244,32 @@ async def get_status_endpoint():
     try:
         status = get_status(_cfg)
         topology_summary = _topology.status_summary()
+
+        # Build model_status from topology so the frontend vision-capability check works
+        model_status: dict = {}
+        for role, srv in _topology.servers.items():
+            model_status[role] = {
+                "model_name": role,
+                "enabled": srv.is_ready(),
+                "status": srv.status.value if hasattr(srv.status, "value") else str(srv.status),
+            }
+
         return JSONResponse({
             "ok": True,
-            # Flat fields expected by the overview panel
             "session": {
                 "session_id": _session_id,
                 "turn_count": status.get("interaction_count", 0),
             },
             "boot_time_s": int(time.time() - topology_summary["boot_time"]) if topology_summary.get("boot_time") else None,
-            "data": {
-                **status,
-                "topology": topology_summary,
-                "capabilities": _runtime_discovery.capabilities if _runtime_discovery else {},
-                "services": _runtime_discovery.to_dict().get("services", {}) if _runtime_discovery else {},
-            }
+            "identity": {
+                "name": status.get("name"),
+                "stable_domains": status.get("identity_stable_domains", 0),
+                "total_domains":  status.get("total_domains", 6),
+            },
+            "model_status": model_status,
+            "topology": topology_summary,
+            "capabilities": _runtime_discovery.capabilities if _runtime_discovery else {},
+            "services": _runtime_discovery.to_dict().get("services", {}) if _runtime_discovery else {},
         })
     except Exception as exc:
         logger.error("Status endpoint error: %s", exc)
@@ -1260,13 +1281,24 @@ async def get_status_endpoint():
 
 @app.get("/api/tools")
 async def get_tools_list():
-    """Get list of tools with enabled state."""
+    """Get list of tools with enabled state and description."""
     try:
-        tools_list = [
-            {"name": name, "enabled": _tool_states.get(name, True)}
-            for name in _tool_states.keys()
-        ]
-        return JSONResponse({"ok": True, "data": tools_list})
+        if _tool_registry is not None:
+            tools_list = [
+                {
+                    "name":    spec.name,
+                    "enabled": spec.enabled,
+                    "description": spec.description,
+                    "pack":    spec.pack,
+                }
+                for spec in _tool_registry.all_tools()
+            ]
+        else:
+            tools_list = [
+                {"name": name, "enabled": _tool_states.get(name, True), "description": ""}
+                for name in _tool_states.keys()
+            ]
+        return JSONResponse({"ok": True, "tools": tools_list})
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
@@ -1276,7 +1308,7 @@ async def get_memory_recent(limit: int = 20):
     """Get recent interactions."""
     try:
         interactions = get_recent_interactions(limit)
-        return JSONResponse({"ok": True, "data": interactions})
+        return JSONResponse({"ok": True, "memories": interactions})
     except Exception as exc:
         logger.error("Memory recent error: %s", exc)
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
@@ -1321,12 +1353,28 @@ async def post_chat(body: ChatRequest):
         import time as _time
         _last_interaction_monotonic = _time.monotonic()
 
-        user_input = body.message.strip()
+        user_input = body.user_message
         if not user_input:
             return JSONResponse(
                 {"ok": False, "error": "Empty message"},
                 status_code=400
             )
+
+        # Resolve text attachment — prepend file content to message if present
+        if body.text_attachment:
+            attach = body.text_attachment
+            file_id = attach.get("file_id", "")
+            filename = attach.get("filename", "file")
+            upload_dir = Path(_cfg.get("upload_dir", "data/uploads"))
+            if not upload_dir.is_absolute():
+                upload_dir = Path(__file__).parent.parent / upload_dir
+            file_path = upload_dir / file_id
+            if file_path.is_file():
+                try:
+                    file_content = file_path.read_text(encoding="utf-8", errors="replace")
+                    user_input = f"[ATTACHMENT: {filename}]\n{file_content}\n\n{user_input}" if user_input else f"[ATTACHMENT: {filename}]\n{file_content}"
+                except Exception as _exc:
+                    logger.warning("Could not read attachment %s: %s", file_id, _exc)
 
         response = await process_turn(
             _topology,
@@ -1343,9 +1391,11 @@ async def post_chat(body: ChatRequest):
         if _initiative_engine:
             _initiative_engine.notify_turn()
 
+        from core.memory import count_interactions
         return JSONResponse({
             "ok": True,
-            "data": {"response": response}
+            "response": response,
+            "turn_count": count_interactions(),
         })
     except Exception as exc:
         logger.error("Chat endpoint error: %s", exc)
@@ -1376,6 +1426,26 @@ async def websocket_chat(websocket: WebSocket):
                 continue
 
             try:
+                global _last_interaction_monotonic
+                import time as _time
+                _last_interaction_monotonic = _time.monotonic()
+
+                # Resolve text attachment — prepend file content to message if present
+                attach = data.get("text_attachment")
+                if attach and isinstance(attach, dict):
+                    file_id = attach.get("file_id", "")
+                    filename = attach.get("filename", "file")
+                    upload_dir = Path(_cfg.get("upload_dir", "data/uploads"))
+                    if not upload_dir.is_absolute():
+                        upload_dir = Path(__file__).parent.parent / upload_dir
+                    file_path = upload_dir / file_id
+                    if file_path.is_file():
+                        try:
+                            file_content = file_path.read_text(encoding="utf-8", errors="replace")
+                            message = f"[ATTACHMENT: {filename}]\n{file_content}\n\n{message}"
+                        except Exception as _exc:
+                            logger.warning("Could not read attachment %s: %s", file_id, _exc)
+
                 # Signal the client that processing has started
                 await websocket.send_json({"type": "thinking"})
 
@@ -1390,9 +1460,11 @@ async def websocket_chat(websocket: WebSocket):
                     _reflection_pipeline.notify_turn()
                 if _initiative_engine:
                     _initiative_engine.notify_turn()
+                from core.memory import count_interactions
                 await websocket.send_json({
                     "type": "response",
                     "response": response,
+                    "turn_count": count_interactions(),
                     "ok": True,
                 })
             except Exception as exc:
@@ -1441,26 +1513,65 @@ async def post_tts(body: TtsRequest):
 
 
 @app.post("/api/upload")
-async def post_upload(file: UploadFile = File(...)):
-    """Accept file upload."""
+async def post_upload(body: UploadRequest):
+    """Accept file upload as JSON base64.
+
+    Persists the file to data/uploads/<file_id> on disk so that subsequent
+    chat turns can read it via the text_attachment mechanism.
+    Returns flat fields (not nested under 'data') to match frontend expectations.
+    """
+    import base64 as _b64
+
     try:
-        content = await file.read()
-        file_id = str(uuid.uuid4())
-        # Stub: just return file metadata
-        return JSONResponse({
-            "ok": True,
-            "data": {
-                "file_id": file_id,
-                "filename": file.filename,
-                "size": len(content),
-            }
-        })
+        raw = _b64.b64decode(body.data)
     except Exception as exc:
-        logger.error("Upload endpoint error: %s", exc)
         return JSONResponse(
-            {"ok": False, "error": str(exc)},
+            {"ok": False, "error": f"Invalid base64 data: {exc}"},
+            status_code=400
+        )
+
+    file_id = str(uuid.uuid4())
+
+    # Determine kind from content_type
+    ct = (body.content_type or "").lower()
+    if ct.startswith("image/"):
+        kind = "image"
+    elif ct.startswith("text/") or ct in ("application/csv", "application/x-csv"):
+        kind = "text"
+    elif ct == "application/pdf":
+        kind = "document"
+    else:
+        # Infer from extension as fallback
+        ext = Path(body.filename).suffix.lower()
+        if ext in (".txt", ".csv", ".md", ".log"):
+            kind = "text"
+        elif ext in (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"):
+            kind = "image"
+        else:
+            kind = "document"
+
+    # Persist to uploads directory
+    try:
+        upload_dir = Path(_cfg.get("upload_dir", "data/uploads"))
+        if not upload_dir.is_absolute():
+            upload_dir = Path(__file__).parent.parent / upload_dir
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        (upload_dir / file_id).write_bytes(raw)
+    except Exception as exc:
+        logger.error("Upload storage error: %s", exc)
+        return JSONResponse(
+            {"ok": False, "error": f"Failed to store upload: {exc}"},
             status_code=500
         )
+
+    return JSONResponse({
+        "ok": True,
+        "file_id":      file_id,
+        "filename":     body.filename,
+        "content_type": body.content_type,
+        "kind":         kind,
+        "size":         len(raw),
+    })
 
 
 @app.get("/api/vision/settings")
@@ -1475,11 +1586,9 @@ async def get_vision_settings(session_id: str | None = None):
         session_enabled = _vision_sessions.get(session_id, _topology.vision_enabled)
         return JSONResponse({
             "ok": True,
-            "data": {
-                "enabled": session_enabled,
-                "provider": _topology.vision_provider.value,
-                "available": _topology.vision_available,
-            }
+            "enabled":   session_enabled,
+            "provider":  _topology.vision_provider.value,
+            "available": _topology.vision_available,
         })
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
@@ -1492,7 +1601,7 @@ async def post_vision_settings(body: VisionSettingsRequest, session_id: str | No
         enabled = body.enabled
         if session_id:
             _vision_sessions[session_id] = enabled
-        return JSONResponse({"ok": True, "data": {"enabled": enabled}})
+        return JSONResponse({"ok": True, "enabled": enabled})
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
@@ -2534,9 +2643,6 @@ async def admin_get_capabilities():
                     "injection_frequency": cr.get("injection_frequency", "medium"),
                     "autonomous_idle":     cr.get("invocation_domains", {}).get("autonomous_idle", False),
                 },
-                "google": {
-                    "gmail_send_enabled": goo.get("gmail_send_enabled", False),
-                },
             },
         })
     except Exception as exc:
@@ -3185,7 +3291,6 @@ def _google_service_enabled(service: str) -> bool:
         "calendar": "calendar_enabled",
         "gmail": "gmail_enabled",
         "drive": "drive_enabled",
-        "gmail_send": "gmail_send_enabled",
     }
     flag = flag_map.get(service)
     return bool(gcfg.get(flag, False)) if flag else False
@@ -3263,7 +3368,6 @@ async def google_status():
                 "token_exists": token_exists,
                 "token_valid": token_valid,
                 "services_enabled": services_enabled,
-                "gmail_send_enabled": bool(gcfg.get("gmail_send_enabled", False)),
                 "calendar_create_enabled": bool(services_enabled["calendar"]),
                 "drive_download_enabled": bool(services_enabled["drive"]),
                 "last_auth_error": None,
@@ -3406,7 +3510,7 @@ async def google_calendar_today():
         return JSONResponse({"ok": False, "error": str(exc), "needs_auth": True}, status_code=401)
     except Exception as exc:
         logger.warning("google_calendar_today error: %s", exc)
-        return JSONResponse({"ok": True, "data": {"events": [], "error": str(exc)}})
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
 
 @app.get("/api/google_workspace/calendar/upcoming")
@@ -3435,7 +3539,7 @@ async def google_calendar_upcoming(days: int = 7):
         return JSONResponse({"ok": False, "error": str(exc), "needs_auth": True}, status_code=401)
     except Exception as exc:
         logger.warning("google_calendar_upcoming error: %s", exc)
-        return JSONResponse({"ok": True, "data": {"events": [], "error": str(exc)}})
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
 
 @app.get("/api/google_workspace/gmail/inbox")

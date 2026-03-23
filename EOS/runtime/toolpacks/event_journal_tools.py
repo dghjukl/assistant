@@ -76,9 +76,11 @@ def register(registry: Any, config: Dict[str, Any]) -> None:
             )
             conn.commit()
             conn.close()
-        except Exception:
-            pass
-        return _jdump({"ok": True, "ts": _utc_iso(), "kind": kind})
+            return _jdump({"ok": True, "ts": _utc_iso(), "kind": kind})
+        except Exception as exc:
+            import logging as _logging
+            _logging.getLogger("eos.event_journal").error("write_event DB error: %s", exc)
+            return _jdump({"ok": False, "error": str(exc), "kind": kind})
 
     registry.register(ToolSpec(
         name="write_event",
@@ -109,9 +111,11 @@ def register(registry: Any, config: Dict[str, Any]) -> None:
             for row in rows:
                 items.append({"ts": row[1], "kind": row[2], "tags": json.loads(row[3] or "[]"), "payload": json.loads(row[4] or "{}")})
             conn.close()
-            return _jdump({"count": len(items), "items": items})
-        except Exception:
-            return _jdump({"count": 0, "items": []})
+            return _jdump({"ok": True, "count": len(items), "items": items})
+        except Exception as exc:
+            import logging as _logging
+            _logging.getLogger("eos.event_journal").error("query_events DB error: %s", exc)
+            return _jdump({"ok": False, "error": str(exc), "count": 0, "items": []})
 
     registry.register(ToolSpec(
         name="query_events",

@@ -59,23 +59,101 @@ class TestHealthAndStatus:
 
 
 class TestChatContractValidation:
-    def test_chat_empty_message_422(self, client):
-        """Empty message string should fail Pydantic validation (422)."""
-        resp = client.post("/api/chat", json={"message": ""})
-        # Either 422 (Pydantic) or 503 (topology not ready) are acceptable
-        assert resp.status_code in (400, 422, 503)
-
-    def test_chat_missing_message_422(self, client):
+    def test_chat_empty_body_422(self, client):
+        """Neither text nor message provided — Pydantic validator rejects it."""
         resp = client.post("/api/chat", json={})
         assert resp.status_code in (422, 503)
 
-    def test_chat_valid_body_503_without_topology(self, client):
-        """Valid body but no topology → 503 (not a schema error)."""
+    def test_chat_text_field_accepted(self, client):
+        """Frontend sends 'text' — should be accepted (503 without topology, not 422)."""
+        resp = client.post("/api/chat", json={"text": "hello"})
+        assert resp.status_code in (200, 503)
+        if resp.status_code == 503:
+            assert resp.json()["ok"] is False
+
+    def test_chat_message_field_accepted(self, client):
+        """Legacy 'message' field is still accepted for backward compatibility."""
         resp = client.post("/api/chat", json={"message": "hello"})
         assert resp.status_code in (200, 503)
         if resp.status_code == 503:
-            data = resp.json()
-            assert data["ok"] is False
+            assert resp.json()["ok"] is False
+
+    def test_chat_response_shape_when_successful(self, client):
+        """When /api/chat succeeds, response must have flat 'response' key (not data.response)."""
+        # We can only verify the schema when a real response comes back;
+        # without topology this just checks 503 shape.
+        resp = client.post("/api/chat", json={"text": "hello"})
+        data = resp.json()
+        assert "ok" in data
+        if data["ok"]:
+            assert "response" in data          # flat, not nested under "data"
+            assert "data" not in data          # no legacy wrapper
+
+
+class TestUploadContractValidation:
+    def test_upload_missing_fields_422(self, client):
+        """Upload with no body is rejected with 422."""
+        resp = client.post("/api/upload", json={})
+        assert resp.status_code == 422
+
+    def test_upload_invalid_base64_400(self, client):
+        """Upload with malformed base64 data returns 400."""
+        resp = client.post("/api/upload", json={
+            "filename": "test.txt",
+            "content_type": "text/plain",
+            "data": "!!!not-valid-base64!!!",
+        })
+        assert resp.status_code == 400
+        assert resp.json()["ok"] is False
+
+    def test_upload_valid_returns_flat_fields(self, client, tmp_path, monkeypatch):
+        """Valid upload returns file_id, filename, content_type, kind at root level."""
+        import base64, webui.server as srv
+        monkeypatch.setattr(srv, "_cfg", {"upload_dir": str(tmp_path)}, raising=False)
+
+        payload = base64.b64encode(b"hello world").decode()
+        resp = client.post("/api/upload", json={
+            "filename": "hello.txt",
+            "content_type": "text/plain",
+            "data": payload,
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ok"] is True
+        assert "file_id" in data             # flat, not nested under "data"
+        assert data["filename"] == "hello.txt"
+        assert data["content_type"] == "text/plain"
+        assert data["kind"] == "text"
+        assert "data" not in data            # no legacy wrapper
+
+
+class TestApiResponseKeys:
+    def test_tools_response_uses_tools_key(self, client):
+        """GET /api/tools must return {ok, tools: [...]} not {ok, data: [...]}."""
+        resp = client.get("/api/tools")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ok"] is True
+        assert "tools" in data
+        assert "data" not in data            # key renamed from legacy
+
+    def test_memory_recent_uses_memories_key(self, client):
+        """GET /api/memory/recent must return {ok, memories: [...]}."""
+        resp = client.get("/api/memory/recent")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ok"] is True
+        assert "memories" in data
+        assert "data" not in data
+
+    def test_vision_settings_get_flat(self, client):
+        """GET /api/vision/settings must return 'enabled' at root level."""
+        resp = client.get("/api/vision/settings")
+        # 503 when topology is absent — check shape regardless
+        data = resp.json()
+        if data.get("ok"):
+            assert "enabled" in data
+            assert "data" not in data
 
 
 class TestTtsContractValidation:
@@ -259,7 +337,6 @@ class TestGoogleWorkspaceRoutes:
                 "calendar_enabled": True,
                 "gmail_enabled": True,
                 "drive_enabled": True,
-                "gmail_send_enabled": False,
             }
         }, raising=False)
         return services
@@ -319,6 +396,60 @@ class TestGoogleWorkspaceRoutes:
         data = resp.json()
         assert data["data"]["query"] == "spec"
         assert services["drive"].files_api.last_list_kwargs["q"] == "fullText contains 'spec'"
+
+    def test_calendar_today_backend_exception_returns_ok_false(self, client, monkeypatch, tmp_path):
+        """Calendar backend exception must return ok:False — must not silently return ok:True."""
+        import types, sys
+        fake_google = types.SimpleNamespace(
+            configure=lambda cfg: None,
+            is_authorized=lambda: True,
+            get_account_info=lambda: {},
+            get_credentials=lambda scopes=None: object(),
+            build_authorize_url=lambda redirect_uri: ("https://accounts.example/auth", "state"),
+            exchange_code=lambda code, state, redirect_uri: {"ok": True},
+            revoke=lambda: {"ok": True},
+            build_service=lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("backend failure")),
+            _client_secret_path=lambda: tmp_path / "cs.json",
+            _token_path=lambda: tmp_path / "tok.json",
+        )
+        monkeypatch.setitem(sys.modules, "core.google_oauth", fake_google)
+        import webui.server as server
+        monkeypatch.setattr(server, "_cfg", {
+            "google": {"enabled": True, "calendar_enabled": True}
+        }, raising=False)
+        resp = client.get("/api/google_workspace/calendar/today")
+        data = resp.json()
+        assert data["ok"] is False, (
+            f"Expected ok:False on backend exception; got ok:{data.get('ok')} — "
+            f"calendar endpoint is masking errors"
+        )
+
+    def test_calendar_upcoming_backend_exception_returns_ok_false(self, client, monkeypatch, tmp_path):
+        """Calendar/upcoming backend exception must return ok:False."""
+        import types, sys
+        fake_google = types.SimpleNamespace(
+            configure=lambda cfg: None,
+            is_authorized=lambda: True,
+            get_account_info=lambda: {},
+            get_credentials=lambda scopes=None: object(),
+            build_authorize_url=lambda redirect_uri: ("https://accounts.example/auth", "state"),
+            exchange_code=lambda code, state, redirect_uri: {"ok": True},
+            revoke=lambda: {"ok": True},
+            build_service=lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("backend failure")),
+            _client_secret_path=lambda: tmp_path / "cs.json",
+            _token_path=lambda: tmp_path / "tok.json",
+        )
+        monkeypatch.setitem(sys.modules, "core.google_oauth", fake_google)
+        import webui.server as server
+        monkeypatch.setattr(server, "_cfg", {
+            "google": {"enabled": True, "calendar_enabled": True}
+        }, raising=False)
+        resp = client.get("/api/google_workspace/calendar/upcoming")
+        data = resp.json()
+        assert data["ok"] is False, (
+            f"Expected ok:False on backend exception; got ok:{data.get('ok')} — "
+            f"calendar/upcoming endpoint is masking errors"
+        )
 
 
 class TestCapabilityContractValidation:

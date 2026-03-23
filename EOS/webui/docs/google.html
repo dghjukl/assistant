@@ -1,7 +1,7 @@
 <div class="page-header">
   <div class="page-eyebrow">Capabilities</div>
   <h1 class="page-title">Google Workspace</h1>
-  <p class="page-lead">EOS can read your Google Calendar, search Gmail, and browse Google Drive. When enabled, it can also send email on your behalf.</p>
+  <p class="page-lead">EOS can read your Google Calendar, search Gmail, and browse Google Drive.</p>
 </div>
 
 <div class="doc-section" id="what">
@@ -22,11 +22,6 @@
       <div class="cap-card-icon">📁</div>
       <div class="cap-card-title">Google Drive</div>
       <div class="cap-card-desc">List and read files, find documents by name or content.</div>
-    </div>
-    <div class="cap-card">
-      <div class="cap-card-icon">📤</div>
-      <div class="cap-card-title">Send Email</div>
-      <div class="cap-card-desc">Compose and send via Gmail — disabled by default, requires explicit enable.</div>
     </div>
   </div>
 </div>
@@ -119,30 +114,6 @@
     <div class="callout-icon">💡</div>
     <div class="callout-title">Token expired?</div>
     <div class="callout-body">Delete <span class="file-path">data\google_token.json</span> and restart EOS. It will open a new browser authorization window and save a fresh token.</div>
-  </div>
-</div>
-
-<div class="doc-rule"></div>
-
-<div class="doc-section" id="gmail-send">
-  <div class="section-eyebrow">Optional Feature</div>
-  <h2 class="section-title">Enabling Gmail Send</h2>
-  <p class="doc-p">Gmail Send is off by default. EOS can read and search your email without it — you only need to enable this if you want EOS to send messages on your behalf.</p>
-
-  <h3 class="sub-title" id="gmail-send-runtime">Enable at runtime</h3>
-  <p class="doc-p">Admin Panel → Control &amp; Permissions → Capabilities → Google → Gmail Send. This takes effect immediately and does not require a restart.</p>
-
-  <h3 class="sub-title" id="gmail-send-permanent">Make it permanent</h3>
-  <p class="doc-p">To keep Gmail Send enabled across restarts, add the following to <span class="file-path">config.json</span>:</p>
-  <div class="code-wrap"><pre>"google": {
-  "enabled": true,
-  "gmail_send_enabled": true
-}</pre></div>
-
-  <div class="callout warning">
-    <div class="callout-icon">⚠️</div>
-    <div class="callout-title">Understand what you're enabling</div>
-    <div class="callout-body">With Gmail Send enabled, EOS can send email on your behalf. It will always tell you what it's sending and why, but only enable this if you've established trust with your EOS instance.</div>
   </div>
 </div>
 

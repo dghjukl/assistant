@@ -28,10 +28,13 @@ async def list_events(days_ahead: int = 7, cfg: dict = {}) -> str:
 
     now = datetime.utcnow().isoformat() + "Z"
     end = (datetime.utcnow() + timedelta(days=days_ahead)).isoformat() + "Z"
-    res = svc.events().list(
-        calendarId="primary", timeMin=now, timeMax=end,
-        maxResults=10, singleEvents=True, orderBy="startTime",
-    ).execute()
+    try:
+        res = svc.events().list(
+            calendarId="primary", timeMin=now, timeMax=end,
+            maxResults=10, singleEvents=True, orderBy="startTime",
+        ).execute()
+    except Exception as exc:
+        return f"Calendar error listing events: {exc}"
 
     events = res.get("items", [])
     if not events:
@@ -57,13 +60,19 @@ async def create_event(
     except Exception as exc:
         return f"Calendar unavailable: {exc}"
 
-    start_dt = datetime.fromisoformat(start_iso)
-    end_dt   = start_dt + timedelta(minutes=duration_minutes)
-    event    = {
+    try:
+        start_dt = datetime.fromisoformat(start_iso)
+    except ValueError as exc:
+        return f"Calendar error: invalid start_iso format '{start_iso}': {exc}"
+    end_dt = start_dt + timedelta(minutes=duration_minutes)
+    event  = {
         "summary":     title,
         "description": description,
         "start": {"dateTime": start_dt.isoformat(), "timeZone": "UTC"},
         "end":   {"dateTime": end_dt.isoformat(),   "timeZone": "UTC"},
     }
-    created = svc.events().insert(calendarId="primary", body=event).execute()
+    try:
+        created = svc.events().insert(calendarId="primary", body=event).execute()
+    except Exception as exc:
+        return f"Calendar error creating event: {exc}"
     return f"Event created: {created.get('summary')} at {start_iso}"

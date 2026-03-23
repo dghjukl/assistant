@@ -2316,7 +2316,6 @@ async function loadCapabilities() {
     const cu    = c.computer_use || {};
     const ws    = c.workspace || {};
     const cr    = c.creativity || {};
-    const goo   = c.google || {};
 
     // Autonomy Dimensions card
     const autonDims = ['perception','cognition','action','initiative'];
@@ -2433,24 +2432,7 @@ async function loadCapabilities() {
         </div>
       </div>`;
 
-    // Google card
-    const googCard = `
-      <div class="cap-card">
-        <div class="cap-card-title">Google</div>
-        <div class="cap-row">
-          <div class="cap-row-info">
-            <div class="cap-row-label">Gmail Send</div>
-            <div class="cap-row-desc">Allow outgoing email ⚠</div>
-          </div>
-          <label class="toggle">
-            <input type="checkbox" ${goo.gmail_send_enabled ? 'checked' : ''}
-              data-cap-group="google" data-cap-key="gmail_send_enabled" />
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-      </div>`;
-
-    grid.innerHTML = autonCard + cuCard + wsCard + crCard + googCard;
+    grid.innerHTML = autonCard + cuCard + wsCard + crCard;
 
     // Wire toggle checkboxes
     grid.querySelectorAll('input[data-cap-group]').forEach(cb => {
@@ -2838,7 +2820,6 @@ async function loadGoogleWorkspace() {
       { label:'Gmail',    on: !!svc.gmail },
       { label:'Drive',    on: !!svc.drive },
       { label:'Token',    on: !!data.token_valid, warn: data.token_exists && !data.token_valid },
-      { label:'Gmail Send', on: !!data.gmail_send_enabled, warn: !!data.gmail_send_enabled },
     ];
     document.getElementById('gw-flags').innerHTML = flagDefs.map(f => `
       <div class="integ-flag">
@@ -2853,7 +2834,6 @@ async function loadGoogleWorkspace() {
         { label:'Calendar read',   on: !!svc.calendar },
         { label:'Cal. create',     on: !!(data.calendar_create_enabled ?? false), warn:true },
         { label:'Gmail read',      on: !!svc.gmail },
-        { label:'Gmail send',      on: !!data.gmail_send_enabled, warn: !!data.gmail_send_enabled },
         { label:'Drive read',      on: !!svc.drive },
         { label:'Drive download',  on: !!(data.drive_download_enabled ?? false), warn:true },
       ];

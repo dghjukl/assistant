@@ -187,7 +187,6 @@
     "token_path": "data/google_token.json",
     "calendar_enabled": false,
     "gmail_enabled": false,
-    "gmail_send_enabled": false,
     "drive_enabled": false
   },
 

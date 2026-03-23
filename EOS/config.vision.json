@@ -175,7 +175,6 @@
     "token_path": "data/google_token.json",
     "calendar_enabled": true,
     "gmail_enabled": true,
-    "gmail_send_enabled": false,
     "drive_enabled": true
   },
 

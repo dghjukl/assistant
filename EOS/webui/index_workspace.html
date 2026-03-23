@@ -825,31 +825,16 @@ function sendMessage() {
   input.value = '';
   autoResize(input);
 
-  // ── Build modality / multimodal payload ────────────────────────────────────
-  let modality = 'text';
-  let multimodal = null;
+  // ── Build attachment payload ────────────────────────────────────────────────
   let textAttachment = null;  // for .txt / .csv / .md uploads (kind==="text")
 
-  if (currentAttachment) {
-    if (visionEnabled && (currentAttachment.kind === 'image' || currentAttachment.kind === 'document')) {
-      // Image / PDF turns use the vision path (requires vision enabled).
-      modality = currentAttachment.kind;
-      multimodal = {
-        vision: {
-          file_id:      currentAttachment.file_id,
-          content_type: currentAttachment.content_type,
-          source_ref:   currentAttachment.filename,
-        },
-      };
-    } else if (currentAttachment.kind === 'text') {
-      // Text-kind uploads (.txt / .csv / .md) are always allowed regardless of
-      // the vision toggle.  The server reads the file from the upload store and
-      // prepends it as an [ATTACHMENT] block before the user's typed message.
-      textAttachment = {
-        file_id:  currentAttachment.file_id,
-        filename: currentAttachment.filename,
-      };
-    }
+  if (currentAttachment && currentAttachment.kind === 'text') {
+    // Text-kind uploads (.txt / .csv / .md): the server reads the file from the
+    // upload store and prepends it as an [ATTACHMENT] block before the message.
+    textAttachment = {
+      file_id:  currentAttachment.file_id,
+      filename: currentAttachment.filename,
+    };
   }
 
   // Capture and clear before the async path so the user can start typing again
@@ -858,10 +843,6 @@ function sendMessage() {
   // ── Dispatch ───────────────────────────────────────────────────────────────
   if (wsReady && ws && ws.readyState === WebSocket.OPEN) {
     const wsPayload = { type: 'chat', text, vision_session: VISION_SESSION_TOKEN };
-    if (multimodal) {
-      wsPayload.modality   = modality;
-      wsPayload.multimodal = multimodal;
-    }
     if (textAttachment) {
       wsPayload.text_attachment = textAttachment;
     }
@@ -871,10 +852,6 @@ function sendMessage() {
     // Fallback to HTTP POST
     showThinking();
     const body = { text };
-    if (multimodal) {
-      body.modality   = modality;
-      body.multimodal = multimodal;
-    }
     if (textAttachment) {
       body.text_attachment = textAttachment;
     }
@@ -1239,9 +1216,9 @@ async function maybeSpeak(text) {
 
 // ── Vision capability + settings ──────────────────────────────────────────────
 async function checkVisionCapability(statusData) {
-  // The frontend model is the only vision-capable role (llama_cpp_vision_server).
+  // The 'vision' role in model_status corresponds to the vision server.
   // Treat vision as capable unless the model entry explicitly marks enabled=false.
-  const frontendInfo = statusData?.model_status?.frontend;
+  const frontendInfo = statusData?.model_status?.vision;
   visionCapable = frontendInfo ? frontendInfo.enabled !== false : true;
 
   const visionBtn = document.getElementById('vision-btn');
@@ -1362,8 +1339,7 @@ async function uploadAndAttach(file) {
       return;
     }
 
-    // Both images and PDFs/documents require vision processing on the backend.
-    // Text files (.txt/.csv/.md) arrive as modality="text" and are always allowed.
+    // Images and PDFs require vision processing; text files are always allowed.
     if (!visionEnabled && (data.kind === 'image' || data.kind === 'document')) {
       appendSystemMessage('ℹ Vision is disabled. Enable vision (👁 button) to attach images or PDFs.');
       return;

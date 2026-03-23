@@ -1,3 +1,0 @@
-# EOS admin token — keep this file private
-# To rotate: delete this file and restart EOS
-YSfv0EqOzn9wrVxnhQnwPxNjAq2Ka8lkxeniSBQ0lUM

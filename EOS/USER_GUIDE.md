@@ -111,10 +111,6 @@ See the [Computer Use](#computer-use) section below for what each mode means.
 - **Frequency** — How often creative reframes are injected: Off / Low / Medium / High
 - **Autonomous Idle** — Whether creativity is invoked during idle cognition cycles
 
-### Google
-
-- **Gmail Send** — Whether EOS can send email on your behalf (off by default, marked ⚠)
-
 ---
 
 ## Voice input and output
@@ -172,7 +168,7 @@ Set `"respond_only_to_mentions": false` to have EOS respond to all messages in a
 
 ### What it does
 
-EOS can read your Google Calendar, search Gmail, and browse Google Drive files. When enabled, it can also send email. This lets you ask EOS things like "what's on my calendar tomorrow" or "find the email from last week about the project deadline."
+EOS can read your Google Calendar, search Gmail, and browse Google Drive files. This lets you ask EOS things like "what's on my calendar tomorrow" or "find the email from last week about the project deadline."
 
 ### Setup
 
@@ -187,10 +183,6 @@ Open the admin panel → **Integrations** tab. This shows:
 - Whether the OAuth token is valid
 - Which services are enabled (Calendar / Gmail / Drive)
 - Live data views — upcoming calendar events, inbox preview, recent Drive files
-
-### Controlling Gmail Send
-
-Gmail sending is off by default. To enable it at runtime: **Control & Permissions → Capabilities → Google → Gmail Send**. To enable it permanently, set `"gmail_send_enabled": true` in `config.json`.
 
 > **Need help with the Google Cloud setup?** Paste this into any AI assistant:
 > *"Walk me through creating a Google Cloud project, enabling the Gmail, Calendar, and Drive APIs, configuring the OAuth consent screen for a desktop app for personal use, and downloading the OAuth 2.0 client secret JSON file."*

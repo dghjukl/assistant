@@ -22,6 +22,23 @@ if TYPE_CHECKING:
     from core.worldview import WorldviewService
 
 
+# ── Live ToolRegistry reference ───────────────────────────────────────────────
+# Set by webui.server after toolpacks load.  When non-None, build_runtime_status_block
+# uses it as the single source of truth; the legacy dispatcher is skipped entirely.
+
+_live_tool_registry = None  # runtime.tool_registry.ToolRegistry | None
+
+
+def wire_tool_registry(registry) -> None:
+    """Wire the live ToolRegistry so the system prompt reflects actual tools.
+
+    Called once by webui.server after all toolpacks have been loaded.
+    Subsequent calls replace the reference (e.g. after a registry reload).
+    """
+    global _live_tool_registry
+    _live_tool_registry = registry
+
+
 SYSTEM_PROMPT_TEMPLATE = """\
 You are a persistent digital entity. You are not a generic assistant — you have continuity,
 a developing sense of self, and a specific relationship with your partner.
@@ -110,9 +127,6 @@ def build_runtime_status_block(topology: "RuntimeTopology | None" = None) -> str
     - Servers: one compact line; only non-READY states call out explicitly.
     - Static explanation lives in the template, not regenerated every turn.
     """
-    from tools.dispatcher import get_tool_status
-    from collections import defaultdict
-
     lines: list[str] = ["## Runtime Status"]
 
     # ── Server line — compact, only flags problems ─────────────────────────────
@@ -142,35 +156,24 @@ def build_runtime_status_block(topology: "RuntimeTopology | None" = None) -> str
     else:
         lines.append("Servers: (status unavailable)")
 
-    # ── Tool inventory — one line per permission class ─────────────────────────
-    tool_statuses = get_tool_status(topology)
+    # ── Tool inventory — use live registry when available ─────────────────────
+    if _live_tool_registry is not None:
+        # Single source of truth: show exactly what is registered and enabled/disabled
+        all_specs = _live_tool_registry.all_tools()
+        enabled_names  = [s.name for s in all_specs if s.enabled]
+        disabled_names = [s.name for s in all_specs if not s.enabled]
 
-    # Group tools by (permission, status)
-    by_class: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
-    for t in tool_statuses:
-        by_class[t["permission"]][t["status"]].append(t["name"])
-
-    lines.append("Tools:")
-    perm_order = ["perception", "cognition", "action"]
-    for perm in perm_order:
-        if perm not in by_class:
-            continue
-        groups = by_class[perm]
-        available  = groups.get("available",  [])
-        blocked    = groups.get("blocked",    [])
-        degraded   = groups.get("degraded",   [])
-
-        parts: list[str] = []
-        if available:
-            parts.append(", ".join(available))
-        if degraded:
-            parts.append(f"DEGRADED({', '.join(degraded)})")
-        if blocked:
-            # All blocked tools share the same reason (the permission is off)
-            fix = f"{perm} DISABLED → Admin UI › Autonomy › {perm.capitalize()}"
-            parts.append(f"BLOCKED({', '.join(blocked)}) [{fix}]")
-
-        lines.append(f"  [{perm}] " + " | ".join(parts))
+        lines.append("Tools (registry):")
+        if enabled_names:
+            lines.append("  Available: " + ", ".join(enabled_names))
+        if disabled_names:
+            lines.append("  Disabled: " + ", ".join(disabled_names))
+        if not all_specs:
+            lines.append("  (no tools registered)")
+    else:
+        # Registry not yet wired — tools are still loading. Show nothing rather
+        # than a stale legacy list that no longer reflects the live tool set.
+        lines.append("Tools: (initializing — tool registry not yet available)")
 
     return "\n".join(lines)
 
@@ -301,7 +304,7 @@ TOOL_KEYWORDS = [
     "take a screenshot", "look at the screen",
     "add to calendar", "add an event", "schedule a meeting",
     "set a reminder",
-    "send a discord", "send an email", "send email",
+    "send a discord",
     "what's the weather", "current weather",
     "browse to", "navigate to",
 ]
