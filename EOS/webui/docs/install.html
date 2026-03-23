@@ -23,13 +23,13 @@
       </thead>
       <tbody>
         <tr>
-          <td><code>Setup-Full.ps1</code></td>
+          <td><code>setup\Setup-Full.ps1</code></td>
           <td>~13 GB</td>
           <td>All models including primary Qwen3-8B, all binaries, TTS engine, embedding model</td>
           <td>Recommended — everything you need in one run</td>
         </tr>
         <tr>
-          <td><code>Setup-Lite.ps1</code></td>
+          <td><code>setup\Setup-Lite.ps1</code></td>
           <td>~3 GB</td>
           <td>Supporting files, pip packages, binaries, TTS — no primary model</td>
           <td>Use when you want to supply the primary model manually, or have a limited connection</td>
@@ -38,7 +38,7 @@
     </table>
   </div>
 
-  <p class="doc-p">If you use <code>Setup-Lite.ps1</code>, you must manually place the primary model file (Qwen3-8B GGUF) into the correct <code>models\</code> subdirectory before starting EOS. Run <code>python verify.py</code> afterwards to confirm the path is correct.</p>
+  <p class="doc-p">If you use <code>setup\Setup-Lite.ps1</code>, you must manually place the primary model file (Qwen3-8B GGUF) into the correct <code>models\</code> subdirectory before starting EOS. Run <code>python verify.py</code> afterwards to confirm the path is correct.</p>
 </div>
 
 <hr class="doc-rule">
@@ -124,7 +124,7 @@
   <div class="callout warning">
     <div class="callout-icon">&#9888;</div>
     <div class="callout-title">Disk space required</div>
-    <div class="callout-body">Setup-Full.ps1 requires approximately <strong>20 GB of free disk space</strong> on the drive where EOS is installed. Ensure you have enough space before starting. The script will fail mid-download if it runs out of space, leaving partial files that must be cleaned up before re-running.</div>
+    <div class="callout-body">setup\Setup-Full.ps1 requires approximately <strong>20 GB of free disk space</strong> on the drive where EOS is installed. Ensure you have enough space before starting. The script will fail mid-download if it runs out of space, leaving partial files that must be cleaned up before re-running.</div>
   </div>
 </div>
 
@@ -231,7 +231,7 @@
         <tr>
           <td><code>verify.py</code> reports missing model</td>
           <td>Model file absent or wrong size</td>
-          <td>Re-run <code>Setup-Full.ps1</code> to re-fetch the missing file</td>
+          <td>Re-run <code>setup\Setup-Full.ps1</code> to re-fetch the missing file</td>
         </tr>
       </tbody>
     </table>

@@ -87,13 +87,13 @@ def check_safety_defaults() -> None:
 
     # All shipped profiles that will be installed/distributed
     profiles = [
-        "config.hardened.json",
-        "config.base.json",
-        "config.base-thinking.json",
-        "config.base-creativity.json",
-        "config.standard.json",
-        "config.full.json",
-        "config.vision.json",
+        "configs/profiles/config.hardened.json",
+        "configs/profiles/config.base.json",
+        "configs/profiles/config.base-thinking.json",
+        "configs/profiles/config.base-creativity.json",
+        "configs/profiles/config.standard.json",
+        "configs/profiles/config.full.json",
+        "configs/profiles/config.vision.json",
     ]
 
     for name in profiles:
@@ -140,7 +140,7 @@ def check_safety_defaults() -> None:
 def check_hardened_profile() -> None:
     section("Hardened Release Profile")
 
-    path = ROOT / "config.hardened.json"
+    path = ROOT / "configs/profiles/config.hardened.json"
     require(path.is_file(), "config.hardened.json exists",
             "Run: create config.hardened.json (see config.base.json as template)")
 

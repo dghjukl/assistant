@@ -59,7 +59,7 @@
     <li class="step-card">
       <div class="step-num green">1</div>
       <div class="step-body">
-        <div class="step-title">Right-click Setup-Full.ps1 and choose "Run with PowerShell"</div>
+        <div class="step-title">Right-click setup\Setup-Full.ps1 and choose "Run with PowerShell"</div>
         <div class="step-desc">If Windows shows a security prompt about execution policy, click <strong>Open</strong> or type <strong>Y</strong> when prompted. The script will start and show progress for each component it installs.</div>
       </div>
     </li>
@@ -67,14 +67,14 @@
       <div class="step-num amber">2</div>
       <div class="step-body">
         <div class="step-title">Wait for the download to complete (~13 GB)</div>
-        <div class="step-desc">Setup-Full.ps1 downloads approximately 13 GB of models and binaries. This only needs to run once. Leave the window open and let it finish — do not close it mid-download.</div>
+        <div class="step-desc">setup\Setup-Full.ps1 downloads approximately 13 GB of models and binaries. This only needs to run once. Leave the window open and let it finish — do not close it mid-download.</div>
       </div>
     </li>
     <li class="step-card">
       <div class="step-num purple">3</div>
       <div class="step-body">
-        <div class="step-title">Alternative: Setup-Lite.ps1</div>
-        <div class="step-desc"><code>Setup-Lite.ps1</code> (~3 GB) installs supporting files only. The primary model must be added manually afterwards. Use this if you want to control which large models are downloaded, or if you are on a limited connection.</div>
+        <div class="step-title">Alternative: setup\Setup-Lite.ps1</div>
+        <div class="step-desc"><code>setup\Setup-Lite.ps1</code> (~3 GB) installs supporting files only. The primary model must be added manually afterwards. Use this if you want to control which large models are downloaded, or if you are on a limited connection.</div>
       </div>
     </li>
   </ol>
@@ -105,7 +105,7 @@
   <div class="callout trouble">
     <div class="callout-icon">&#128295;</div>
     <div class="callout-title">Missing model file?</div>
-    <div class="callout-body">If <code>verify.py</code> reports a missing model file, re-run <code>Setup-Full.ps1</code>. It will skip files that already downloaded correctly and only re-fetch what is missing or incomplete.</div>
+    <div class="callout-body">If <code>verify.py</code> reports a missing model file, re-run <code>setup\Setup-Full.ps1</code>. It will skip files that already downloaded correctly and only re-fetch what is missing or incomplete.</div>
   </div>
 </div>
 
@@ -121,7 +121,7 @@
 
   <h3 class="sub-title" id="manual-launcher">Manual: Script Launchers</h3>
   <p class="doc-p">For the standard recommended stack, run:</p>
-  <div class="code-wrap"><pre>start-standard.bat</pre></div>
+  <div class="code-wrap"><pre>launchers\start-standard.bat</pre></div>
   <p class="doc-p">This opens three console windows:</p>
 
   <div class="table-wrap">
@@ -230,11 +230,11 @@
         </tr>
         <tr>
           <td>Vision</td>
-          <td>Run <code>start-vision-gpu.bat</code> (NVIDIA GPU required)</td>
+          <td>Run <code>launchers\start-vision-gpu.bat</code> (NVIDIA GPU required)</td>
         </tr>
         <tr>
           <td>Voice (STT / TTS)</td>
-          <td>Already active if Setup-Full.ps1 completed — no extra steps</td>
+          <td>Already active if setup\Setup-Full.ps1 completed — no extra steps</td>
         </tr>
         <tr>
           <td>Worldview</td>
@@ -252,7 +252,7 @@
   <div class="callout-title">If something fails</div>
   <div class="callout-body">
     <ul class="doc-list">
-      <li>Re-run <code>Setup-Full.ps1</code> — it is safe to re-run and will skip files that are already correct.</li>
+      <li>Re-run <code>setup\Setup-Full.ps1</code> — it is safe to re-run and will skip files that are already correct.</li>
       <li>Re-run <code>python verify.py</code> — check for red errors and resolve them before restarting.</li>
       <li>Run <code>status-eos.bat</code> to see which services are currently active, degraded, or unavailable.</li>
       <li>Check the <a onclick="nav('troubleshooting')" style="cursor:pointer;text-decoration:underline">Troubleshooting</a> page for common error messages and fixes.</li>
