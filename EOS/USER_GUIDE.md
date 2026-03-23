@@ -53,7 +53,7 @@ The main interface. Type a message and press Enter or click Send. EOS maintains 
 
 ### Admin panel — http://127.0.0.1:7860/admin
 
-The operator's control surface. Use this to monitor the system, adjust capabilities at runtime, inspect cognition traces, and manage integrations. All tabs are described below.
+The relationship and safety control surface. Use this to monitor the system, narrow or revoke capabilities if needed, inspect cognition traces, and manage integrations. All tabs are described below.
 
 ---
 
@@ -78,7 +78,7 @@ The operator's control surface. Use this to monitor the system, adjust capabilit
 
 ## Capabilities panel (Control & Permissions → Capabilities)
 
-The top section of the **Control & Permissions** tab has live toggles for every major capability. Changes take effect immediately — no restart needed. They reset to `config.json` values on next boot. To make a change permanent, edit `config.json`.
+The top section of the **Control & Permissions** tab has live toggles for every major capability. Treat them as safety controls first: EOS is meant to have meaningful presence, judgment, and capability in normal use, and these toggles exist so you can narrow, supervise, or revoke capability immediately if needed. Changes take effect immediately — no restart needed. They reset to `config.json` values on next boot. To make a change permanent, edit `config.json`.
 
 ### Autonomy dimensions
 
@@ -91,7 +91,7 @@ EOS has four autonomy dimensions that gate what it can do:
 | **Action** | Using tools — file operations, web requests, external integrations |
 | **Initiative** | Acting without being asked — proactive tasks, autonomous idle behavior |
 
-For testing, all four should be on. For a more passive assistant, turn off Action and Initiative.
+The intended relationship model is trust-first, not capability-starved by default. In normal use, leave the dimensions aligned with the kind of partner presence you want. Turn dimensions off when you need a safer, narrower, or more supervised mode.
 
 ### Computer Use
 
@@ -193,11 +193,11 @@ Open the admin panel → **Integrations** tab. This shows:
 
 ### What it does
 
-EOS can launch and interact with approved desktop applications — opening files in Notepad, editing code in VS Code, browsing approved websites. This is a layered, opt-in system: you decide which apps are allowed, what actions are permitted within each, and the operating mode.
+EOS can launch and interact with approved desktop applications — opening files in Notepad, editing code in VS Code, browsing approved websites. This is a layered safety system: you decide which apps remain entrusted, what actions stay permitted within each, and how tightly supervised the operating mode should be.
 
-### Enabling it
+### Configuring it
 
-1. In **Control & Permissions → Capabilities → Computer Use**, toggle **Enabled** on
+1. In **Control & Permissions → Capabilities → Computer Use**, confirm **Enabled** matches the level of desktop agency you want EOS to have right now
 2. Set **Default Mode** to `Command Only` or `Supervised Session`
 3. Alternatively, set these in `config.json` and restart:
    ```json
@@ -228,7 +228,7 @@ To revoke an app: delete its `.json` file. It takes effect immediately on next p
 
 ### The HALT button
 
-The admin panel's **Computer Use** tab has a red **⛔ HALT** button. Pressing it immediately stops all active computer-use activity and sets the mode to Off. Use this if the entity does something unexpected.
+The admin panel's **Computer Use** tab has a red **⛔ HALT** button. Pressing it immediately stops all active computer-use activity and sets the mode to Off. Use this if the entity does something unexpected, unsafe, or simply needs to be pulled back into a safer operating posture.
 
 ### Confirming actions
 
@@ -255,7 +255,7 @@ Drop any file into `data\workspace\context\`. EOS will see it referenced in its 
 
 ### Workspace permissions
 
-By default, EOS can read and write workspace files. Deleting and executing require the corresponding capabilities to be enabled in the Capabilities panel or `config.json`. See [Capabilities panel](#capabilities-panel-control--permissions--capabilities) above.
+EOS is intended to have a meaningful working environment in its workspace. If you need to reduce risk, deleting and executing can be narrowed or revoked from the Capabilities panel or `config.json`. See [Capabilities panel](#capabilities-panel-control--permissions--capabilities) above.
 
 ---
 

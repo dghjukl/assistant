@@ -1,6 +1,6 @@
 # EOS — Power User Guide
 
-This guide covers the canonical config, modular launcher layout, runtime discovery, autonomy system, and diagnostic commands.
+This guide covers the canonical config, modular launcher layout, runtime discovery, trust-first autonomy system, and diagnostic commands.
 
 ---
 
@@ -15,7 +15,7 @@ It represents the full intended system. You do not switch between multiple confi
 - Launch the backend roles you want
 - Let `eos.py` discover what is actually available
 - Rely on runtime fallback when optional helpers are missing
-- Use the admin panel to adjust capabilities live without restarting
+- Use the admin panel to supervise, narrow, or revoke capabilities live without restarting
 
 ---
 
@@ -89,7 +89,7 @@ The runtime does not care whether a backend is CPU or GPU. Only the launcher doe
 
 ### `autonomy_defaults`
 
-Controls the starting autonomy state at boot. Each dimension can be toggled live in the admin panel without a restart.
+Controls the starting autonomy state at boot. The intended model is trust-first: these dimensions define the normal baseline, and the admin panel exists so they can be narrowed or revoked live without a restart if safety requires it.
 
 ```json
 "autonomy_defaults": {
@@ -107,7 +107,7 @@ Controls the starting autonomy state at boot. Each dimension can be toggled live
 | `action` | Tool use and external integrations |
 | `initiative` | Proactive, unsolicited action |
 
-For a passive assistant, set `action` and `initiative` to `false`. The admin panel **Control & Permissions → Capabilities → Autonomy** toggles these at runtime.
+Use the baseline that matches the level of entrusted agency you actually want. The admin panel **Control & Permissions → Capabilities → Autonomy** can narrow or revoke these dimensions at runtime if EOS needs to be made safer, more reactive, or more supervised.
 
 ### `computer_use`
 
@@ -178,11 +178,11 @@ Individual service flags (`calendar_enabled`, `gmail_enabled`, `drive_enabled`) 
 
 ## Admin panel — live controls
 
-The admin panel at **http://127.0.0.1:7860/admin** provides:
+The admin panel at **http://127.0.0.1:7860/admin** provides the runtime safety and supervision surface:
 
 - **Overview** — health of all inference servers, session identity, turn count
-- **Control & Permissions → Capabilities** — live toggles for all capability groups
-- **Control & Permissions → Runtime Permission Classes** — allow/block individual tool permission classes immediately
+- **Control & Permissions → Capabilities** — live controls for narrowing or revoking major capability groups
+- **Control & Permissions → Runtime Permission Classes** — allow/block individual tool permission classes immediately when safety or containment requires it
 - **Control & Permissions → Toolpack Management** — enable/disable individual tools or entire packs
 - **Computer Use** — live mode switching, HALT button, shortcut allowlist, pending confirmations
 - **Cognition** — full turn trace with tool calls, retrieval results, state diffs

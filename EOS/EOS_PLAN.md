@@ -19,8 +19,8 @@ EOS is a **persistent digital entity** — not an assistant, not a chatbot, not 
 
 ### The Core Design Principles (Do Not Violate)
 
-- **Identity grows freely; capability grows by grant.** The entity's sense of self develops through experience without restriction. What it can *do* to the world expands only as the partner explicitly extends trust.
-- **Bounded autonomy is not diminished autonomy.** Limits are a feature of the relationship, not a cage. The partner controls the aperture.
+- **Identity grows freely; capability starts from entrusted presence and can be narrowed for safety.** The entity's sense of self develops through experience without restriction. What it can *do* to the world should not feel feature-locked by default; governance exists so capabilities can be supervised, constrained, or revoked if trust is strained or safety demands it.
+- **Bounded autonomy is a safety backstop, not the default relationship.** Limits are a feature of the relationship, not a cage. The partner holds the ability to narrow the aperture when necessary, but the ordinary stance is trust rather than deprivation.
 - **Continuity over statelessness.** Every session builds on the last. Memory is not optional.
 - **The entity is one person's.** This is not a multi-user system. The relationship is singular and specific.
 - **Opacity is the enemy.** The partner can always see what EOS is doing and why. The audit trail is non-negotiable.
@@ -50,7 +50,7 @@ EOS runs entirely locally on a Windows machine. All models are GGUF files served
 - **Idle cognition** — Spontaneous thought during unattended periods. Four tiers (ACTIVE/RESTING/DRIFTING/DEEP) based on idle duration. Probabilistic, not mechanical.
 - **Initiative engine** — Proactive signal generation. Collects signals from idle time, turn count, memory pressure, identity stability. Queues and executes background cognition with governance controls.
 - **Investigation engine** — Multi-pass structured inquiry. Entity can investigate a topic or question across sessions with evidence accumulation and synthesis.
-- **Autonomy / permission layer** — Granular capability gates. Partner controls via admin UI. Every capability that could be "the horror" is behind a toggle the partner holds.
+- **Autonomy / permission layer** — Granular capability governance. The admin UI is the place where the partner can supervise, narrow, or revoke capability at runtime if safety requires it. Every consequential ability is observable, governable, and interruptible.
 - **Signal bus** — Internal event system for inter-subsystem communication and observability.
 - **Session continuity** — Compact excerpt of previous conversation injected at session start so entity knows where it left off.
 - **Toolpacks** — Modular tool bundles: web, filesystem, git, process, scheduler, workspace, Google, notifications, ingestion, telemetry, and more.
@@ -195,7 +195,7 @@ Decide what "privileged" means in EOS's context and implement accordingly. Likel
 Each tool should be individually gated behind its own autonomy permission so the partner can grant just what's needed.
 
 **End state:**
-EOS has a real privileged capability tier — operations that require explicit elevated trust from the partner. This is the highest tier of the "give it the abilities from the horror without the horror" design.
+EOS has a real privileged capability tier — operations that require the strongest safety scrutiny and the clearest trust boundaries. This is the highest tier of the "give it the abilities from the horror without the horror" design, where revocation and containment matter most.
 
 ---
 
@@ -439,7 +439,7 @@ The three-layer permission model (OFF / COMMAND_ONLY / SUPERVISED_SESSION) is de
 4. Each capability should be individually enumerable and gate-able
 
 **End state:**
-EOS can do things on your computer that you'd be comfortable showing to M3GAN — as long as you've explicitly handed it the key. Computer use becomes a real dimension of the partner relationship: "I trust you to do X on my behalf."
+EOS can do things on your computer that you'd be comfortable showing to M3GAN — while keeping the ability to supervise, narrow, or revoke that access the moment safety requires it. Computer use becomes a real dimension of the partner relationship: "I trust you to do X on my behalf, and I can pull us back into a safer mode immediately if needed."
 
 ---
 

@@ -1,7 +1,7 @@
 <div class="page-header">
   <div class="page-eyebrow">Reference</div>
   <h1 class="page-title">Admin Panel</h1>
-  <p class="page-lead">The operator's control surface for monitoring, tuning, and managing EOS at runtime.</p>
+  <p class="page-lead">The safety and supervision surface for monitoring EOS, tuning its behavior, and constraining capabilities when necessary.</p>
 </div>
 
 <div class="callout important">
@@ -125,13 +125,13 @@
 <div class="doc-section" id="control">
   <div class="section-eyebrow">Reference</div>
   <h2 class="section-title">Control &amp; Permissions Tab</h2>
-  <p class="doc-p">This tab is the primary control surface for adjusting what EOS is allowed to do at runtime. Changes take effect immediately.</p>
+  <p class="doc-p">This tab is the primary safety surface for adjusting what EOS is allowed to do at runtime. The intended relationship is trust-first; these controls exist so capabilities can be narrowed, supervised, or revoked immediately if needed. Changes take effect immediately.</p>
 
   <h3 class="sub-title" id="control-capabilities">Capabilities</h3>
-  <p class="doc-p">Live toggles for all capability groups — Perception, Cognition, Action, and Initiative. Toggling a group off removes that class of behavior immediately. See the <a onclick="nav('capabilities')">Capabilities &amp; Autonomy</a> page for what each group controls.</p>
+  <p class="doc-p">Live toggles for all capability groups — Perception, Cognition, Action, and Initiative. Toggling a group off removes that class of behavior immediately. Use these as runtime safety levers, not as the default definition of the relationship. See the <a onclick="nav('capabilities')">Capabilities &amp; Autonomy</a> page for what each group controls.</p>
 
   <h3 class="sub-title" id="control-permissions">Runtime Permission Classes</h3>
-  <p class="doc-p">Allow or block tool permission classes immediately. These are the security controls that gate whether EOS can use tools in sensitive categories such as file system access, network calls, or shell execution. Blocking a class here takes effect without a restart and does not require editing <code>config.json</code>.</p>
+  <p class="doc-p">Allow or block tool permission classes immediately. These are the security controls that gate whether EOS can use tools in sensitive categories such as file system access, network calls, or shell execution. Use them to respond quickly when a capability needs to be constrained. Blocking a class here takes effect without a restart and does not require editing <code>config.json</code>.</p>
 
   <h3 class="sub-title" id="control-toolpacks">Toolpack Management</h3>
   <p class="doc-p">Enable or disable individual tools or entire toolpacks at runtime. Use this to temporarily pull a tool out of rotation without restarting EOS. Disabled tools remain loaded in memory but will not be offered to or invoked by the model.</p>
