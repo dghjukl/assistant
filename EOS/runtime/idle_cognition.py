@@ -49,8 +49,11 @@ Usage
 
     engine = IdleCognitionEngine(cfg)
 
+    # Call whenever a user interaction arrives
+    engine.notify_interaction()
+
     # Call from the scheduler loop or an async task
-    await engine.maybe_fire(topology, tracer, bus, last_interaction_at)
+    await engine.maybe_fire(topology, tracer, bus)
 
     # Force a fire (admin panel / testing)
     await engine.force_fire(topology, tracer, bus)
@@ -98,6 +101,11 @@ class IdleCognitionEngine:
     """
     Manages and fires unprompted idle cognition.
 
+    The engine owns its own last-interaction monotonic timestamp. Call
+    :meth:`notify_interaction` whenever user activity arrives, then call
+    :meth:`maybe_fire` from a scheduler loop to decide whether the current
+    idle window should produce an unprompted thought.
+
     Parameters
     ----------
     cfg : dict
@@ -125,6 +133,7 @@ class IdleCognitionEngine:
         self._temperature: float = float(ic.get("temperature", 0.82))
 
         # Runtime state
+        self._last_interaction_monotonic: float = time.monotonic()
         self._last_fire_monotonic: float = 0.0
         self._fires_today: int = 0
         self._last_fire_day: int = -1   # day-of-year
@@ -137,7 +146,6 @@ class IdleCognitionEngine:
         topology: "RuntimeTopology",
         tracer: Any,
         bus: Any,
-        last_interaction_monotonic: float,
         entity_snapshot: Any | None = None,
     ) -> Optional[dict]:
         """
@@ -149,7 +157,7 @@ class IdleCognitionEngine:
         if not self._enabled:
             return None
 
-        idle_hours = _hours_since(last_interaction_monotonic)
+        idle_hours = _hours_since(self._last_interaction_monotonic)
         tier = self._get_tier(idle_hours)
 
         if tier == IdleTier.ACTIVE:
@@ -194,22 +202,24 @@ class IdleCognitionEngine:
         )
 
     def notify_interaction(self) -> None:
-        """Call whenever the user sends a message — resets the idle clock."""
-        # This is signalled via the last_interaction_monotonic parameter;
-        # the caller is responsible for tracking the monotonic timestamp.
-        pass
+        """Record a user interaction and reset the engine's idle clock."""
+        self._last_interaction_monotonic = time.monotonic()
 
     def status(self) -> dict:
         """Return current engine status for the admin panel."""
-        idle_h = _hours_since(self._last_fire_monotonic) if self._last_fire_monotonic else 0.0
+        idle_h = _hours_since(self._last_interaction_monotonic)
         return {
-            "enabled":        self._enabled,
-            "fires_today":    self._fires_today,
-            "max_per_day":    self._max_per_day,
-            "last_fire_at":   self._last_result.get("fired_at") if self._last_result else None,
-            "last_tier":      self._last_result.get("tier") if self._last_result else None,
-            "last_preview":   self._last_result.get("text_preview") if self._last_result else None,
-            "hours_since_last_fire": round(idle_h, 2),
+            "enabled": self._enabled,
+            "tier": self._get_tier(idle_h),
+            "fires_today": self._fires_today,
+            "max_per_day": self._max_per_day,
+            "last_interaction_monotonic": round(self._last_interaction_monotonic, 3),
+            "hours_since_last_interaction": round(idle_h, 2),
+            "seconds_since_interaction": round(idle_h * 3600.0, 2),
+            "last_fire_at": self._last_result.get("fired_at") if self._last_result else None,
+            "last_tier": self._last_result.get("tier") if self._last_result else None,
+            "last_preview": self._last_result.get("text_preview") if self._last_result else None,
+            "hours_since_last_fire": round(_hours_since(self._last_fire_monotonic), 2) if self._last_fire_monotonic else None,
         }
 
     # ── Internal ──────────────────────────────────────────────────────────────

@@ -406,17 +406,17 @@ EOS handles abnormal shutdowns gracefully. It wakes up after a crash, knows what
 
 #### W-15: Notify Interaction — Idle Cognition Tracking
 
-**Status:** Empty function body
-**File(s):** `runtime/idle_cognition.py`
+**Status:** 🟢 Complete
+**File(s):** `runtime/idle_cognition.py`, `webui/app_runtime.py`
 
 **Current state:**
-`notify_interaction()` is defined but does nothing (`pass`). The idle cognition engine tracks `last_interaction_monotonic` separately through a different path. The empty method is potentially confusing.
+`IdleCognitionEngine` now owns the last-interaction monotonic timestamp internally. `notify_interaction()` updates that engine state, `maybe_fire()` reads the internal timestamp instead of taking an external `last_interaction_monotonic` argument, and status/admin output reports idle time from the same source of truth.
 
-**What needs to be done:**
-Either implement `notify_interaction()` as the canonical way to update the interaction timestamp within the idle engine, or remove it and document where `last_interaction_monotonic` is actually maintained.
+**What was done:**
+Implemented `notify_interaction()` as the canonical interaction-update path, updated scheduler and chat/websocket call sites to use it, and aligned status output/docstrings with the internal timestamp design.
 
 **End state:**
-Clear, single path for tracking when the last interaction happened. No empty methods creating confusion.
+Clear, single path for tracking when the last interaction happened inside idle cognition. No empty methods creating confusion.
 
 ---
 
@@ -500,7 +500,7 @@ Use this section to mark items as work progresses. Update in-place.
 | W-12 | Config alignment pass | 🔴 Not started | |
 | W-13 | Memory maintenance scheduling | 🔴 Not started | |
 | W-14 | Crash recovery boot integration | 🔴 Not started | |
-| W-15 | notify_interaction cleanup | 🔴 Not started | |
+| W-15 | notify_interaction cleanup | 🟢 Complete | `IdleCognitionEngine` now stores the interaction monotonic timestamp internally; `notify_interaction()` updates it, `maybe_fire()` reads it, and admin/presence status now reflects the same engine-owned idle clock. |
 | W-16 | Computer use OS integration depth | 🔴 Not started | |
 | W-17 | Multi-mode startup parity | 🔴 Not started | |
 | W-18 | Discord interface completeness | 🔴 Not started | |
