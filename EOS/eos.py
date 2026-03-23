@@ -19,6 +19,7 @@ from pathlib import Path
 
 from runtime.launch_catalog import LEGACY_SURFACES
 from runtime.service_discovery import discover_runtime, format_runtime_summary
+from webui.server import create_app
 
 logging.basicConfig(
     level=logging.INFO,
@@ -87,7 +88,6 @@ def main() -> None:
     if args.status:
         return
 
-    os.environ["EOS_CONFIG"] = str(config_path)
     os.environ["EOS_ROOT"] = str(ROOT)
     os.chdir(ROOT)
 
@@ -99,8 +99,9 @@ def main() -> None:
     logger.info("Admin panel at  http://%s:%d/admin", host, port)
 
     import uvicorn
+    app = create_app(config_path=config_path)
     uvicorn.run(
-        "webui.server:app",
+        app,
         host=host,
         port=port,
         log_level="info",

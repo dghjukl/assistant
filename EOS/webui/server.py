@@ -23,9 +23,10 @@ startup_event = on_startup
 shutdown_event = on_shutdown
 
 
-def create_app() -> FastAPI:
+def create_app(*, config_path: str | Path | None = None) -> FastAPI:
     app = FastAPI(title='EOS WebUI', version='1.0', docs_url=None, redoc_url=None)
     app.state.eos = app_state
+    app.state.config_path = str(config_path) if config_path is not None else None
     app.add_middleware(AdminAuthMiddleware)
     app.add_middleware(AccessControlMiddleware)
 
@@ -45,11 +46,14 @@ def create_app() -> FastAPI:
     ):
         app.include_router(router)
 
+    async def _startup() -> None:
+        await startup_event(app)
+
     if hasattr(app, 'add_event_handler'):
-        app.add_event_handler('startup', startup_event)
+        app.add_event_handler('startup', _startup)
         app.add_event_handler('shutdown', shutdown_event)
     else:  # FastAPI/Starlette compatibility fallback
-        app.router.on_startup.append(startup_event)
+        app.router.on_startup.append(_startup)
         app.router.on_shutdown.append(shutdown_event)
     return app
 

@@ -63,7 +63,20 @@ def load_config(config_path: str | Path) -> dict[str, Any]:
 
 # ── Model path resolution ─────────────────────────────────────────────────────
 
-def _resolve_model_path(model_path: str, root: Path) -> Path | None:
+def _warn_on_ambiguous_choice(role_label: str, candidates: list[Path], selected: Path) -> None:
+    """Log a warning when directory-based model selection is ambiguous."""
+    if len(candidates) <= 1:
+        return
+    logger.warning(
+        "[%s] Multiple GGUF files found; selected %s from: %s. "
+        "Set an explicit file path in config to remove ambiguity.",
+        role_label,
+        selected.name,
+        ", ".join(path.name for path in candidates),
+    )
+
+
+def _resolve_model_path(model_path: str, root: Path, *, role: str = "model") -> Path | None:
     """
     Resolve a model_path that may be either:
       - A specific file:  "models/primary/Qwen3-8B-Q6_K.gguf"
@@ -84,11 +97,15 @@ def _resolve_model_path(model_path: str, root: Path) -> Path | None:
             f for f in p.glob("*.gguf")
             if not f.name.lower().startswith("mmproj")
         )
-        return candidates[0] if candidates else None
+        if not candidates:
+            return None
+        selected = candidates[0]
+        _warn_on_ambiguous_choice(role, candidates, selected)
+        return selected
     return None
 
 
-def _resolve_mmproj_path(mmproj_path: str, root: Path) -> Path | None:
+def _resolve_mmproj_path(mmproj_path: str, root: Path, *, role: str = "mmproj") -> Path | None:
     """
     Resolve an mmproj_path that may be a file or a directory.
     Directory mode: returns the first mmproj*.gguf found.
@@ -98,7 +115,11 @@ def _resolve_mmproj_path(mmproj_path: str, root: Path) -> Path | None:
         return p
     if p.is_dir():
         candidates = sorted(p.glob("mmproj*.gguf"))
-        return candidates[0] if candidates else None
+        if not candidates:
+            return None
+        selected = candidates[0]
+        _warn_on_ambiguous_choice(role, candidates, selected)
+        return selected
     return None
 
 
@@ -130,7 +151,7 @@ def _launch_server(role: str, srv_cfg: dict, root: Path) -> subprocess.Popen:
     parallel = srv_cfg.get("parallel", 1)
 
     # Resolve model path — supports both specific files and bare directories.
-    model = _resolve_model_path(srv_cfg["model_path"], root)
+    model = _resolve_model_path(srv_cfg["model_path"], root, role=role)
     if model is None:
         raise BootError(
             f"[{role}] No model file found at: {srv_cfg['model_path']} — "
@@ -151,7 +172,7 @@ def _launch_server(role: str, srv_cfg: dict, root: Path) -> subprocess.Popen:
     # Resolve mmproj — supports both specific files and bare directories.
     mmproj_str = srv_cfg.get("mmproj_path")
     if mmproj_str:
-        mmproj = _resolve_mmproj_path(mmproj_str, root)
+        mmproj = _resolve_mmproj_path(mmproj_str, root, role=f"{role}:mmproj")
         if mmproj:
             cmd += ["--mmproj", str(mmproj)]
         else:
