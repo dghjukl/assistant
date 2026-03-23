@@ -187,6 +187,7 @@ def build_system_prompt(
     goal_store: "GoalStore | None" = None,
     workspace_service: "WorkspaceService | None" = None,
     worldview_service: "WorldviewService | None" = None,
+    entity_snapshot = None,
 ) -> str:
     """Assemble the full system prompt from current entity state. Called fresh each turn.
 
@@ -204,55 +205,72 @@ def build_system_prompt(
         When provided, injects the entity's active goals so it knows what
         it is currently working toward.
     """
-    name = get_entity_name()
-    name_clause = (
-        f"Your name is {name}."
-        if name
-        else "You have not yet chosen a name. A name will emerge when your identity is fully stable."
-    )
-
-    identity = get_identity_state()
-    identity_lines = []
-    for domain, state in identity.items():
-        if state["answer"]:
-            conf = f"{state['confidence']:.0%}"
-            identity_lines.append(f"  [{domain}] ({conf} confidence): {state['answer']}")
-        else:
-            identity_lines.append(f"  [{domain}]: not yet formed")
-    identity_clause = (
-        "\n".join(identity_lines) if identity_lines else "  (identity forming)"
-    )
-
-    relational = get_relational_model()
-    if relational:
-        rel_lines = [f"  {k}: {v}" for k, v in relational.items()
-                     if not k.startswith("_")]
-        relational_clause = "\n".join(rel_lines)
+    if entity_snapshot is not None:
+        name_clause = entity_snapshot.name_clause
+        identity_clause = entity_snapshot.identity_clause
+        relational_clause = entity_snapshot.relational_clause
+        autonomy_clause = entity_snapshot.autonomy_clause
+        runtime_status = entity_snapshot.runtime_status_block
     else:
-        relational_clause = "  (relationship forming — learning about your partner)"
+        name = get_entity_name()
+        name_clause = (
+            f"Your name is {name}."
+            if name
+            else "You have not yet chosen a name. A name will emerge when your identity is fully stable."
+        )
 
-    autonomy_clause   = build_autonomy_clause()
-    runtime_status    = build_runtime_status_block(topology)
+        identity = get_identity_state()
+        identity_lines = []
+        for domain, state in identity.items():
+            if state["answer"]:
+                conf = f"{state['confidence']:.0%}"
+                identity_lines.append(f"  [{domain}] ({conf} confidence): {state['answer']}")
+            else:
+                identity_lines.append(f"  [{domain}]: not yet formed")
+        identity_clause = (
+            "\n".join(identity_lines) if identity_lines else "  (identity forming)"
+        )
+
+        relational = get_relational_model()
+        if relational:
+            rel_lines = [f"  {k}: {v}" for k, v in relational.items()
+                         if not k.startswith("_")]
+            relational_clause = "\n".join(rel_lines)
+        else:
+            relational_clause = "  (relationship forming — learning about your partner)"
+
+        autonomy_clause   = build_autonomy_clause()
+        runtime_status    = build_runtime_status_block(topology)
 
     # Lifecycle block — injected as trusted factual context, not inferred memory
     lifecycle_block = lifecycle.prompt_block() if lifecycle is not None else ""
 
     # Goals block — active intentions that persist across sessions
-    goals_block = goal_store.prompt_block() if goal_store is not None else ""
+    goals_block = (
+        entity_snapshot.goals_block
+        if entity_snapshot is not None
+        else goal_store.prompt_block() if goal_store is not None else ""
+    )
 
     # Workspace block — entity's persistent file environment and context library
     workspace_block = (
-        workspace_service.workspace_block() if workspace_service is not None else ""
+        entity_snapshot.workspace_block
+        if entity_snapshot is not None
+        else workspace_service.workspace_block() if workspace_service is not None else ""
     )
 
     # Worldview block — compressed model of partner's values, reasoning style, orientation
     worldview_block = (
-        worldview_service.worldview_block() if worldview_service is not None else ""
+        entity_snapshot.worldview_block
+        if entity_snapshot is not None
+        else worldview_service.worldview_block() if worldview_service is not None else ""
     )
 
     # Session primer — compact excerpt of the previous conversation
     session_primer = (
-        session_continuity.session_primer()
+        entity_snapshot.session_primer
+        if entity_snapshot is not None
+        else session_continuity.session_primer()
         if session_continuity is not None
         else ""
     )

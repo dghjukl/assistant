@@ -380,6 +380,7 @@ class InvestigationEngine:
         objective: str = "",
         tracer=None,
         bus=None,
+        entity_snapshot: Any | None = None,
     ) -> dict[str, Any]:
         """Execute one bounded investigation pass (async, non-blocking).
 
@@ -446,13 +447,13 @@ class InvestigationEngine:
 
             if task_type == "evidence_review":
                 await self._do_evidence_review(
-                    topology, inv, evidence_items, result
+                    topology, inv, evidence_items, result, entity_snapshot=entity_snapshot
                 )
 
             elif task_type == "hypothesis_generation":
                 if enough_evidence:
                     await self._do_hypothesis_generation(
-                        topology, inv, evidence_items, result
+                        topology, inv, evidence_items, result, entity_snapshot=entity_snapshot
                     )
                 else:
                     result["degraded_backend"] = True
@@ -465,7 +466,7 @@ class InvestigationEngine:
             elif task_type == "recommendation_draft":
                 if enough_evidence:
                     await self._do_recommendation_draft(
-                        topology, inv, evidence_items, result
+                        topology, inv, evidence_items, result, entity_snapshot=entity_snapshot
                     )
                 else:
                     result["degraded_backend"] = True
@@ -473,7 +474,9 @@ class InvestigationEngine:
                     result["next_action"] = "evidence_review"
 
             elif task_type == "synthesis":
-                await self._do_synthesis(topology, inv, evidence_items, result)
+                await self._do_synthesis(
+                    topology, inv, evidence_items, result, entity_snapshot=entity_snapshot
+                )
 
             else:
                 result["error_text"] = f"Unknown task_type: {task_type}"
@@ -552,6 +555,7 @@ class InvestigationEngine:
         use_thinking_worker: bool = False,
         temperature: float = 0.4,
         max_tokens: int = 512,
+        entity_snapshot: Any | None = None,
     ) -> tuple[str, bool]:
         """Call the reasoning backend. Returns (text, degraded).
 
@@ -564,10 +568,15 @@ class InvestigationEngine:
         unavailable (handled transparently inside think_for_background).
         Degraded=True means reasoning was completely unavailable.
         """
+        if entity_snapshot is not None:
+            prompt = f"{entity_snapshot.background_context_block()}\n\n---\n{prompt}"
+
         if use_thinking_worker:
             try:
                 from runtime.orchestrator import think_for_background
-                artifact = await think_for_background(topology, prompt)
+                artifact = await think_for_background(
+                    topology, prompt, entity_snapshot=entity_snapshot
+                )
                 if artifact.degraded:
                     logger.debug(
                         "[InvestigationEngine] ThinkingFaculty degraded — falling back to primary"
@@ -616,6 +625,7 @@ class InvestigationEngine:
         inv: dict,
         evidence: list[dict],
         result: dict,
+        entity_snapshot: Any | None = None,
     ) -> None:
         evidence_block = "\n".join(
             f"[{i+1}] {e.get('text', '')[:300]}"
@@ -628,7 +638,9 @@ class InvestigationEngine:
             "Briefly summarise the key themes and gaps in this evidence. "
             "What is most relevant? What is missing? 3-5 bullet points."
         )
-        text, degraded = await self._call_reasoning(topology, prompt, max_tokens=400)
+        text, degraded = await self._call_reasoning(
+            topology, prompt, max_tokens=400, entity_snapshot=entity_snapshot
+        )
         result["summary"]          = text or "Evidence reviewed (reasoning unavailable)."
         result["degraded_backend"] = degraded
         result["confidence_score"] = 0.6 if not degraded else 0.3
@@ -641,6 +653,7 @@ class InvestigationEngine:
         inv: dict,
         evidence: list[dict],
         result: dict,
+        entity_snapshot: Any | None = None,
     ) -> None:
         evidence_block = "\n".join(
             f"[{i+1}] {e.get('text', '')[:200]}"
@@ -656,6 +669,7 @@ class InvestigationEngine:
             topology, prompt,
             use_thinking_worker=True,  # use port 8083 for deeper reasoning
             max_tokens=600,
+            entity_snapshot=entity_snapshot,
         )
         hypotheses = []
         if text:
@@ -675,6 +689,7 @@ class InvestigationEngine:
         inv: dict,
         evidence: list[dict],
         result: dict,
+        entity_snapshot: Any | None = None,
     ) -> None:
         evidence_block = "\n".join(
             f"[{i+1}] {e.get('text', '')[:200]}"
@@ -686,7 +701,9 @@ class InvestigationEngine:
             "Draft 2-3 specific, actionable recommendations. "
             "Format each as: R1: <recommendation>"
         )
-        text, degraded = await self._call_reasoning(topology, prompt, max_tokens=500)
+        text, degraded = await self._call_reasoning(
+            topology, prompt, max_tokens=500, entity_snapshot=entity_snapshot
+        )
         recommendations = []
         if text:
             for line in text.split("\n"):
@@ -706,6 +723,7 @@ class InvestigationEngine:
         inv: dict,
         evidence: list[dict],
         result: dict,
+        entity_snapshot: Any | None = None,
     ) -> None:
         evidence_block = "\n".join(
             f"- {e.get('text', '')[:200]}"
@@ -723,6 +741,7 @@ class InvestigationEngine:
             use_thinking_worker=True,
             temperature=0.5,
             max_tokens=700,
+            entity_snapshot=entity_snapshot,
         )
         result["summary"]          = text or "Synthesis unavailable (reasoning backend degraded)."
         result["degraded_backend"] = degraded

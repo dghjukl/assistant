@@ -193,6 +193,7 @@ class InitiativeEngine:
         *,
         tracer=None,
         bus=None,
+        entity_snapshot: Any | None = None,
     ) -> list[dict[str, Any]]:
         """Execute all 'queued' (or 'ready_for_execution') items non-blockingly.
 
@@ -225,6 +226,8 @@ class InitiativeEngine:
                 "If it's a checkpoint, assess current engagement and goals. "
                 "Be concise and purposeful."
             )
+            if entity_snapshot is not None:
+                task = f"{entity_snapshot.background_context_block()}\n\n---\n{task}"
 
             def _on_complete(result: str, _item: dict = item) -> None:
                 _item["status"] = "completed"
@@ -257,6 +260,7 @@ class InitiativeEngine:
                     topology,
                     task,
                     on_complete=_on_complete,
+                    entity_snapshot=entity_snapshot,
                 )
             )
             dispatched.append(item)

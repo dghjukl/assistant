@@ -67,13 +67,24 @@ where 0.00 = completely uncertain, 1.00 = fully stable and clear.
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
 
-async def _call_qwen_think(primary_endpoint: str, prompt: str, context: str) -> str:
+async def _call_qwen_think(
+    primary_endpoint: str,
+    prompt: str,
+    context: str,
+    snapshot_context: str = "",
+) -> str:
     """Call Qwen3 with /think mode for deep reflection."""
+    user_content = f"/think\n\nContext from recent interactions:\n{context}\n\n{prompt}"
+    if snapshot_context:
+        user_content = (
+            f"/think\n\nShared entity snapshot:\n{snapshot_context}\n\n"
+            f"Context from recent interactions:\n{context}\n\n{prompt}"
+        )
     messages = [
         {"role": "system", "content": EVAL_SYSTEM_PROMPT},
         {
             "role": "user",
-            "content": f"/think\n\nContext from recent interactions:\n{context}\n\n{prompt}",
+            "content": user_content,
         },
     ]
     async with httpx.AsyncClient(timeout=120) as client:
@@ -122,6 +133,7 @@ async def run_evaluation_cycle(
     signal_bus=None,        # optional: runtime.signal_bus.SignalBus
     cfg: dict | None = None,
     continuity_monitor=None,  # optional: runtime.identity_continuity.IdentityContinuityMonitor
+    snapshot_context: str = "",
 ) -> dict:
     """
     Run a full identity evaluation across all 6 domains.
@@ -144,7 +156,9 @@ async def run_evaluation_cycle(
 
     for domain, prompt in DOMAIN_PROMPTS.items():
         try:
-            raw              = await _call_qwen_think(primary_endpoint, prompt, context)
+            raw              = await _call_qwen_think(
+                primary_endpoint, prompt, context, snapshot_context=snapshot_context
+            )
             answer, confidence = _parse_confidence(raw)
             old_answer       = current_state[domain]["answer"]
             drift            = _compute_drift(old_answer, answer)

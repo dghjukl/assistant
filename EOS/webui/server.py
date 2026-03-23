@@ -116,6 +116,7 @@ _session_continuity = None     # runtime.session_continuity.SessionContinuitySer
 _goal_store = None             # core.intent.GoalStore
 _workspace_service = None      # runtime.workspace_service.WorkspaceService
 _worldview_service = None      # core.worldview.WorldviewService
+_entity_state_service = None   # runtime.entity_state_service.EntityStateService
 _backup_service = None         # runtime.backup_service.BackupService
 _computer_use_service = None   # runtime.computer_use_service.ComputerUseService
 _runtime_discovery = None       # runtime.service_discovery.RuntimeDiscovery
@@ -193,6 +194,26 @@ def _sanitize_config(cfg: dict) -> dict:
         else:
             safe[key] = val
     return safe
+
+
+def _build_entity_snapshot(
+    *,
+    scope: str,
+    source: str,
+    metadata: dict[str, Any] | None = None,
+):
+    """Build a fresh shared entity-state snapshot when the service is available."""
+    if _entity_state_service is None:
+        return None
+    try:
+        return _entity_state_service.build_snapshot(
+            scope=scope,
+            source=source,
+            metadata=metadata,
+        )
+    except Exception as exc:
+        logger.debug("EntityStateService snapshot failed (%s): %s", source, exc)
+        return None
 
 
 def _group_tools_by_category() -> dict[str, list[str]]:
@@ -304,6 +325,11 @@ async def _memory_maintenance_loop() -> None:
 
             _emit_log("info", "memory_maintenance", "Starting maintenance run")
             try:
+                _build_entity_snapshot(
+                    scope="background",
+                    source="memory_maintenance.loop",
+                    metadata={"loop": "memory_maintenance"},
+                )
                 from runtime.memory_maintenance import run_maintenance
                 result = await run_maintenance(
                     _topology, _cfg, tracer=_tracer, bus=_bus
@@ -337,6 +363,11 @@ async def _initiative_loop() -> None:
             if not can("initiative"):
                 continue
             try:
+                snapshot = _build_entity_snapshot(
+                    scope="background",
+                    source="initiative.loop",
+                    metadata={"loop": "initiative"},
+                )
                 result = _initiative_engine.evaluate()
                 if result.get("selected"):
                     _emit_log(
@@ -345,7 +376,7 @@ async def _initiative_loop() -> None:
                         {"selected": result["selected"], "queue_depth": result["queue_depth"]},
                     )
                 dispatched = await _initiative_engine.execute_queued(
-                    _topology, _cfg, tracer=_tracer, bus=_bus
+                    _topology, _cfg, tracer=_tracer, bus=_bus, entity_snapshot=snapshot
                 )
                 if dispatched:
                     _emit_log(
@@ -559,7 +590,7 @@ def _ensure_runtime_dirs(root: Path) -> None:
 async def startup_event():
     """Initialize the server: load config, discover topology, init tracer."""
     global _topology, _cfg, _tracer, _bus, _reflection_pipeline, _initiative_engine, _investigation_engine, _primary_degraded, _tool_registry, _runtime_discovery
-    global _sensor_poller, _crash_recovery, _capability_registry, _backend_probe, _idle_cognition, _identity_continuity, _entity_lifecycle, _session_continuity, _goal_store, _workspace_service, _backup_service, _worldview_service, _computer_use_service
+    global _sensor_poller, _crash_recovery, _capability_registry, _backend_probe, _idle_cognition, _identity_continuity, _entity_lifecycle, _session_continuity, _goal_store, _workspace_service, _backup_service, _worldview_service, _computer_use_service, _entity_state_service
 
     try:
         # 1. Load config
@@ -682,6 +713,18 @@ async def startup_event():
         except Exception as exc:
             logger.warning("EntityLifecycleService init failed: %s", exc)
 
+        # 3c2. Entity state service — shared snapshot authority for turns/background loops
+        try:
+            from runtime.entity_state_service import EntityStateService
+            _entity_state_service = EntityStateService(_cfg)
+            _entity_state_service.wire(
+                topology=_topology,
+                lifecycle_service=_entity_lifecycle,
+            )
+            _emit_log("info", "startup", "EntityStateService initialized")
+        except Exception as exc:
+            logger.warning("EntityStateService init failed: %s", exc)
+
         # 3d. Session continuity — load prior session excerpt for system prompt primer
         try:
             from runtime.session_continuity import SessionContinuityService
@@ -699,6 +742,13 @@ async def startup_event():
                 logger.info("[session_continuity] Prior session primer available.")
         except Exception as exc:
             logger.warning("SessionContinuityService init failed: %s", exc)
+        finally:
+            if _entity_state_service is not None:
+                _entity_state_service.wire(
+                    topology=_topology,
+                    lifecycle_service=_entity_lifecycle,
+                    session_continuity=_session_continuity,
+                )
 
         # 3e. Goal store — load durable goals
         try:
@@ -710,6 +760,14 @@ async def startup_event():
                 logger.info("[goal_store] %d active goal(s) loaded.", active_n)
         except Exception as exc:
             logger.warning("GoalStore init failed: %s", exc)
+        finally:
+            if _entity_state_service is not None:
+                _entity_state_service.wire(
+                    topology=_topology,
+                    lifecycle_service=_entity_lifecycle,
+                    session_continuity=_session_continuity,
+                    goal_store=_goal_store,
+                )
 
         # 3f. Workspace service — first-class persistent environment for the entity
         try:
@@ -724,6 +782,15 @@ async def startup_event():
             logger.info("[workspace] Ready. %d files, %d context doc(s).", file_n, ctx_n)
         except Exception as exc:
             logger.warning("WorkspaceService init failed: %s", exc)
+        finally:
+            if _entity_state_service is not None:
+                _entity_state_service.wire(
+                    topology=_topology,
+                    lifecycle_service=_entity_lifecycle,
+                    session_continuity=_session_continuity,
+                    goal_store=_goal_store,
+                    workspace_service=_workspace_service,
+                )
 
         # 3g. Worldview service — passive partner orientation subsystem
         try:
@@ -739,6 +806,16 @@ async def startup_event():
             )
         except Exception as exc:
             logger.warning("WorldviewService init failed: %s", exc)
+        finally:
+            if _entity_state_service is not None:
+                _entity_state_service.wire(
+                    topology=_topology,
+                    lifecycle_service=_entity_lifecycle,
+                    session_continuity=_session_continuity,
+                    goal_store=_goal_store,
+                    workspace_service=_workspace_service,
+                    worldview_service=_worldview_service,
+                )
 
         # 3h. Backup service — state snapshots and restore path
         try:
@@ -823,6 +900,17 @@ async def startup_event():
                       {"total": len(_capability_registry.all())})
         except Exception as exc:
             logger.warning("CapabilityRegistry init failed: %s", exc)
+        finally:
+            if _entity_state_service is not None:
+                _entity_state_service.wire(
+                    topology=_topology,
+                    lifecycle_service=_entity_lifecycle,
+                    session_continuity=_session_continuity,
+                    goal_store=_goal_store,
+                    workspace_service=_workspace_service,
+                    worldview_service=_worldview_service,
+                    capability_registry=_capability_registry,
+                )
 
         # 4d. Init SensorPoller (hardware self-observation)
         try:
@@ -918,6 +1006,17 @@ async def startup_event():
                 _emit_log("info", "startup", "ToolRegistry wired to entity system prompt")
             except Exception as _wexc:
                 logger.warning("Entity tool registry wiring failed: %s", _wexc)
+            if _entity_state_service is not None:
+                _entity_state_service.wire(
+                    topology=_topology,
+                    lifecycle_service=_entity_lifecycle,
+                    session_continuity=_session_continuity,
+                    goal_store=_goal_store,
+                    workspace_service=_workspace_service,
+                    worldview_service=_worldview_service,
+                    capability_registry=_capability_registry,
+                    tool_registry=_tool_registry,
+                )
         except Exception as exc:
             logger.warning("Toolpack init failed — falling back to legacy tool states: %s", exc)
             # Fallback: seed _tool_states from old dispatcher
@@ -1028,7 +1127,12 @@ async def startup_event():
             _reflection_pipeline = ReflectionPipeline(_cfg)
             if _topology:
                 task3 = asyncio.create_task(
-                    _reflection_pipeline.run_loop(_topology, tracer=_tracer, bus=_bus)
+                    _reflection_pipeline.run_loop(
+                        _topology,
+                        tracer=_tracer,
+                        bus=_bus,
+                        entity_state_service=_entity_state_service,
+                    )
                 )
                 _background_tasks.add(task3)
                 task3.add_done_callback(_background_tasks.discard)
@@ -1044,9 +1148,15 @@ async def startup_event():
                 if _idle_cognition is None or _topology is None:
                     continue
                 try:
+                    snapshot = _build_entity_snapshot(
+                        scope="background",
+                        source="idle_cognition.loop",
+                        metadata={"loop": "idle_cognition"},
+                    )
                     await _idle_cognition.maybe_fire(
                         _topology, _tracer, _bus,
                         last_interaction_monotonic=_last_interaction_monotonic or _time.monotonic(),
+                        entity_snapshot=snapshot,
                     )
                 except Exception as _exc:
                     logger.debug("idle_cognition loop error: %s", _exc)
@@ -1244,6 +1354,11 @@ async def get_status_endpoint():
     try:
         status = get_status(_cfg)
         topology_summary = _topology.status_summary()
+        snapshot = _build_entity_snapshot(
+            scope="status",
+            source="/api/status",
+            metadata={"endpoint": "/api/status"},
+        )
 
         # Build model_status from topology so the frontend vision-capability check works
         model_status: dict = {}
@@ -1262,14 +1377,21 @@ async def get_status_endpoint():
             },
             "boot_time_s": int(time.time() - topology_summary["boot_time"]) if topology_summary.get("boot_time") else None,
             "identity": {
-                "name": status.get("name"),
-                "stable_domains": status.get("identity_stable_domains", 0),
-                "total_domains":  status.get("total_domains", 6),
+                "name": snapshot.name if snapshot is not None else status.get("name"),
+                "stable_domains": (
+                    snapshot.identity_summary.get("stable_count", 0)
+                    if snapshot is not None else status.get("identity_stable_domains", 0)
+                ),
+                "total_domains": (
+                    snapshot.identity_summary.get("total_domains", 6)
+                    if snapshot is not None else status.get("total_domains", 6)
+                ),
             },
             "model_status": model_status,
             "topology": topology_summary,
             "capabilities": _runtime_discovery.capabilities if _runtime_discovery else {},
             "services": _runtime_discovery.to_dict().get("services", {}) if _runtime_discovery else {},
+            "entity_state": snapshot.to_dict() if snapshot is not None else None,
         })
     except Exception as exc:
         logger.error("Status endpoint error: %s", exc)
@@ -2365,6 +2487,31 @@ async def admin_runtime_diagnostics():
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
 
+@app.get("/admin/diagnostic/entity-state")
+async def admin_entity_state_diagnostic():
+    """Get the latest shared entity-state snapshot with a short recent history."""
+    try:
+        if _entity_state_service is None:
+            return JSONResponse(
+                {"ok": False, "error": "EntityStateService not initialized"},
+                status_code=503,
+            )
+        latest = _build_entity_snapshot(
+            scope="diagnostic",
+            source="/admin/diagnostic/entity-state",
+            metadata={"endpoint": "/admin/diagnostic/entity-state"},
+        )
+        return JSONResponse({
+            "ok": True,
+            "data": {
+                "latest": latest.to_dict() if latest is not None else None,
+                "history": _entity_state_service.history(limit=5),
+            },
+        })
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
 @app.get("/admin/tool-registry-diagnostics")
 async def admin_tool_registry():
     """Get tool registry diagnostics."""
@@ -2755,8 +2902,13 @@ async def admin_initiative_execute():
                 {"ok": False, "error": "InitiativeEngine or topology not available"},
                 status_code=503,
             )
+        snapshot = _build_entity_snapshot(
+            scope="background",
+            source="initiative.admin_execute",
+            metadata={"endpoint": "/admin/initiative/execute"},
+        )
         dispatched = await _initiative_engine.execute_queued(
-            _topology, _cfg, tracer=_tracer, bus=_bus
+            _topology, _cfg, tracer=_tracer, bus=_bus, entity_snapshot=snapshot
         )
         _emit_log("info", "initiative", f"Admin executed {len(dispatched)} initiatives")
         return JSONResponse({"ok": True, "data": {"dispatched": len(dispatched)}})
@@ -2849,6 +3001,15 @@ async def admin_investigation_run_pass(investigation_id: str, body: Investigatio
         task_type = body.task_type
         objective = body.objective
         _emit_log("info", "investigation", f"Running pass: {task_type}", {"id": investigation_id})
+        snapshot = _build_entity_snapshot(
+            scope="background",
+            source="investigation.run_pass",
+            metadata={
+                "endpoint": "/admin/investigation/run-pass",
+                "investigation_id": investigation_id,
+                "task_type": task_type,
+            },
+        )
         result = await _investigation_engine.run_pass(
             _topology,
             investigation_id,
@@ -2857,6 +3018,7 @@ async def admin_investigation_run_pass(investigation_id: str, body: Investigatio
             objective=objective,
             tracer=_tracer,
             bus=_bus,
+            entity_snapshot=snapshot,
         )
         return JSONResponse(result if "ok" in result else {"ok": True, "data": result})
     except Exception as exc:
@@ -3807,7 +3969,14 @@ async def admin_force_idle_cognition():
     try:
         if _idle_cognition is None or _topology is None:
             return JSONResponse({"ok": False, "error": "IdleCognitionEngine or topology not ready"}, status_code=503)
-        result = await _idle_cognition.force_fire(_topology, _tracer, _bus)
+        snapshot = _build_entity_snapshot(
+            scope="background",
+            source="idle_cognition.force_fire",
+            metadata={"endpoint": "/admin/system/idle-cognition/force"},
+        )
+        result = await _idle_cognition.force_fire(
+            _topology, _tracer, _bus, entity_snapshot=snapshot
+        )
         return JSONResponse({"ok": True, "data": result or {"message": "fire returned no result"}})
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)

@@ -333,6 +333,7 @@ async def think_for_background(
     topology: RuntimeTopology,
     task: str,
     on_complete: Callable[[str], None] | None = None,
+    entity_snapshot: Any | None = None,
 ) -> ThinkingArtifact:
     """
     QWEN's delegation interface for background subsystem thinking requests.
@@ -349,8 +350,10 @@ async def think_for_background(
     worker.  Direct HTTP calls to port 8083 from outside this module violate
     the architectural contract.
     """
-    faculty   = _get_faculty(topology)
-    artifact  = await faculty.deliberate(task)
+    faculty = _get_faculty(topology)
+    if entity_snapshot is not None:
+        task = f"{entity_snapshot.background_context_block()}\n\n---\n{task}"
+    artifact = await faculty.deliberate(task)
 
     if on_complete:
         try:
@@ -413,6 +416,7 @@ async def call_qwen3(
     *,
     use_think: bool = False,
     override_system: str | None = None,
+    entity_snapshot: Any | None = None,
 ) -> str:
     """
     Send a message through the full cognitive pipeline:
@@ -424,6 +428,8 @@ async def call_qwen3(
     _goal_store        = None
     _workspace_svc     = None
     _worldview_svc     = None
+    _entity_state_svc  = None
+    _entity_snapshot   = entity_snapshot
     try:
         import webui.server as _srv
         _lc = getattr(_srv, "_entity_lifecycle", None)
@@ -433,6 +439,13 @@ async def call_qwen3(
         _goal_store    = getattr(_srv, "_goal_store", None)
         _workspace_svc = getattr(_srv, "_workspace_service", None)
         _worldview_svc = getattr(_srv, "_worldview_service", None)
+        _entity_state_svc = getattr(_srv, "_entity_state_service", None)
+        if _entity_snapshot is None and _entity_state_svc is not None:
+            _entity_snapshot = _entity_state_svc.build_snapshot(
+                scope="turn",
+                source="orchestrator.call_qwen3",
+                metadata={"user_message_preview": user_message[:120]},
+            )
     except Exception:
         pass
 
@@ -443,6 +456,7 @@ async def call_qwen3(
         goal_store=_goal_store,
         workspace_service=_workspace_svc,
         worldview_service=_worldview_svc,
+        entity_snapshot=_entity_snapshot,
     )
     memory_context = recall_as_context(user_message, top_k=3)
 
@@ -518,6 +532,19 @@ async def process_turn(
     creativity_artifact: CreativityArtifact | None = None
     tool_result:  str | None = None
     final_response = ""
+    entity_snapshot = None
+
+    try:
+        import webui.server as _srv
+        _entity_state_svc = getattr(_srv, "_entity_state_service", None)
+        if _entity_state_svc is not None:
+            entity_snapshot = _entity_state_svc.build_snapshot(
+                scope="turn",
+                source="orchestrator.process_turn",
+                metadata={"turn_id": turn_id, "user_input_preview": user_input[:120]},
+            )
+    except Exception:
+        entity_snapshot = None
 
     # ── Memory retrieval (for tracing) ────────────────────────────────────────
     mem_results: list[dict] = []
@@ -574,7 +601,7 @@ async def process_turn(
                 "Do not guess or fabricate information."
             )
             final_response = await call_qwen3(
-                topology, deferral_prompt, cfg, use_think=False
+                topology, deferral_prompt, cfg, use_think=False, entity_snapshot=entity_snapshot
             )
 
         # ── TOOL_OR_EXTERNAL ─────────────────────────────────────────────────
@@ -588,7 +615,7 @@ async def process_turn(
                     f"Original request: '{user_input}'"
                 )
                 final_response = await call_qwen3(
-                    topology, followup, cfg, use_think=False
+                    topology, followup, cfg, use_think=False, entity_snapshot=entity_snapshot
                 )
             else:
                 tool_server_up = topology.tool_endpoint() is not None
@@ -599,11 +626,11 @@ async def process_turn(
                         "You may let your partner know this if it's relevant.]\n\n"
                     )
                     final_response = await call_qwen3(
-                        topology, tool_note + user_input, cfg, use_think=False
+                        topology, tool_note + user_input, cfg, use_think=False, entity_snapshot=entity_snapshot
                     )
                 else:
                     final_response = await call_qwen3(
-                        topology, user_input, cfg, use_think=False
+                        topology, user_input, cfg, use_think=False, entity_snapshot=entity_snapshot
                     )
 
         # ── INTERNAL_ESCALATION ───────────────────────────────────────────────
@@ -641,7 +668,7 @@ async def process_turn(
                     "and propose a constructive next step."
                 )
                 final_response = await call_qwen3(
-                    topology, escalation_prompt, cfg, use_think=False
+                    topology, escalation_prompt, cfg, use_think=False, entity_snapshot=entity_snapshot
                 )
             else:
                 # Inject faculty artifact; optionally inject creativity suggestions
@@ -666,7 +693,7 @@ async def process_turn(
                     f"User question: {user_input}"
                 )
                 final_response = await call_qwen3(
-                    topology, escalation_prompt, cfg, use_think=False
+                    topology, escalation_prompt, cfg, use_think=False, entity_snapshot=entity_snapshot
                 )
 
         # ── DIRECT_ANSWER (+ EXPLORATORY_MODE creativity injection) ──────────
@@ -696,11 +723,11 @@ async def process_turn(
                     f"---\nUser request: {user_input}"
                 )
                 final_response = await call_qwen3(
-                    topology, augmented_input, cfg, use_think=False
+                    topology, augmented_input, cfg, use_think=False, entity_snapshot=entity_snapshot
                 )
             else:
                 final_response = await call_qwen3(
-                    topology, user_input, cfg, use_think=False
+                    topology, user_input, cfg, use_think=False, entity_snapshot=entity_snapshot
                 )
 
         # ── Persist to interaction log + vector memory ────────────────────────
