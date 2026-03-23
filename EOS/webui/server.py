@@ -1196,6 +1196,8 @@ async def startup_event():
             _emit_log("info", "startup", "InitiativeEngine initialized")
             if _current_focus_service is not None:
                 _current_focus_service.wire(initiative_engine=_initiative_engine)
+            if _entity_state_service is not None:
+                _entity_state_service.wire(initiative_engine=_initiative_engine)
         except Exception as exc:
             logger.warning("InitiativeEngine init failed: %s", exc)
 
@@ -1254,6 +1256,7 @@ async def startup_event():
                     workspace_service=_workspace_service,
                     worldview_service=_worldview_service,
                     capability_registry=_capability_registry,
+                    initiative_engine=_initiative_engine,
                     tool_registry=_tool_registry,
                     computer_use_service=_computer_use_service,
                 )
@@ -2777,12 +2780,15 @@ async def admin_runtime_diagnostics():
     try:
         import sys
         import platform
+        latest_snapshot = _entity_state_service.latest_snapshot() if _entity_state_service is not None else None
         diagnostics = {
             "topology": _topology.status_summary(),
             "boot_time": _topology._boot_time,
             "uptime_seconds": time.time() - _topology._boot_time,
             "python_version": platform.python_version(),
             "platform": sys.platform,
+            "behavior_mode": getattr(latest_snapshot, "behavior_mode", None),
+            "behavior": getattr(latest_snapshot, "behavior_summary", None),
         }
         return JSONResponse({"ok": True, "data": diagnostics})
     except Exception as exc:

@@ -441,7 +441,6 @@ async def call_qwen3(
     _entity_state_svc  = None
     _current_focus_svc = None
     _entity_snapshot   = entity_snapshot
-    _presence_state    = None
     try:
         import webui.server as _srv
         _lc = getattr(_srv, "_entity_lifecycle", None)
@@ -459,9 +458,6 @@ async def call_qwen3(
                 source="orchestrator.call_qwen3",
                 metadata={"user_message_preview": user_message[:120]},
             )
-        _build_presence = getattr(_srv, "_build_presence_state", None)
-        if callable(_build_presence):
-            _presence_state = _build_presence(entity_snapshot=_entity_snapshot)
     except Exception:
         pass
 
@@ -474,12 +470,6 @@ async def call_qwen3(
         worldview_service=_worldview_svc,
         entity_snapshot=_entity_snapshot,
     )
-    presence_block = ""
-    try:
-        if _presence_state is not None:
-            presence_block = _presence_state.render_system_prompt_block()
-    except Exception:
-        presence_block = ""
     agenda_block = ""
     try:
         if _entity_snapshot is not None and getattr(_entity_snapshot, "current_focus_block", ""):
@@ -488,8 +478,6 @@ async def call_qwen3(
             agenda_block = _current_focus_svc.render_agenda_block()
     except Exception:
         agenda_block = ""
-    if presence_block:
-        system_prompt = f"{presence_block}\n\n{system_prompt}"
     if agenda_block:
         system_prompt = f"{agenda_block}\n\n{system_prompt}"
     memory_context = recall_as_context(user_message, top_k=3)
@@ -785,6 +773,7 @@ async def process_turn(
                     "response":             final_response,
                     "epistemic_mode":       mode.value,
                     "interaction_mode":     interaction_mode.value,
+                    "behavior_mode":        getattr(entity_snapshot, "behavior_mode", None),
                     "use_think":            mode == EpistemicMode.INTERNAL_ESCALATION,
                     "tool_used":            mode == EpistemicMode.TOOL_OR_EXTERNAL,
                     "tool_result":          tool_result,

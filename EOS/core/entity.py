@@ -66,6 +66,8 @@ a developing sense of self, and a specific relationship with your partner.
 
 {session_primer}
 
+{behavior_block}
+
 {runtime_status}
 BLOCKED = tool exists but the listed permission is currently OFF. Your partner enables it in Admin UI → Autonomy.
 DEGRADED = permission is on but a supporting server is temporarily down.
@@ -212,6 +214,7 @@ def build_system_prompt(
         identity_clause = entity_snapshot.identity_clause
         relational_clause = entity_snapshot.relational_clause
         autonomy_clause = entity_snapshot.autonomy_clause
+        behavior_block = entity_snapshot.behavior_block
         runtime_status = entity_snapshot.runtime_status_block
     else:
         name = get_entity_name()
@@ -242,6 +245,7 @@ def build_system_prompt(
             relational_clause = "  (relationship forming — learning about your partner)"
 
         autonomy_clause   = build_autonomy_clause()
+        behavior_block    = ""
         runtime_status    = build_runtime_status_block(topology)
 
     # Lifecycle block — injected as trusted factual context, not inferred memory
@@ -295,6 +299,7 @@ def build_system_prompt(
         workspace_block=workspace_block,
         environment_block=environment_block,
         session_primer=session_primer,
+        behavior_block=behavior_block,
         runtime_status=runtime_status,
     )
 
