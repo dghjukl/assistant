@@ -66,6 +66,7 @@ class _BackupStub:
 class _TopologyStub:
     def __init__(self):
         self._boot_time = time.time() - 10
+        self.servers = {}
 
     def status_summary(self) -> dict:
         return {"boot_time": self._boot_time, "servers": {}}
@@ -187,3 +188,64 @@ def test_run_auto_backup_cycle_records_failure():
     assert app_state.backup_service.runs[-1][0] == "failure"
     assert app_state.backup_service._diag["recent_failure"]["error"] == "boom"
     assert any(entry["source"] == "backup" and entry["level"] == "error" for entry in app_state.log_ring)
+
+
+class _OvernightStub:
+    def __init__(self):
+        self.cancelled = False
+
+    def get_status(self, include_history: bool = False):
+        return {
+            "enabled": True,
+            "phase": "DEEP_NIGHT",
+            "status": "active",
+            "current_window": {
+                "id": "ONC-1",
+                "away_start_time": "2026-03-23T22:00:00Z",
+                "expected_return_time": "2026-03-24T09:00:00Z",
+                "source": "conversation",
+                "confidence": 0.88,
+            },
+            "posture": {
+                "allow_investigations": True,
+                "allow_memory_maintenance": True,
+                "allow_initiative": True,
+            },
+            "recent_history": [{"id": "ONC-0", "status": "ended"}] if include_history else [],
+            "config": {"allow_investigations_overnight": True},
+        }
+
+    def cancel_current(self):
+        self.cancelled = True
+        return {"id": "ONC-1", "status": "cancelled"}
+
+    def update_expected_return_time(self, *, expected_return_time: str):
+        return {"id": "ONC-1", "expected_return_time": expected_return_time}
+
+    def note_interaction(self, *, now=None):
+        return None
+
+
+def test_get_status_endpoint_includes_overnight(monkeypatch):
+    app_state.topology = _TopologyStub()
+    app_state.cfg = {}
+    app_state.overnight_cycle_service = _OvernightStub()
+    monkeypatch.setattr(app_runtime, "get_status", lambda cfg: {"interaction_count": 4})
+
+    response = asyncio.run(app_runtime.get_status_endpoint())
+    payload = json.loads(response.body)
+
+    assert payload["ok"] is True
+    assert payload["overnight"]["phase"] == "DEEP_NIGHT"
+    assert payload["overnight"]["current_window"]["source"] == "conversation"
+
+
+def test_admin_overnight_status_uses_service_payload():
+    app_state.overnight_cycle_service = _OvernightStub()
+
+    response = asyncio.run(app_runtime.admin_overnight_status())
+    payload = json.loads(response.body)
+
+    assert payload["ok"] is True
+    assert payload["data"]["phase"] == "DEEP_NIGHT"
+    assert payload["data"]["recent_history"][0]["status"] == "ended"

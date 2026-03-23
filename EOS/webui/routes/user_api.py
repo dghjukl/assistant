@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 from webui.app_runtime import (
     get_status_endpoint, get_tools_list, get_memory_recent, get_presence, get_initiative,
+    get_overnight_status, post_overnight_cancel, post_overnight_return_time,
     post_chat, post_tts, post_upload, get_vision_settings, post_vision_settings,
     get_identity, get_autonomy, post_autonomy, post_identity_eval, get_relational,
 )
@@ -11,6 +12,9 @@ router.add_api_route('/api/tools', get_tools_list, methods=['GET'])
 router.add_api_route('/api/memory/recent', get_memory_recent, methods=['GET'])
 router.add_api_route('/api/presence', get_presence, methods=['GET'])
 router.add_api_route('/api/initiative', get_initiative, methods=['GET'])
+router.add_api_route('/api/overnight', get_overnight_status, methods=['GET'])
+router.add_api_route('/api/overnight/cancel', post_overnight_cancel, methods=['POST'])
+router.add_api_route('/api/overnight/return-time', post_overnight_return_time, methods=['POST'])
 router.add_api_route('/api/chat', post_chat, methods=['POST'])
 router.add_api_route('/api/tts', post_tts, methods=['POST'])
 router.add_api_route('/api/upload', post_upload, methods=['POST'])

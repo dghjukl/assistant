@@ -1,17 +1,16 @@
 {
-  "_comment": "EOS Hardened Profile — locked-down baseline for public/untrusted deployment. All external integrations off. Only safe, read-only toolpacks loaded. No autonomous action or initiative. Operator must explicitly re-enable features after review.",
+  "_comment": "EOS Hardened Profile \u2014 locked-down baseline for public/untrusted deployment. All external integrations off. Only safe, read-only toolpacks loaded. No autonomous action or initiative. Operator must explicitly re-enable features after review.",
   "_hardening_notes": [
-    "discord.enabled = false — no outbound Discord messaging without explicit opt-in",
-    "google.enabled = false — no OAuth or Google API access without explicit opt-in",
-    "autonomy_defaults.action = false — entity cannot execute tools autonomously",
-    "autonomy_defaults.initiative = false — entity does not self-initiate tasks",
-    "computer_use.enabled = false — no desktop/GUI access",
+    "discord.enabled = false \u2014 no outbound Discord messaging without explicit opt-in",
+    "google.enabled = false \u2014 no OAuth or Google API access without explicit opt-in",
+    "autonomy_defaults.action = false \u2014 entity cannot execute tools autonomously",
+    "autonomy_defaults.initiative = false \u2014 entity does not self-initiate tasks",
+    "computer_use.enabled = false \u2014 no desktop/GUI access",
     "toolpacks: only deterministic, text, diff, event_journal, workspace (no-delete/no-exec), telemetry, ingestion loaded",
-    "workspace_tools.allow_delete = false — workspace files cannot be deleted",
-    "workspace_tools.allow_exec = false — workspace cannot execute code"
+    "workspace_tools.allow_delete = false \u2014 workspace files cannot be deleted",
+    "workspace_tools.allow_exec = false \u2014 workspace cannot execute code"
   ],
   "deployment_mode": "standard",
-
   "servers": {
     "primary": {
       "_role": "Conscious mind. The only model that speaks, reasons, holds identity, and makes decisions.",
@@ -71,14 +70,23 @@
       "required": false
     }
   },
-
   "creativity": {
     "_comment": "Creativity subsystem disabled in hardened profile.",
     "enabled": false,
     "injection_frequency": "off",
-    "_injection_frequency_options": ["off", "low", "medium", "high"],
+    "_injection_frequency_options": [
+      "off",
+      "low",
+      "medium",
+      "high"
+    ],
     "intensity": "conservative",
-    "_intensity_options": ["conservative", "balanced", "exploratory", "aggressive"],
+    "_intensity_options": [
+      "conservative",
+      "balanced",
+      "exploratory",
+      "aggressive"
+    ],
     "invocation_domains": {
       "reasoning_assistance": false,
       "autonomous_idle": false,
@@ -87,7 +95,11 @@
       "stuck_state_recovery": false
     },
     "output_structure_mode": "structured",
-    "_output_structure_options": ["structured", "semi-structured", "loose"],
+    "_output_structure_options": [
+      "structured",
+      "semi-structured",
+      "loose"
+    ],
     "advanced": {
       "_comment": "Advanced overrides. Not active in hardened profile.",
       "temperature": null,
@@ -97,33 +109,44 @@
       "response_format_template": null
     },
     "_intensity_presets": {
-      "conservative":  {"temperature": 0.6,  "top_p": 0.85, "top_k": 40},
-      "balanced":      {"temperature": 0.85, "top_p": 0.92, "top_k": 60},
-      "exploratory":   {"temperature": 1.05, "top_p": 0.96, "top_k": 80},
-      "aggressive":    {"temperature": 1.3,  "top_p": 0.99, "top_k": 100}
+      "conservative": {
+        "temperature": 0.6,
+        "top_p": 0.85,
+        "top_k": 40
+      },
+      "balanced": {
+        "temperature": 0.85,
+        "top_p": 0.92,
+        "top_k": 60
+      },
+      "exploratory": {
+        "temperature": 1.05,
+        "top_p": 0.96,
+        "top_k": 80
+      },
+      "aggressive": {
+        "temperature": 1.3,
+        "top_p": 0.99,
+        "top_k": 100
+      }
     }
   },
-
   "primary": {
     "is_multimodal": false,
     "requires_mmproj": false,
     "mmproj_path": null
   },
-
   "webui": {
     "host": "127.0.0.1",
     "port": 7860
   },
-
   "retrieval": {
     "embed_model": "models/embedding/all-MiniLM-L6-v2",
     "chroma_path": "data/memory_store",
     "collection": "entity_memory",
     "top_k": 5
   },
-
   "db_path": "data/entity_state.db",
-
   "qwen3": {
     "temperature": 0.7,
     "top_p": 0.9,
@@ -131,13 +154,11 @@
     "think_token": "/think",
     "no_think_token": "/no_think"
   },
-
   "identity": {
     "eval_every_n_interactions": 20,
     "stability_threshold": 0.85,
     "naming_requires_stable": 6
   },
-
   "autonomy_defaults": {
     "_comment": "Hardened: all autonomous action disabled. Operator must explicitly enable.",
     "perception": true,
@@ -145,7 +166,6 @@
     "action": false,
     "initiative": false
   },
-
   "cognition": {
     "enable_cognition_trace": true,
     "turn_ring_size": 200,
@@ -154,9 +174,8 @@
     "relational_interval_turns": 40,
     "relational_interval_seconds": 1800
   },
-
   "idle_cognition": {
-    "_comment": "Hardened mode — idle cognition disabled. In hardened mode all autonomous unsupervised behaviour is off.",
+    "_comment": "Hardened mode \u2014 idle cognition disabled. In hardened mode all autonomous unsupervised behaviour is off.",
     "enabled": false,
     "resting_threshold_hours": 2.0,
     "drifting_threshold_hours": 6.0,
@@ -170,7 +189,6 @@
     "max_tokens": 180,
     "temperature": 0.82
   },
-
   "stt": {
     "model_path": "models/stt/ggml-small.en-q8_0.bin",
     "sample_rate": 16000,
@@ -182,14 +200,12 @@
     "fw_device": "cpu",
     "fw_compute": "int8"
   },
-
   "tts": {
     "binary": "Piper/piper/piper.exe",
     "model_path": "models/tts/en_US-amy-medium.onnx",
     "sample_rate": 22050,
     "speaker_id": 0
   },
-
   "discord": {
     "_comment": "Hardened: Discord disabled. Enable only after reviewing credential security.",
     "enabled": false,
@@ -197,7 +213,6 @@
     "respond_only_to_mentions": true,
     "ignore_bots": true
   },
-
   "google": {
     "_comment": "Hardened: Google OAuth disabled. Enable only after reviewing credential security.",
     "enabled": false,
@@ -207,7 +222,6 @@
     "gmail_enabled": false,
     "drive_enabled": false
   },
-
   "workspace_tools": {
     "_comment": "Sandboxed workspace. Delete and exec permanently off in hardened profile.",
     "enabled": true,
@@ -215,21 +229,18 @@
     "allow_delete": false,
     "allow_exec": false
   },
-
   "worldview": {
     "_comment": "Passive partner orientation subsystem. Sources processed on demand only.",
     "enabled": true,
     "worldview_path": "data/worldview",
     "max_profile_lines_in_prompt": 10
   },
-
   "backup": {
     "_comment": "Automatic state snapshots.",
     "backup_path": "data/backups",
     "max_backups": 10,
     "auto_backup_interval_hours": 24
   },
-
   "computer_use": {
     "_comment": "Hardened: computer use permanently off. Enable only after explicit operator review.",
     "_doc": "Enabling this does NOT grant the entity unrestricted computer access. The entity may only use applications present in approved_shortcuts_path, and only the actions listed in app_policy_path. The operator sets the mode. Halt is always available.",
@@ -244,7 +255,6 @@
       "supervised_session": "Approved apps with bounded continuation while operator supervises."
     }
   },
-
   "toolpacks": {
     "_comment": "Hardened: only safe read-only and sandboxed packs loaded. Network, process, privileged, system, scheduler, secrets, Google, Discord packs excluded.",
     "enabled": true,
@@ -258,5 +268,21 @@
       "ingestion_tools"
     ],
     "required_packs": []
+  },
+  "overnight_cycle": {
+    "enabled": true,
+    "conversation_declare_enabled": true,
+    "early_phase_hours": 2.0,
+    "deep_phase_start_hours": 2.0,
+    "prewake_lead_hours": 1.5,
+    "allow_investigations_overnight": true,
+    "allow_memory_maintenance_overnight": true,
+    "allow_initiative_overnight": true,
+    "use_declared_window_as_bias": true,
+    "cancel_on_live_return": true,
+    "live_override_grace_minutes": 20.0,
+    "default_soon_minutes": 30,
+    "default_morning_return_hour": 8.0,
+    "llm_fallback_enabled": true
   }
 }

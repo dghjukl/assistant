@@ -147,6 +147,7 @@ class IdleCognitionEngine:
         tracer: Any,
         bus: Any,
         entity_snapshot: Any | None = None,
+        overnight_status: dict[str, Any] | None = None,
     ) -> Optional[dict]:
         """
         Check idle tier and probabilistically fire an idle cognition.
@@ -183,7 +184,7 @@ class IdleCognitionEngine:
             return None
 
         return await self._fire(
-            topology, tracer, bus, tier, idle_hours, entity_snapshot=entity_snapshot
+            topology, tracer, bus, tier, idle_hours, entity_snapshot=entity_snapshot, overnight_status=overnight_status
         )
 
     async def force_fire(
@@ -192,13 +193,14 @@ class IdleCognitionEngine:
         tracer: Any,
         bus: Any,
         entity_snapshot: Any | None = None,
+        overnight_status: dict[str, Any] | None = None,
     ) -> Optional[dict]:
         """Fire an idle cognition unconditionally (admin/testing)."""
         idle_hours = _hours_since(self._last_fire_monotonic) if self._last_fire_monotonic else 0.0
         tier = self._get_tier(idle_hours)
         return await self._fire(
             topology, tracer, bus, tier, idle_hours,
-            forced=True, entity_snapshot=entity_snapshot,
+            forced=True, entity_snapshot=entity_snapshot, overnight_status=overnight_status,
         )
 
     def notify_interaction(self, *, at_monotonic: float | None = None) -> None:
@@ -242,11 +244,31 @@ class IdleCognitionEngine:
             IdleTier.DEEP:     self._deep_prob,
         }.get(tier, 0.0)
 
+    def _overnight_guidance(self, overnight_status: dict[str, Any] | None) -> str:
+        phase = str((overnight_status or {}).get("phase") or "DAY_ACTIVE")
+        if phase == "EARLY_NIGHT":
+            return (
+                "Overnight posture: the user has recently signed off. Keep this cognition light,"
+                " reflective, and low-disruption. Avoid spinning up heavy new work."
+            )
+        if phase == "DEEP_NIGHT":
+            return (
+                "Overnight posture: deep overnight window. Deeper synthesis, consolidation, and"
+                " reflective cognition are appropriate if they stay grounded and concise."
+            )
+        if phase == "PREWAKE":
+            return (
+                "Overnight posture: pre-wake. Favor gentle synthesis and preparation for the"
+                " user's return; avoid opening heavy new threads."
+            )
+        return ""
+
     def _build_prompt(
         self,
         tier: str,
         idle_hours: float,
         entity_snapshot: Any | None = None,
+        overnight_status: dict[str, Any] | None = None,
     ) -> str:
         """Build the system/user prompt for the idle cognition call."""
         tier_instructions = {
@@ -267,6 +289,9 @@ class IdleCognitionEngine:
             ),
         }
         prompt = tier_instructions.get(tier, tier_instructions[IdleTier.RESTING])
+        overnight_guidance = self._overnight_guidance(overnight_status)
+        if overnight_guidance:
+            prompt = f"{overnight_guidance}\n\n{prompt}"
         if entity_snapshot is not None:
             return f"{entity_snapshot.background_context_block()}\n\n---\n{prompt}"
         return prompt
@@ -280,6 +305,7 @@ class IdleCognitionEngine:
         idle_hours: float,
         forced: bool = False,
         entity_snapshot: Any | None = None,
+        overnight_status: dict[str, Any] | None = None,
     ) -> Optional[dict]:
         """Execute an idle cognition call via the thinking faculty delegation."""
         try:
@@ -288,7 +314,12 @@ class IdleCognitionEngine:
             logger.warning("[idle_cognition] orchestrator not available for delegation")
             return None
 
-        prompt = self._build_prompt(tier, idle_hours, entity_snapshot=entity_snapshot)
+        prompt = self._build_prompt(
+            tier,
+            idle_hours,
+            entity_snapshot=entity_snapshot,
+            overnight_status=overnight_status,
+        )
 
         try:
             result = await think_for_background(

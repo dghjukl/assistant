@@ -481,3 +481,28 @@ class TestCapabilityContractValidation:
             headers={"X-Admin-Token": "any"},
         )
         assert resp.status_code in (401, 422)
+
+
+class TestOvernightApiContracts:
+    def test_overnight_status_route_shape(self, client):
+        resp = client.get('/api/overnight')
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data['ok'] is True
+        assert 'overnight' in data
+
+    def test_admin_overnight_route_shape(self, client):
+        resp = client.get('/admin/system/overnight', headers={'X-Admin-Token': 'any'})
+        assert resp.status_code in (200, 401, 503)
+        data = resp.json()
+        if data.get('ok'):
+            assert 'data' in data
+            assert 'phase' in data['data']
+
+    def test_overnight_return_time_validation(self, client):
+        resp = client.post('/api/overnight/return-time', json={})
+        assert resp.status_code == 422
+
+    def test_overnight_cancel_validation(self, client):
+        resp = client.post('/api/overnight/cancel', json={'reason': 'test'})
+        assert resp.status_code in (200, 503)

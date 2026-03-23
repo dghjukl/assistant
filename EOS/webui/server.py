@@ -80,6 +80,7 @@ _STATE_EXPORTS = {
     "_entity_state_service": "entity_state_service",
     "_backup_service": "backup_service",
     "_computer_use_service": "computer_use_service",
+    "_overnight_cycle_service": "overnight_cycle_service",
     "_runtime_discovery": "runtime_discovery",
     "_tool_states": "tool_states",
     "_perm_allowlist": "perm_allowlist",

@@ -31,6 +31,7 @@ class AppState:
     entity_state_service: Any = None
     backup_service: Any = None
     computer_use_service: Any = None
+    overnight_cycle_service: Any = None
     runtime_discovery: Any = None
     last_interaction_monotonic: float = 0.0
     primary_degraded: bool = False

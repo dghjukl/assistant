@@ -188,3 +188,13 @@ class LanPairRequest(BaseModel):
 class LanSessionRevokeRequest(BaseModel):
     """Revoke a specific LAN session token."""
     token: str = Field(..., min_length=1, description="Session token to revoke.")
+
+
+# ── Overnight cycle ───────────────────────────────────────────────────────────
+
+class OvernightReturnTimeRequest(BaseModel):
+    expected_return_time: str = Field(..., min_length=1, description="ISO-8601 expected return timestamp.")
+
+
+class OvernightCancelRequest(BaseModel):
+    reason: str = Field("user_request", description="Reason for cancelling the active overnight cycle.")

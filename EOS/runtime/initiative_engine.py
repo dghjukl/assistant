@@ -135,6 +135,7 @@ class InitiativeEngine:
         *,
         memory_retrieved_count: int = 0,
         attention_summary: dict[str, Any] | None = None,
+        overnight_status: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Collect signals, select top candidate, queue it if eligible.
 
@@ -142,6 +143,7 @@ class InitiativeEngine:
         Caller is responsible for checking the autonomy gate before calling.
         """
         signals = self._collect_signals(memory_retrieved_count=memory_retrieved_count)
+        signals = self._apply_overnight_bias(signals, overnight_status=overnight_status)
         selected = self._select_signal(signals, attention_summary=attention_summary)
         now = _iso_now()
         self._last_eval_at = time.time()
@@ -192,6 +194,7 @@ class InitiativeEngine:
             "selected":         enacted,
             "suppression_reason": suppression_reason,
             "queue_depth":      len(self._queue),
+            "overnight_phase": str((overnight_status or {}).get("phase") or "DAY_ACTIVE"),
         }
 
     async def execute_queued(
@@ -202,6 +205,7 @@ class InitiativeEngine:
         tracer=None,
         bus=None,
         entity_snapshot: Any | None = None,
+        overnight_status: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
         """Execute all 'queued' (or 'ready_for_execution') items non-blockingly.
 
@@ -220,6 +224,8 @@ class InitiativeEngine:
         for item in list(self._queue):
             if item.get("status") not in ("queued", "ready_for_execution"):
                 continue
+            if not self._should_dispatch(item, overnight_status=overnight_status):
+                continue
 
             item["status"] = "dispatched"
             item["dispatched_at"] = _iso_now()
@@ -234,6 +240,9 @@ class InitiativeEngine:
                 "If it's a checkpoint, assess current engagement and goals. "
                 "Be concise and purposeful."
             )
+            overnight_note = self._overnight_task_note(overnight_status)
+            if overnight_note:
+                task = f"{overnight_note}\n\n{task}"
             if entity_snapshot is not None:
                 task = f"{entity_snapshot.background_context_block()}\n\n---\n{task}"
 
@@ -431,6 +440,55 @@ class InitiativeEngine:
         self._queue.clear()
 
     # ── Signal collection ─────────────────────────────────────────────────────
+
+    def _apply_overnight_bias(
+        self,
+        signals: list[InitiativeSignal],
+        *,
+        overnight_status: dict[str, Any] | None,
+    ) -> list[InitiativeSignal]:
+        phase = str((overnight_status or {}).get("phase") or "DAY_ACTIVE")
+        if phase == "EARLY_NIGHT":
+            allowed = {"self_reflection", "session_checkpoint"}
+            return [
+                InitiativeSignal(s.source, s.initiative_type, "low", s.rationale + " Overnight early-night posture keeps this light.")
+                for s in signals
+                if s.initiative_type in allowed
+            ]
+        if phase == "PREWAKE":
+            allowed = {"memory_consolidation", "session_checkpoint"}
+            return [
+                InitiativeSignal(s.source, s.initiative_type, s.priority, s.rationale + " Pre-wake posture favors synthesis over new exploration.")
+                for s in signals
+                if s.initiative_type in allowed
+            ]
+        if phase == "DEEP_NIGHT":
+            boosted: list[InitiativeSignal] = []
+            for s in signals:
+                priority = s.priority
+                if s.initiative_type in {"self_reflection", "memory_consolidation"}:
+                    priority = "high" if s.priority == "medium" else s.priority
+                boosted.append(InitiativeSignal(s.source, s.initiative_type, priority, s.rationale + " Deep-night posture permits overnight initiative work."))
+            return boosted
+        return signals
+
+    def _should_dispatch(self, item: dict[str, Any], *, overnight_status: dict[str, Any] | None) -> bool:
+        posture = dict((overnight_status or {}).get("posture") or {})
+        if posture and not posture.get("allow_initiative", True):
+            initiative_type = str(item.get("initiative_type") or "")
+            if initiative_type not in {"memory_consolidation", "session_checkpoint"}:
+                return False
+        return True
+
+    def _overnight_task_note(self, overnight_status: dict[str, Any] | None) -> str:
+        phase = str((overnight_status or {}).get("phase") or "DAY_ACTIVE")
+        if phase == "DEEP_NIGHT":
+            return "Overnight initiative posture: the user is away in a deep-night window. Favor consolidation, careful synthesis, and calm initiative."
+        if phase == "PREWAKE":
+            return "Overnight initiative posture: pre-wake window. Keep work lightweight and preparatory."
+        if phase == "EARLY_NIGHT":
+            return "Overnight initiative posture: early night. Keep any initiative minimal and non-intrusive."
+        return ""
 
     def _collect_signals(
         self,

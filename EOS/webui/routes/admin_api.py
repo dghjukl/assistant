@@ -24,6 +24,7 @@ from webui.app_runtime import (
     admin_tools_pending, admin_tool_confirm, admin_tool_deny,
     admin_goals_list, admin_goals_create, admin_goals_complete, admin_goals_abandon,
     admin_workspace, admin_workspace_scan,
+    admin_overnight_status,
     admin_worldview_status, admin_worldview_refresh, admin_worldview_extract,
     admin_backup_list, admin_backup_create, admin_backup_get, admin_backup_restore,
     admin_integrity_check,
@@ -106,6 +107,7 @@ router.add_api_route('/admin/entity/goals/{goal_id}/complete', admin_goals_compl
 router.add_api_route('/admin/entity/goals/{goal_id}/abandon', admin_goals_abandon, methods=['POST'])
 router.add_api_route('/admin/system/workspace', admin_workspace, methods=['GET'])
 router.add_api_route('/admin/system/workspace/scan-context', admin_workspace_scan, methods=['POST'])
+router.add_api_route('/admin/system/overnight', admin_overnight_status, methods=['GET'])
 router.add_api_route('/admin/system/worldview', admin_worldview_status, methods=['GET'])
 router.add_api_route('/admin/system/worldview/refresh', admin_worldview_refresh, methods=['POST'])
 router.add_api_route('/admin/system/worldview/extract', admin_worldview_extract, methods=['POST'])
