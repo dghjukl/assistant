@@ -52,6 +52,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, TYPE_CHECKING
 
+from runtime.exception_observability import observe_exception
+
 if TYPE_CHECKING:
     from runtime.topology import RuntimeTopology
 
@@ -258,8 +260,18 @@ class InitiativeEngine:
                                 "result_summary":  result[:200],
                             },
                         ))
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        observe_exception(
+                            logger=logger,
+                            subsystem="initiative_engine",
+                            operation="publish initiative completion signal",
+                            exc=exc,
+                            level=logging.WARNING,
+                            context={
+                                "initiative_id": _item.get("initiative_id"),
+                                "initiative_type": _item.get("initiative_type"),
+                            },
+                        )
 
             asyncio.create_task(
                 think_for_background(

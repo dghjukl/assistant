@@ -54,10 +54,13 @@ import logging
 import shutil
 import sqlite3
 import time
+from collections import deque
 from dataclasses import dataclass, asdict, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+
+from runtime.exception_observability import observe_exception
 
 logger = logging.getLogger("eos.backup_service")
 UTC = timezone.utc
@@ -184,6 +187,7 @@ class BackupService:
             backup_cfg.get("auto_backup_interval_hours", _AUTO_BACKUP_INTERVAL_HOURS)
         )
         self._cfg = cfg
+        self._recent_failures: deque[dict] = deque(maxlen=20)
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -229,6 +233,15 @@ class BackupService:
                 logger.debug("[backup] SQLite backup done (%d bytes)", sz)
             except Exception as exc:
                 logger.warning("[backup] SQLite backup failed: %s", exc)
+                observe_exception(
+                    logger=logger,
+                    subsystem="backup_service",
+                    operation="backup sqlite database",
+                    exc=exc,
+                    level=logging.WARNING,
+                    context={"backup_id": dir_name, "db_path": str(self._db_path)},
+                    diagnostics=self._recent_failures,
+                )
                 files.append({"name": "entity_state.db", "type": "sqlite", "error": str(exc)})
 
         # ── ChromaDB directory copy ───────────────────────────────────────
@@ -246,6 +259,15 @@ class BackupService:
                 logger.debug("[backup] ChromaDB copy done (%d bytes)", sz)
             except Exception as exc:
                 logger.warning("[backup] ChromaDB copy failed: %s", exc)
+                observe_exception(
+                    logger=logger,
+                    subsystem="backup_service",
+                    operation="backup vector store",
+                    exc=exc,
+                    level=logging.WARNING,
+                    context={"backup_id": dir_name, "source_path": str(self._chroma_path)},
+                    diagnostics=self._recent_failures,
+                )
                 files.append({"name": "memory_store", "type": "directory", "error": str(exc)})
 
         # ── Workspace copy ────────────────────────────────────────────────
@@ -263,6 +285,15 @@ class BackupService:
                 logger.debug("[backup] Workspace copy done (%d bytes)", sz)
             except Exception as exc:
                 logger.warning("[backup] Workspace copy failed: %s", exc)
+                observe_exception(
+                    logger=logger,
+                    subsystem="backup_service",
+                    operation="backup workspace",
+                    exc=exc,
+                    level=logging.WARNING,
+                    context={"backup_id": dir_name, "source_path": str(self._ws_path)},
+                    diagnostics=self._recent_failures,
+                )
                 files.append({"name": "workspace", "type": "directory", "error": str(exc)})
 
         # ── JSON state files ──────────────────────────────────────────────
@@ -287,6 +318,15 @@ class BackupService:
                     total_bytes += sz
                 except Exception as exc:
                     logger.warning("[backup] Failed to copy %s: %s", fname, exc)
+                    observe_exception(
+                        logger=logger,
+                        subsystem="backup_service",
+                        operation="backup json state file",
+                        exc=exc,
+                        level=logging.WARNING,
+                        context={"backup_id": dir_name, "file_name": fname},
+                        diagnostics=self._recent_failures,
+                    )
 
         # ── Write manifest ────────────────────────────────────────────────
         version = _eos_version()
@@ -337,6 +377,15 @@ class BackupService:
                 )
             except Exception as exc:
                 logger.debug("[backup] Failed to load manifest %s: %s", mf_path, exc)
+                observe_exception(
+                    logger=logger,
+                    subsystem="backup_service",
+                    operation="enumerate backup manifest",
+                    exc=exc,
+                    level=logging.DEBUG,
+                    context={"manifest_path": str(mf_path)},
+                    diagnostics=self._recent_failures,
+                )
         return manifests
 
     def get_backup(self, backup_id: str) -> Optional[BackupManifest]:
@@ -348,7 +397,16 @@ class BackupService:
             return BackupManifest.from_dict(
                 json.loads(mf_path.read_text(encoding="utf-8"))
             )
-        except Exception:
+        except Exception as exc:
+            observe_exception(
+                logger=logger,
+                subsystem="backup_service",
+                operation="load backup manifest",
+                exc=exc,
+                level=logging.WARNING,
+                context={"backup_id": backup_id, "manifest_path": str(mf_path)},
+                diagnostics=self._recent_failures,
+            )
             return None
 
     def restore_backup(self, backup_id: str) -> dict:
@@ -394,6 +452,15 @@ class BackupService:
             except Exception as exc:
                 errors.append(f"SQLite restore failed: {exc}")
                 logger.error("[backup] SQLite restore failed: %s", exc)
+                observe_exception(
+                    logger=logger,
+                    subsystem="backup_service",
+                    operation="restore sqlite database",
+                    exc=exc,
+                    level=logging.ERROR,
+                    context={"backup_id": backup_id, "source_path": str(db_src)},
+                    diagnostics=self._recent_failures,
+                )
 
         # ── ChromaDB ──────────────────────────────────────────────────────
         chroma_src = backup_dir / "memory_store"
@@ -409,6 +476,15 @@ class BackupService:
             except Exception as exc:
                 errors.append(f"ChromaDB restore failed: {exc}")
                 logger.error("[backup] ChromaDB restore failed: %s", exc)
+                observe_exception(
+                    logger=logger,
+                    subsystem="backup_service",
+                    operation="restore vector store",
+                    exc=exc,
+                    level=logging.ERROR,
+                    context={"backup_id": backup_id, "source_path": str(chroma_src)},
+                    diagnostics=self._recent_failures,
+                )
 
         # ── Workspace ─────────────────────────────────────────────────────
         ws_src = backup_dir / "workspace"
@@ -424,6 +500,15 @@ class BackupService:
             except Exception as exc:
                 errors.append(f"Workspace restore failed: {exc}")
                 logger.error("[backup] Workspace restore failed: %s", exc)
+                observe_exception(
+                    logger=logger,
+                    subsystem="backup_service",
+                    operation="restore workspace",
+                    exc=exc,
+                    level=logging.ERROR,
+                    context={"backup_id": backup_id, "source_path": str(ws_src)},
+                    diagnostics=self._recent_failures,
+                )
 
         # ── JSON state files ──────────────────────────────────────────────
         json_files = [
@@ -442,6 +527,15 @@ class BackupService:
                     shutil.copy2(str(src), str(dest))
                 except Exception as exc:
                     errors.append(f"{fname} restore failed: {exc}")
+                    observe_exception(
+                        logger=logger,
+                        subsystem="backup_service",
+                        operation="restore json state file",
+                        exc=exc,
+                        level=logging.ERROR,
+                        context={"backup_id": backup_id, "file_name": fname},
+                        diagnostics=self._recent_failures,
+                    )
 
         result = {
             "ok": len(errors) == 0,
@@ -524,7 +618,16 @@ class BackupService:
             created = datetime.fromisoformat(latest.created_at.replace("Z", "+00:00"))
             age_hours = (datetime.now(UTC) - created).total_seconds() / 3600
             return age_hours >= self._auto_interval_hours
-        except Exception:
+        except Exception as exc:
+            observe_exception(
+                logger=logger,
+                subsystem="backup_service",
+                operation="evaluate auto-backup freshness",
+                exc=exc,
+                level=logging.WARNING,
+                context={"latest_backup_id": latest.backup_id, "created_at": latest.created_at},
+                diagnostics=self._recent_failures,
+            )
             return True
 
     # ── Internal ──────────────────────────────────────────────────────────────
@@ -539,6 +642,23 @@ class BackupService:
                 logger.info("[backup] Pruned old backup: %s", bk.backup_id)
             except Exception as exc:
                 logger.warning("[backup] Failed to prune %s: %s", bk.backup_id, exc)
+                observe_exception(
+                    logger=logger,
+                    subsystem="backup_service",
+                    operation="prune old backup",
+                    exc=exc,
+                    level=logging.WARNING,
+                    context={"backup_id": bk.backup_id, "backup_path": bk.backup_path},
+                    diagnostics=self._recent_failures,
+                )
+
+    def diagnostics(self) -> dict:
+        return {
+            "backup_root": str(self._backup_root),
+            "max_backups": self._max_backups,
+            "auto_interval_hours": self._auto_interval_hours,
+            "recent_failures": list(self._recent_failures),
+        }
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

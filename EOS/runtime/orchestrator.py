@@ -83,6 +83,8 @@ from core.memory  import init_db, log_interaction, get_recent_interactions, sear
 from core.identity import run_evaluation_cycle, request_self_name
 from core.memory   import get_entity_name, get_relational_model
 from core.worldview import build_worldview_extraction_prompt
+from runtime.capability_registry import CapabilityStatus
+from runtime.exception_observability import observe_exception
 from runtime.topology import RuntimeTopology
 from runtime.thinking_faculty import ThinkingFaculty, ThinkingArtifact
 from runtime.creativity_service import (
@@ -440,8 +442,15 @@ async def think_for_background(
     if on_complete:
         try:
             on_complete(artifact.best_text)
-        except Exception:
-            pass
+        except Exception as exc:
+            observe_exception(
+                logger=logger,
+                subsystem="orchestrator",
+                operation="run background completion callback",
+                exc=exc,
+                level=logging.WARNING,
+                context={"task_preview": task[:120]},
+            )
 
     return artifact
 
@@ -1000,8 +1009,15 @@ async def process_turn(
                         final_response[:100],
                     ],
                 })
-            except Exception:
-                pass
+            except Exception as exc:
+                observe_exception(
+                    logger=logger,
+                    subsystem="orchestrator",
+                    operation="record turn trace",
+                    exc=exc,
+                    level=logging.WARNING,
+                    context={"turn_id": turn_id},
+                )
 
         # ── Identity eval dispatch (non-blocking background task) ─────────────
         if should_run_identity_eval(cfg):
@@ -1051,8 +1067,17 @@ async def _run_identity_eval_background(
                     "suggestions": results.get("suggestions", []),
                     "similar_before": results.get("cycle", 0) > 1,
                 })
-            except Exception:
-                pass
+            except Exception as exc:
+                observe_exception(
+                    logger=logger,
+                    subsystem="orchestrator",
+                    operation="record background identity reflection",
+                    exc=exc,
+                    level=logging.WARNING,
+                    context={"cycle": results.get("cycle", 0)},
+                    capability_name="reflection_pipeline",
+                    capability_status=CapabilityStatus.DEGRADED,
+                )
 
         if bus:
             try:
@@ -1070,8 +1095,17 @@ async def _run_identity_eval_background(
                         },
                     },
                 ))
-            except Exception:
-                pass
+            except Exception as exc:
+                observe_exception(
+                    logger=logger,
+                    subsystem="orchestrator",
+                    operation="publish background identity signal",
+                    exc=exc,
+                    level=logging.WARNING,
+                    context={"cycle": results.get("cycle", 0)},
+                    capability_name="reflection_pipeline",
+                    capability_status=CapabilityStatus.DEGRADED,
+                )
 
         rel = get_relational_model()
         if rel.get("naming_condition_met") and not get_entity_name():
@@ -1088,8 +1122,17 @@ async def _run_identity_eval_background(
                             confidence=1.0,
                             payload={"name": name},
                         ))
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        observe_exception(
+                            logger=logger,
+                            subsystem="orchestrator",
+                            operation="publish entity-named signal",
+                            exc=exc,
+                            level=logging.WARNING,
+                            context={"name": name},
+                            capability_name="reflection_pipeline",
+                            capability_status=CapabilityStatus.DEGRADED,
+                        )
 
     except Exception as exc:
         logger.error("[Identity] Evaluation error: %s", exc)
