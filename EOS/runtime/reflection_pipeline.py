@@ -94,11 +94,22 @@ class ReflectionPipeline:
         try:
             # Attach continuity monitor if available (lazy import to avoid cycles)
             continuity_monitor = None
+            current_focus_service = None
             try:
                 import webui.server as _srv  # type: ignore
                 continuity_monitor = getattr(_srv, "_identity_continuity", None)
+                current_focus_service = getattr(_srv, "_current_focus_service", None)
             except Exception:
                 pass
+
+            if current_focus_service is not None:
+                current_focus_service.set_background_focus(
+                    focus_id=f"reflection-{reflection_id}",
+                    title="Run identity reflection",
+                    why_now="The reflection scheduler determined that identity state should be refreshed.",
+                    next_action="Evaluate current identity domains and record any changes.",
+                    source="maintenance",
+                )
 
             results = await run_evaluation_cycle(
                 primary_endpoint=topology.primary_endpoint(),
@@ -203,10 +214,34 @@ class ReflectionPipeline:
             except Exception as exc:
                 logger.debug("Focus name-review injection failed: %s", exc)
 
+            if current_focus_service is not None:
+                current_focus_service.set_background_focus(
+                    focus_id=f"reflection-{reflection_id}",
+                    title="Identity reflection complete",
+                    why_now="The latest scheduled identity evaluation finished.",
+                    next_action="Wait for the next reflection trigger or user turn.",
+                    status="done",
+                    source="maintenance",
+                    metadata={"results": results},
+                )
+
             return results
 
         except Exception as exc:
             logger.error("[ReflectionPipeline] Eval failed: %s", exc)
+            try:
+                if current_focus_service is not None:
+                    current_focus_service.set_background_focus(
+                        focus_id=f"reflection-{reflection_id}",
+                        title="Identity reflection failed",
+                        why_now="A scheduled identity evaluation raised an error.",
+                        next_action="Inspect the reflection failure before retrying.",
+                        status="blocked",
+                        source="maintenance",
+                        metadata={"error": str(exc)},
+                    )
+            except Exception:
+                pass
             return {"error": str(exc), "reflection_id": reflection_id}
         finally:
             # Reset counters regardless of success
@@ -224,6 +259,20 @@ class ReflectionPipeline:
         import time
         logger.info("[ReflectionPipeline] Starting relational eval cycle...")
         try:
+            current_focus_service = None
+            try:
+                import webui.server as _srv  # type: ignore
+                current_focus_service = getattr(_srv, "_current_focus_service", None)
+            except Exception:
+                pass
+            if current_focus_service is not None:
+                current_focus_service.set_background_focus(
+                    focus_id="reflection-relational",
+                    title="Run relational reflection",
+                    why_now="The relational-evaluation schedule triggered a background review.",
+                    next_action="Refresh the relational model from recent interactions.",
+                    source="maintenance",
+                )
             from core.relational import run_relational_cycle
             results = await run_relational_cycle(
                 primary_endpoint=topology.primary_endpoint(),
@@ -234,9 +283,32 @@ class ReflectionPipeline:
                 "[ReflectionPipeline] Relational cycle complete (%s).",
                 "skipped" if results.get("skipped") else f"cycle {results.get('cycle', '?')}",
             )
+            if current_focus_service is not None:
+                current_focus_service.set_background_focus(
+                    focus_id="reflection-relational",
+                    title="Relational reflection complete",
+                    why_now="The relational review finished.",
+                    next_action="Wait for the next relational trigger or user turn.",
+                    status="done",
+                    source="maintenance",
+                    metadata={"results": results},
+                )
             return results
         except Exception as exc:
             logger.error("[ReflectionPipeline] Relational eval failed: %s", exc)
+            try:
+                if current_focus_service is not None:
+                    current_focus_service.set_background_focus(
+                        focus_id="reflection-relational",
+                        title="Relational reflection failed",
+                        why_now="A relational evaluation cycle raised an error.",
+                        next_action="Inspect the relational-eval failure before retrying.",
+                        status="blocked",
+                        source="maintenance",
+                        metadata={"error": str(exc)},
+                    )
+            except Exception:
+                pass
             return {"error": str(exc)}
         finally:
             import time as _t

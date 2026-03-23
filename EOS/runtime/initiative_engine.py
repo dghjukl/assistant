@@ -271,6 +271,63 @@ class InitiativeEngine:
         """Return a copy of the current initiative queue."""
         return [dict(item) for item in self._queue]
 
+    def current_focus(self) -> dict[str, Any] | None:
+        """Return the most relevant initiative item as a current-focus record."""
+        status_rank = {
+            "dispatched": 0,
+            "ready_for_execution": 1,
+            "queued": 2,
+            "awaiting_consent": 3,
+            "deferred": 4,
+        }
+        eligible = [
+            dict(item)
+            for item in self._queue
+            if item.get("status") in status_rank
+        ]
+        if not eligible:
+            return None
+
+        eligible.sort(
+            key=lambda item: (
+                status_rank.get(str(item.get("status")), 99),
+                _PRIORITY_RANK.get(str(item.get("priority")), 99),
+                str(item.get("scheduled_at", "")),
+            )
+        )
+        item = eligible[0]
+        raw_status = str(item.get("status") or "queued")
+        status_map = {
+            "dispatched": "active",
+            "ready_for_execution": "active",
+            "queued": "active",
+            "awaiting_consent": "waiting",
+            "deferred": "waiting",
+        }
+        next_action_map = {
+            "dispatched": "Finish the initiative task and record its result.",
+            "ready_for_execution": "Execute the approved initiative task.",
+            "queued": "Execute the queued initiative task.",
+            "awaiting_consent": "Wait for consent or admin feedback before execution.",
+            "deferred": "Revisit this initiative when conditions improve.",
+        }
+        title = str(item.get("initiative_type") or "initiative").replace("_", " ").strip().title()
+        return {
+            "focus_id": item.get("initiative_id") or "initiative-current",
+            "title": title,
+            "why_now": str(item.get("rationale") or "An initiative candidate is currently queued."),
+            "next_action": next_action_map.get(raw_status, "Review the initiative queue."),
+            "status": status_map.get(raw_status, "waiting"),
+            "source": "initiative",
+            "updated_at": str(
+                item.get("dispatched_at")
+                or item.get("feedback_at")
+                or item.get("scheduled_at")
+                or _iso_now()
+            ),
+            "metadata": item,
+        }
+
     def get_status(self) -> dict[str, Any]:
         """Return engine health snapshot for admin API."""
         return {

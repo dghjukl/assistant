@@ -114,6 +114,7 @@ _identity_continuity = None    # runtime.identity_continuity.IdentityContinuityM
 _entity_lifecycle = None       # runtime.entity_lifecycle.EntityLifecycleService
 _session_continuity = None     # runtime.session_continuity.SessionContinuityService
 _goal_store = None             # core.intent.GoalStore
+_current_focus_service = None  # runtime.current_focus.CurrentFocusService
 _workspace_service = None      # runtime.workspace_service.WorkspaceService
 _worldview_service = None      # core.worldview.WorldviewService
 _entity_state_service = None   # runtime.entity_state_service.EntityStateService
@@ -214,6 +215,35 @@ def _build_entity_snapshot(
     except Exception as exc:
         logger.debug("EntityStateService snapshot failed (%s): %s", source, exc)
         return None
+
+
+def _get_current_focus_dict() -> dict[str, Any]:
+    """Return the authoritative current-focus record as a plain dict."""
+    if _current_focus_service is None:
+        return {
+            "focus_id": "focus-unavailable",
+            "title": "Stand by for the next meaningful task",
+            "why_now": "Current focus service is not initialized.",
+            "next_action": "Wait for user input or startup completion.",
+            "status": "waiting",
+            "source": "maintenance",
+            "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "metadata": {"available": False},
+        }
+    try:
+        return _current_focus_service.get_current_focus().to_dict()
+    except Exception as exc:
+        logger.debug("CurrentFocusService lookup failed: %s", exc)
+        return {
+            "focus_id": "focus-error",
+            "title": "Stand by for the next meaningful task",
+            "why_now": f"Current focus lookup failed: {exc}",
+            "next_action": "Retry current focus resolution.",
+            "status": "blocked",
+            "source": "maintenance",
+            "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "metadata": {"available": False, "error": str(exc)},
+        }
 
 
 def _group_tools_by_category() -> dict[str, list[str]]:
@@ -324,7 +354,17 @@ async def _memory_maintenance_loop() -> None:
                 continue
 
             _emit_log("info", "memory_maintenance", "Starting maintenance run")
+            focus_id = None
             try:
+                if _current_focus_service is not None:
+                    focus = _current_focus_service.set_background_focus(
+                        focus_id="maintenance-loop",
+                        title="Run memory maintenance",
+                        why_now="The scheduled memory-maintenance interval elapsed.",
+                        next_action="Prune, consolidate, and health-check memory stores.",
+                        source="maintenance",
+                    )
+                    focus_id = focus.focus_id
                 _build_entity_snapshot(
                     scope="background",
                     source="memory_maintenance.loop",
@@ -344,9 +384,29 @@ async def _memory_maintenance_loop() -> None:
                         "consolidated":        result.get("consolidation", {}).get("entries_created", 0),
                     },
                 )
+                if _current_focus_service is not None:
+                    _current_focus_service.set_background_focus(
+                        focus_id=focus_id or "maintenance-loop",
+                        title="Memory maintenance finished",
+                        why_now="The scheduled maintenance run completed successfully.",
+                        next_action="Wait for the next maintenance interval or user task.",
+                        status="done",
+                        source="maintenance",
+                        metadata={"result": result},
+                    )
             except Exception as exc:
                 _emit_log("error", "memory_maintenance", f"Maintenance failed: {exc}")
                 logger.error("Memory maintenance error: %s", exc)
+                if _current_focus_service is not None:
+                    _current_focus_service.set_background_focus(
+                        focus_id=focus_id or "maintenance-loop",
+                        title="Memory maintenance failed",
+                        why_now="A scheduled maintenance cycle raised an error.",
+                        next_action="Inspect the failure and retry when safe.",
+                        status="blocked",
+                        source="maintenance",
+                        metadata={"error": str(exc)},
+                    )
 
         except Exception as exc:
             logger.error("Memory maintenance loop error: %s", exc)
@@ -363,6 +423,14 @@ async def _initiative_loop() -> None:
             if not can("initiative"):
                 continue
             try:
+                if _current_focus_service is not None:
+                    _current_focus_service.set_background_focus(
+                        focus_id="initiative-eval",
+                        title="Evaluate initiative opportunities",
+                        why_now="The initiative scheduler fired and autonomy permits proactive work.",
+                        next_action="Inspect current signals and queue the strongest initiative candidate.",
+                        source="maintenance",
+                    )
                 snapshot = _build_entity_snapshot(
                     scope="background",
                     source="initiative.loop",
@@ -384,8 +452,27 @@ async def _initiative_loop() -> None:
                         f"Dispatched {len(dispatched)} initiative(s)",
                         {"dispatched": [d.get("initiative_type") for d in dispatched]},
                     )
+                elif _current_focus_service is not None and not result.get("selected"):
+                    _current_focus_service.set_background_focus(
+                        focus_id="initiative-eval",
+                        title="Initiative evaluation complete",
+                        why_now="The initiative scheduler ran but did not find a stronger proactive task.",
+                        next_action="Wait for the next initiative cycle or user turn.",
+                        status="done",
+                        source="maintenance",
+                    )
             except Exception as exc:
                 logger.debug("Initiative eval error: %s", exc)
+                if _current_focus_service is not None:
+                    _current_focus_service.set_background_focus(
+                        focus_id="initiative-eval",
+                        title="Initiative evaluation failed",
+                        why_now="The initiative background loop encountered an error.",
+                        next_action="Inspect the initiative error and retry on a future cycle.",
+                        status="blocked",
+                        source="maintenance",
+                        metadata={"error": str(exc)},
+                    )
         except Exception as exc:
             logger.error("Initiative loop error: %s", exc)
 
@@ -590,7 +677,7 @@ def _ensure_runtime_dirs(root: Path) -> None:
 async def startup_event():
     """Initialize the server: load config, discover topology, init tracer."""
     global _topology, _cfg, _tracer, _bus, _reflection_pipeline, _initiative_engine, _investigation_engine, _primary_degraded, _tool_registry, _runtime_discovery
-    global _sensor_poller, _crash_recovery, _capability_registry, _backend_probe, _idle_cognition, _identity_continuity, _entity_lifecycle, _session_continuity, _goal_store, _workspace_service, _backup_service, _worldview_service, _computer_use_service, _entity_state_service
+    global _sensor_poller, _crash_recovery, _capability_registry, _backend_probe, _idle_cognition, _identity_continuity, _entity_lifecycle, _session_continuity, _goal_store, _current_focus_service, _workspace_service, _backup_service, _worldview_service, _computer_use_service, _entity_state_service
 
     try:
         # 1. Load config
@@ -725,6 +812,14 @@ async def startup_event():
         except Exception as exc:
             logger.warning("EntityStateService init failed: %s", exc)
 
+        # 3c3. Current focus service — one shared "what am I doing now?" record
+        try:
+            from runtime.current_focus import CurrentFocusService
+            _current_focus_service = CurrentFocusService()
+            _emit_log("info", "startup", "CurrentFocusService initialized")
+        except Exception as exc:
+            logger.warning("CurrentFocusService init failed: %s", exc)
+
         # 3d. Session continuity — load prior session excerpt for system prompt primer
         try:
             from runtime.session_continuity import SessionContinuityService
@@ -748,6 +843,7 @@ async def startup_event():
                     topology=_topology,
                     lifecycle_service=_entity_lifecycle,
                     session_continuity=_session_continuity,
+                    current_focus_service=_current_focus_service,
                 )
 
         # 3e. Goal store — load durable goals
@@ -767,7 +863,10 @@ async def startup_event():
                     lifecycle_service=_entity_lifecycle,
                     session_continuity=_session_continuity,
                     goal_store=_goal_store,
+                    current_focus_service=_current_focus_service,
                 )
+            if _current_focus_service is not None:
+                _current_focus_service.wire(goal_store=_goal_store)
 
         # 3f. Workspace service — first-class persistent environment for the entity
         try:
@@ -789,6 +888,7 @@ async def startup_event():
                     lifecycle_service=_entity_lifecycle,
                     session_continuity=_session_continuity,
                     goal_store=_goal_store,
+                    current_focus_service=_current_focus_service,
                     workspace_service=_workspace_service,
                 )
 
@@ -961,6 +1061,8 @@ async def startup_event():
             from runtime.initiative_engine import InitiativeEngine
             _initiative_engine = InitiativeEngine(_cfg)
             _emit_log("info", "startup", "InitiativeEngine initialized")
+            if _current_focus_service is not None:
+                _current_focus_service.wire(initiative_engine=_initiative_engine)
         except Exception as exc:
             logger.warning("InitiativeEngine init failed: %s", exc)
 
@@ -969,6 +1071,8 @@ async def startup_event():
             from runtime.investigation_engine import InvestigationEngine
             _investigation_engine = InvestigationEngine(_cfg)
             _emit_log("info", "startup", "InvestigationEngine initialized")
+            if _current_focus_service is not None:
+                _current_focus_service.wire(investigation_engine=_investigation_engine)
         except Exception as exc:
             logger.warning("InvestigationEngine init failed: %s", exc)
 
@@ -1012,6 +1116,7 @@ async def startup_event():
                     lifecycle_service=_entity_lifecycle,
                     session_continuity=_session_continuity,
                     goal_store=_goal_store,
+                    current_focus_service=_current_focus_service,
                     workspace_service=_workspace_service,
                     worldview_service=_worldview_service,
                     capability_registry=_capability_registry,
@@ -1137,6 +1242,15 @@ async def startup_event():
                 _background_tasks.add(task3)
                 task3.add_done_callback(_background_tasks.discard)
                 _emit_log("info", "startup", "ReflectionPipeline started")
+                if _current_focus_service is not None:
+                    _current_focus_service.set_background_focus(
+                        focus_id="reflection-scheduler",
+                        title="Monitor reflection schedule",
+                        why_now="Reflection and relational evaluation loops are running in the background.",
+                        next_action="Wait for the next reflection trigger and refresh identity state.",
+                        status="waiting",
+                        source="maintenance",
+                    )
         except Exception as exc:
             logger.warning("ReflectionPipeline start failed: %s", exc)
 
@@ -1148,6 +1262,15 @@ async def startup_event():
                 if _idle_cognition is None or _topology is None:
                     continue
                 try:
+                    if _current_focus_service is not None:
+                        _current_focus_service.set_background_focus(
+                            focus_id="idle-cognition",
+                            title="Check whether idle cognition should fire",
+                            why_now="The idle cognition scheduler woke up after a quiet period.",
+                            next_action="Assess inactivity and optionally fire a background thought.",
+                            status="active",
+                            source="maintenance",
+                        )
                     snapshot = _build_entity_snapshot(
                         scope="background",
                         source="idle_cognition.loop",
@@ -1158,6 +1281,15 @@ async def startup_event():
                         last_interaction_monotonic=_last_interaction_monotonic or _time.monotonic(),
                         entity_snapshot=snapshot,
                     )
+                    if _current_focus_service is not None:
+                        _current_focus_service.set_background_focus(
+                            focus_id="idle-cognition",
+                            title="Idle cognition check complete",
+                            why_now="The idle cognition scheduler finished its latest review.",
+                            next_action="Wait for the next idle-cognition window.",
+                            status="done",
+                            source="maintenance",
+                        )
                 except Exception as _exc:
                     logger.debug("idle_cognition loop error: %s", _exc)
 
@@ -1391,6 +1523,7 @@ async def get_status_endpoint():
             "topology": topology_summary,
             "capabilities": _runtime_discovery.capabilities if _runtime_discovery else {},
             "services": _runtime_discovery.to_dict().get("services", {}) if _runtime_discovery else {},
+            "current_focus": _get_current_focus_dict(),
             "entity_state": snapshot.to_dict() if snapshot is not None else None,
         })
     except Exception as exc:
@@ -1518,6 +1651,7 @@ async def post_chat(body: ChatRequest):
             "ok": True,
             "response": response,
             "turn_count": count_interactions(),
+            "current_focus": _get_current_focus_dict(),
         })
     except Exception as exc:
         logger.error("Chat endpoint error: %s", exc)
@@ -1587,6 +1721,7 @@ async def websocket_chat(websocket: WebSocket):
                     "type": "response",
                     "response": response,
                     "turn_count": count_interactions(),
+                    "current_focus": _get_current_focus_dict(),
                     "ok": True,
                 })
             except Exception as exc:
@@ -2572,13 +2707,41 @@ async def admin_memory_maintenance():
     try:
         from runtime.memory_maintenance import run_maintenance
         _emit_log("info", "memory_maintenance", "Manual maintenance triggered")
+        if _current_focus_service is not None:
+            _current_focus_service.set_background_focus(
+                focus_id="maintenance-admin",
+                title="Run manual memory maintenance",
+                why_now="An admin explicitly requested a maintenance cycle.",
+                next_action="Execute maintenance immediately and capture the result.",
+                source="maintenance",
+            )
         result = await run_maintenance(
             _topology, _cfg, tracer=_tracer, bus=_bus
         )
         _last_maintenance_result = result
-        return JSONResponse({"ok": True, "data": result})
+        if _current_focus_service is not None:
+            _current_focus_service.set_background_focus(
+                focus_id="maintenance-admin",
+                title="Manual memory maintenance finished",
+                why_now="The requested maintenance cycle completed.",
+                next_action="Review maintenance results or wait for the next task.",
+                status="done",
+                source="maintenance",
+                metadata={"result": result},
+            )
+        return JSONResponse({"ok": True, "data": result, "current_focus": _get_current_focus_dict()})
     except Exception as exc:
         logger.error("Manual maintenance error: %s", exc)
+        if _current_focus_service is not None:
+            _current_focus_service.set_background_focus(
+                focus_id="maintenance-admin",
+                title="Manual memory maintenance failed",
+                why_now="The admin-requested maintenance cycle raised an error.",
+                next_action="Inspect the maintenance failure before retrying.",
+                status="blocked",
+                source="maintenance",
+                metadata={"error": str(exc)},
+            )
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
 
@@ -2840,10 +3003,10 @@ async def admin_initiative_status():
     try:
         from core.autonomy import can
         if _initiative_engine is None:
-            return JSONResponse({"ok": True, "data": {"available": False}})
+            return JSONResponse({"ok": True, "data": {"available": False}, "current_focus": _get_current_focus_dict()})
         status = _initiative_engine.get_status()
         status["autonomy_gate"] = can("initiative")
-        return JSONResponse({"ok": True, "data": status})
+        return JSONResponse({"ok": True, "data": status, "current_focus": _get_current_focus_dict()})
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
@@ -2853,8 +3016,8 @@ async def admin_initiative_queue():
     """Get current initiative queue."""
     try:
         if _initiative_engine is None:
-            return JSONResponse({"ok": True, "data": []})
-        return JSONResponse({"ok": True, "data": _initiative_engine.get_queue()})
+            return JSONResponse({"ok": True, "data": [], "current_focus": _get_current_focus_dict()})
+        return JSONResponse({"ok": True, "data": _initiative_engine.get_queue(), "current_focus": _get_current_focus_dict()})
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
@@ -2871,7 +3034,7 @@ async def admin_initiative_trigger(body: InitiativeTriggerRequest):
         rationale = body.rationale
         result = _initiative_engine.trigger_eval(rationale=rationale)
         _emit_log("info", "initiative", "Manual trigger", result)
-        return JSONResponse({"ok": True, "data": result})
+        return JSONResponse({"ok": True, "data": result, "current_focus": _get_current_focus_dict()})
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
@@ -2888,7 +3051,7 @@ async def admin_initiative_feedback(body: InitiativeFeedbackRequest):
         result = _initiative_engine.apply_feedback(body.initiative_id, body.feedback)
         if result.get("ok"):
             _emit_log("info", "initiative", f"Feedback '{body.feedback}' → {body.initiative_id}")
-        return JSONResponse(result)
+        return JSONResponse({**result, "current_focus": _get_current_focus_dict()})
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
@@ -2911,7 +3074,7 @@ async def admin_initiative_execute():
             _topology, _cfg, tracer=_tracer, bus=_bus, entity_snapshot=snapshot
         )
         _emit_log("info", "initiative", f"Admin executed {len(dispatched)} initiatives")
-        return JSONResponse({"ok": True, "data": {"dispatched": len(dispatched)}})
+        return JSONResponse({"ok": True, "data": {"dispatched": len(dispatched)}, "current_focus": _get_current_focus_dict()})
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
@@ -2925,7 +3088,7 @@ async def admin_initiative_clear():
         before = len(_initiative_engine.get_queue())
         _initiative_engine.clear_queue()
         _emit_log("info", "initiative", f"Queue cleared ({before} items removed)")
-        return JSONResponse({"ok": True, "data": {"cleared": before}})
+        return JSONResponse({"ok": True, "data": {"cleared": before}, "current_focus": _get_current_focus_dict()})
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
@@ -2942,7 +3105,7 @@ async def admin_investigation_list(status: str = "", limit: int = 20):
             status=status or None,
             limit=max(1, min(limit, 100)),
         )
-        return JSONResponse({"ok": True, "data": items})
+        return JSONResponse({"ok": True, "data": items, "current_focus": _get_current_focus_dict()})
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
@@ -2964,7 +3127,7 @@ async def admin_investigation_create(body: InvestigationCreateRequest):
             created_by="admin",
         )
         _emit_log("info", "investigation", f"Created: {body.title}", {"id": inv["investigation_id"]})
-        return JSONResponse({"ok": True, "data": inv})
+        return JSONResponse({"ok": True, "data": inv, "current_focus": _get_current_focus_dict()})
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
@@ -2984,7 +3147,7 @@ async def admin_investigation_get(investigation_id: str):
                 {"ok": False, "error": "Not found"},
                 status_code=404,
             )
-        return JSONResponse({"ok": True, "data": inv})
+        return JSONResponse({"ok": True, "data": inv, "current_focus": _get_current_focus_dict()})
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
@@ -3020,7 +3183,10 @@ async def admin_investigation_run_pass(investigation_id: str, body: Investigatio
             bus=_bus,
             entity_snapshot=snapshot,
         )
-        return JSONResponse(result if "ok" in result else {"ok": True, "data": result})
+        payload = result if "ok" in result else {"ok": True, "data": result}
+        if isinstance(payload, dict):
+            payload["current_focus"] = _get_current_focus_dict()
+        return JSONResponse(payload)
     except Exception as exc:
         logger.error("Investigation run_pass error: %s", exc)
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
@@ -3039,7 +3205,7 @@ async def admin_investigation_resolve(investigation_id: str, body: Investigation
         if inv is None:
             return JSONResponse({"ok": False, "error": "Not found"}, status_code=404)
         _emit_log("info", "investigation", f"Resolved: {investigation_id}")
-        return JSONResponse({"ok": True, "data": inv})
+        return JSONResponse({"ok": True, "data": inv, "current_focus": _get_current_focus_dict()})
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
@@ -3057,7 +3223,7 @@ async def admin_investigation_reopen(investigation_id: str):
         if inv is None:
             return JSONResponse({"ok": False, "error": "Not found"}, status_code=404)
         _emit_log("info", "investigation", f"Reopened: {investigation_id}")
-        return JSONResponse({"ok": True, "data": inv})
+        return JSONResponse({"ok": True, "data": inv, "current_focus": _get_current_focus_dict()})
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
@@ -3075,7 +3241,7 @@ async def admin_investigation_delete(investigation_id: str):
         if not deleted:
             return JSONResponse({"ok": False, "error": "Not found"}, status_code=404)
         _emit_log("info", "investigation", f"Deleted: {investigation_id}")
-        return JSONResponse({"ok": True, "data": {"deleted": investigation_id}})
+        return JSONResponse({"ok": True, "data": {"deleted": investigation_id}, "current_focus": _get_current_focus_dict()})
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
@@ -3086,7 +3252,7 @@ async def admin_investigation_diagnostics():
     try:
         if _investigation_engine is None:
             return JSONResponse({"ok": True, "data": {"available": False}})
-        return JSONResponse({"ok": True, "data": _investigation_engine.get_diagnostics()})
+        return JSONResponse({"ok": True, "data": _investigation_engine.get_diagnostics(), "current_focus": _get_current_focus_dict()})
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
@@ -3974,10 +4140,28 @@ async def admin_force_idle_cognition():
             source="idle_cognition.force_fire",
             metadata={"endpoint": "/admin/system/idle-cognition/force"},
         )
+        if _current_focus_service is not None:
+            _current_focus_service.set_background_focus(
+                focus_id="idle-cognition-force",
+                title="Force idle cognition",
+                why_now="An admin explicitly requested an immediate idle-cognition run.",
+                next_action="Run the idle-cognition cycle now.",
+                source="maintenance",
+            )
         result = await _idle_cognition.force_fire(
             _topology, _tracer, _bus, entity_snapshot=snapshot
         )
-        return JSONResponse({"ok": True, "data": result or {"message": "fire returned no result"}})
+        if _current_focus_service is not None:
+            _current_focus_service.set_background_focus(
+                focus_id="idle-cognition-force",
+                title="Idle cognition force-run complete",
+                why_now="The admin-triggered idle-cognition cycle finished.",
+                next_action="Wait for the next scheduled idle-cognition window.",
+                status="done",
+                source="maintenance",
+                metadata={"result": result},
+            )
+        return JSONResponse({"ok": True, "data": result or {"message": "fire returned no result"}, "current_focus": _get_current_focus_dict()})
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
@@ -4041,6 +4225,7 @@ async def admin_goals_list():
                 "all":     [g.to_dict() for g in all_g],
                 "active_count": _goal_store.active_count(),
             },
+            "current_focus": _get_current_focus_dict(),
         })
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
@@ -4061,7 +4246,7 @@ async def admin_goals_create(body: GoalCreateRequest):
             context     = body.context,
             source      = body.source,
         )
-        return JSONResponse({"ok": True, "goal_id": goal_id})
+        return JSONResponse({"ok": True, "goal_id": goal_id, "current_focus": _get_current_focus_dict()})
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
@@ -4075,7 +4260,7 @@ async def admin_goals_complete(goal_id: str, body: GoalNoteRequest = None):
         found = _goal_store.complete_goal(goal_id, note=body.note if body else "")
         if not found:
             return JSONResponse({"ok": False, "error": "Goal not found"}, status_code=404)
-        return JSONResponse({"ok": True, "goal_id": goal_id, "status": "completed"})
+        return JSONResponse({"ok": True, "goal_id": goal_id, "status": "completed", "current_focus": _get_current_focus_dict()})
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
@@ -4089,7 +4274,7 @@ async def admin_goals_abandon(goal_id: str, body: GoalAbandonRequest = None):
         found = _goal_store.abandon_goal(goal_id, reason=body.reason if body else "")
         if not found:
             return JSONResponse({"ok": False, "error": "Goal not found"}, status_code=404)
-        return JSONResponse({"ok": True, "goal_id": goal_id, "status": "abandoned"})
+        return JSONResponse({"ok": True, "goal_id": goal_id, "status": "abandoned", "current_focus": _get_current_focus_dict()})
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 

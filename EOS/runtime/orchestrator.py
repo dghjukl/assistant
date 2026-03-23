@@ -429,6 +429,7 @@ async def call_qwen3(
     _workspace_svc     = None
     _worldview_svc     = None
     _entity_state_svc  = None
+    _current_focus_svc = None
     _entity_snapshot   = entity_snapshot
     try:
         import webui.server as _srv
@@ -440,6 +441,7 @@ async def call_qwen3(
         _workspace_svc = getattr(_srv, "_workspace_service", None)
         _worldview_svc = getattr(_srv, "_worldview_service", None)
         _entity_state_svc = getattr(_srv, "_entity_state_service", None)
+        _current_focus_svc = getattr(_srv, "_current_focus_service", None)
         if _entity_snapshot is None and _entity_state_svc is not None:
             _entity_snapshot = _entity_state_svc.build_snapshot(
                 scope="turn",
@@ -458,6 +460,16 @@ async def call_qwen3(
         worldview_service=_worldview_svc,
         entity_snapshot=_entity_snapshot,
     )
+    agenda_block = ""
+    try:
+        if _entity_snapshot is not None and getattr(_entity_snapshot, "current_focus_block", ""):
+            agenda_block = _entity_snapshot.current_focus_block
+        elif _current_focus_svc is not None:
+            agenda_block = _current_focus_svc.render_agenda_block()
+    except Exception:
+        agenda_block = ""
+    if agenda_block:
+        system_prompt = f"{agenda_block}\n\n{system_prompt}"
     memory_context = recall_as_context(user_message, top_k=3)
 
     qwen_cfg    = cfg.get("qwen3", {})

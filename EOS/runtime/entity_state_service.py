@@ -57,6 +57,8 @@ class EntityStateSnapshot:
     relational_summary: dict[str, Any]
     relational_clause: str
     autonomy_clause: str
+    current_focus_summary: dict[str, Any]
+    current_focus_block: str
     goals_summary: dict[str, Any]
     goals_block: str
     session_summary: dict[str, Any]
@@ -78,11 +80,13 @@ class EntityStateSnapshot:
         worldview_line = self.worldview_summary.get("status_line", "no worldview profile")
         workspace_line = self.workspace_summary.get("status_line", "workspace unavailable")
         tools_line = ", ".join(self.tool_summary.get("enabled_names", [])[:8]) or "none"
+        current_focus = self.current_focus_summary or {}
         return "\n".join([
             "## Shared Entity Snapshot",
             f"Snapshot: {self.snapshot_id} · {self.scope} · source={self.source}",
             f"Name: {self.name or '(unnamed)'}",
             f"Identity: {identity_line}",
+            f"Current focus: {current_focus.get('title', 'stand by')} ({current_focus.get('status', 'waiting')})",
             f"Current goals: {goals_line}",
             f"Session continuity: {'available' if self.session_summary.get('has_prior_session') else 'none'}",
             f"Worldview: {worldview_line}",
@@ -102,6 +106,7 @@ class EntityStateSnapshot:
             "identity": self.identity_summary,
             "relational": self.relational_summary,
             "autonomy_clause": self.autonomy_clause,
+            "current_focus": self.current_focus_summary,
             "goals": self.goals_summary,
             "session": self.session_summary,
             "worldview": self.worldview_summary,
@@ -123,6 +128,7 @@ class EntityStateService:
         self._lifecycle_service = None
         self._session_continuity = None
         self._goal_store = None
+        self._current_focus_service = None
         self._workspace_service = None
         self._worldview_service = None
         self._capability_registry = None
@@ -136,6 +142,7 @@ class EntityStateService:
         lifecycle_service=None,
         session_continuity=None,
         goal_store=None,
+        current_focus_service=None,
         workspace_service=None,
         worldview_service=None,
         capability_registry=None,
@@ -145,6 +152,7 @@ class EntityStateService:
         self._lifecycle_service = lifecycle_service
         self._session_continuity = session_continuity
         self._goal_store = goal_store
+        self._current_focus_service = current_focus_service
         self._workspace_service = workspace_service
         self._worldview_service = worldview_service
         self._capability_registry = capability_registry
@@ -212,6 +220,22 @@ class EntityStateService:
         }
 
         autonomy_clause = build_autonomy_clause()
+
+        current_focus_summary: dict[str, Any] = {
+            "title": "Stand by for the next meaningful task",
+            "status": "waiting",
+            "source": "maintenance",
+            "why_now": "No current focus record is available.",
+            "next_action": "Wait for user input or the next background cycle.",
+        }
+        current_focus_block = ""
+        if self._current_focus_service is not None:
+            try:
+                focus = self._current_focus_service.get_current_focus()
+                current_focus_summary = focus.to_dict()
+                current_focus_block = self._current_focus_service.render_agenda_block()
+            except Exception as exc:
+                current_focus_summary["error"] = str(exc)
 
         goals_block = ""
         goals_summary: dict[str, Any] = {
@@ -346,6 +370,8 @@ class EntityStateService:
             relational_summary=relational_summary,
             relational_clause=relational_clause,
             autonomy_clause=autonomy_clause,
+            current_focus_summary=current_focus_summary,
+            current_focus_block=current_focus_block,
             goals_summary=goals_summary,
             goals_block=goals_block,
             session_summary=session_summary,

@@ -337,6 +337,48 @@ class InvestigationEngine:
     def list(self, status: str | None = None, limit: int = 20) -> list[dict[str, Any]]:
         return self._store.list(status=status, limit=limit)
 
+    def current_focus(self) -> dict[str, Any] | None:
+        """Return the most relevant unresolved investigation as a focus record."""
+        active = self._store.list(status="active", limit=1)
+        open_items = self._store.list(status="open", limit=1) if not active else []
+        candidate = (active or open_items or [None])[0]
+        if candidate is None:
+            return None
+
+        full = self.get(candidate["investigation_id"]) or candidate
+        passes = full.get("passes", []) or []
+        latest_pass = passes[-1] if passes else {}
+        latest_summary = str(latest_pass.get("summary") or "").strip()
+        latest_next = str(latest_pass.get("next_action") or "").strip()
+        latest_outcome = str(latest_pass.get("outcome_status") or "").strip()
+
+        status = "active"
+        if latest_outcome in {"failed", "timed_out", "cancelled"}:
+            status = "blocked"
+        elif str(full.get("status")) == "open":
+            status = "waiting"
+
+        why_now = (
+            latest_summary
+            or str(full.get("description") or "").strip()
+            or "An unresolved investigation still needs evidence-grounded follow-up."
+        )
+        next_action = latest_next or "Run the next investigation pass."
+
+        return {
+            "focus_id": full.get("investigation_id") or "investigation-current",
+            "title": str(full.get("title") or "Investigation"),
+            "why_now": why_now,
+            "next_action": next_action,
+            "status": status,
+            "source": "investigation",
+            "updated_at": str(full.get("updated_at") or _iso_now()),
+            "metadata": {
+                "investigation": full,
+                "latest_pass": latest_pass,
+            },
+        }
+
     def resolve(
         self,
         investigation_id: str,
