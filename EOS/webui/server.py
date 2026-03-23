@@ -806,6 +806,7 @@ async def startup_event():
             _entity_state_service = EntityStateService(_cfg)
             _entity_state_service.wire(
                 topology=_topology,
+                runtime_discovery=_runtime_discovery,
                 lifecycle_service=_entity_lifecycle,
             )
             _emit_log("info", "startup", "EntityStateService initialized")
@@ -841,6 +842,7 @@ async def startup_event():
             if _entity_state_service is not None:
                 _entity_state_service.wire(
                     topology=_topology,
+                    runtime_discovery=_runtime_discovery,
                     lifecycle_service=_entity_lifecycle,
                     session_continuity=_session_continuity,
                     current_focus_service=_current_focus_service,
@@ -860,6 +862,7 @@ async def startup_event():
             if _entity_state_service is not None:
                 _entity_state_service.wire(
                     topology=_topology,
+                    runtime_discovery=_runtime_discovery,
                     lifecycle_service=_entity_lifecycle,
                     session_continuity=_session_continuity,
                     goal_store=_goal_store,
@@ -885,6 +888,7 @@ async def startup_event():
             if _entity_state_service is not None:
                 _entity_state_service.wire(
                     topology=_topology,
+                    runtime_discovery=_runtime_discovery,
                     lifecycle_service=_entity_lifecycle,
                     session_continuity=_session_continuity,
                     goal_store=_goal_store,
@@ -910,6 +914,7 @@ async def startup_event():
             if _entity_state_service is not None:
                 _entity_state_service.wire(
                     topology=_topology,
+                    runtime_discovery=_runtime_discovery,
                     lifecycle_service=_entity_lifecycle,
                     session_continuity=_session_continuity,
                     goal_store=_goal_store,
@@ -991,6 +996,19 @@ async def startup_event():
                 logger.info("[computer_use] Disabled in config (computer_use.enabled=false). Subsystem not loaded.")
         except Exception as exc:
             logger.warning("ComputerUseService init failed: %s", exc)
+        finally:
+            if _entity_state_service is not None:
+                _entity_state_service.wire(
+                    topology=_topology,
+                    runtime_discovery=_runtime_discovery,
+                    lifecycle_service=_entity_lifecycle,
+                    session_continuity=_session_continuity,
+                    goal_store=_goal_store,
+                    current_focus_service=_current_focus_service,
+                    workspace_service=_workspace_service,
+                    worldview_service=_worldview_service,
+                    computer_use_service=_computer_use_service,
+                )
 
         # 4c. Init CapabilityRegistry
         try:
@@ -1004,12 +1022,14 @@ async def startup_event():
             if _entity_state_service is not None:
                 _entity_state_service.wire(
                     topology=_topology,
+                    runtime_discovery=_runtime_discovery,
                     lifecycle_service=_entity_lifecycle,
                     session_continuity=_session_continuity,
                     goal_store=_goal_store,
                     workspace_service=_workspace_service,
                     worldview_service=_worldview_service,
                     capability_registry=_capability_registry,
+                    computer_use_service=_computer_use_service,
                 )
 
         # 4d. Init SensorPoller (hardware self-observation)
@@ -1113,6 +1133,7 @@ async def startup_event():
             if _entity_state_service is not None:
                 _entity_state_service.wire(
                     topology=_topology,
+                    runtime_discovery=_runtime_discovery,
                     lifecycle_service=_entity_lifecycle,
                     session_continuity=_session_continuity,
                     goal_store=_goal_store,
@@ -1121,6 +1142,7 @@ async def startup_event():
                     worldview_service=_worldview_service,
                     capability_registry=_capability_registry,
                     tool_registry=_tool_registry,
+                    computer_use_service=_computer_use_service,
                 )
         except Exception as exc:
             logger.warning("Toolpack init failed — falling back to legacy tool states: %s", exc)
@@ -2641,6 +2663,33 @@ async def admin_entity_state_diagnostic():
             "data": {
                 "latest": latest.to_dict() if latest is not None else None,
                 "history": _entity_state_service.history(limit=5),
+            },
+        })
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+@app.get("/admin/diagnostic/environment-model")
+async def admin_environment_model_diagnostic():
+    """Inspect the structured environment model the entity is currently using."""
+    try:
+        if _entity_state_service is None:
+            return JSONResponse(
+                {"ok": False, "error": "EntityStateService not initialized"},
+                status_code=503,
+            )
+        latest = _build_entity_snapshot(
+            scope="diagnostic",
+            source="/admin/diagnostic/environment-model",
+            metadata={"endpoint": "/admin/diagnostic/environment-model"},
+        )
+        environment = latest.environment_summary if latest is not None else None
+        return JSONResponse({
+            "ok": True,
+            "data": {
+                "environment": environment,
+                "prompt_block": getattr(latest, "environment_block", "") if latest is not None else "",
+                "tool_context": getattr(latest, "environment_tool_context", "") if latest is not None else "",
             },
         })
     except Exception as exc:

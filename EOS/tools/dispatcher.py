@@ -160,6 +160,7 @@ async def extract_tool_call(
     tool_intent: str,
     topology: "RuntimeTopology",
     available_tools: dict[str, dict] | None = None,
+    environment_context: str = "",
 ) -> dict | None:
     """
     Send Qwen3's natural language tool intent to the Tool Server.
@@ -178,10 +179,14 @@ async def extract_tool_call(
 
     schema_doc = json.dumps(available_tools or TOOL_SCHEMA, indent=2)
 
+    environment_block = f"Current environment model:\n{environment_context}\n\n" if environment_context else ""
     system = (
         "You are a tool-call extractor. Given a natural language description of an action, "
         "output a JSON object with 'tool' (tool name) and 'args' (argument dict).\n"
+        f"{environment_block}"
         f"Available tools and their argument schemas:\n{schema_doc}\n"
+        "Choose tools that match the known environment surfaces and connected services. "
+        "Do not route to desktop/browser/calendar/discord actions unless the environment model shows that surface exists or is reachable.\n"
         "If no tool applies, output: {\"tool\": null, \"args\": {}}\n"
         "Output only valid JSON. No explanation. No markdown fences."
     )

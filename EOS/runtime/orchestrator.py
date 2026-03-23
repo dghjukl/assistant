@@ -133,6 +133,8 @@ def _format_tool_output(result: Any) -> str:
 async def _run_registry_tool_intent(
     user_input: str,
     topology: RuntimeTopology,
+    *,
+    entity_snapshot: Any | None = None,
 ) -> str | None:
     """Extract and execute a tool call via the live ToolRegistry/ToolExecutor."""
     if _tool_executor is None or getattr(_tool_executor, "registry", None) is None:
@@ -144,7 +146,15 @@ async def _run_registry_tool_intent(
 
     from tools.dispatcher import extract_tool_call
 
-    call = await extract_tool_call(user_input, topology, available_tools=tool_schema)
+    env_ctx = ""
+    if entity_snapshot is not None:
+        env_ctx = getattr(entity_snapshot, "environment_tool_context", "") or ""
+    call = await extract_tool_call(
+        user_input,
+        topology,
+        available_tools=tool_schema,
+        environment_context=env_ctx,
+    )
     if not call or not call.get("tool"):
         return None
 
@@ -618,7 +628,11 @@ async def process_turn(
 
         # ── TOOL_OR_EXTERNAL ─────────────────────────────────────────────────
         elif mode == EpistemicMode.TOOL_OR_EXTERNAL:
-            tool_result = await _run_registry_tool_intent(user_input, topology)
+            tool_result = await _run_registry_tool_intent(
+                user_input,
+                topology,
+                entity_snapshot=entity_snapshot,
+            )
 
             if tool_result:
                 followup = (

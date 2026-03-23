@@ -67,6 +67,9 @@ class EntityStateSnapshot:
     worldview_block: str
     workspace_summary: dict[str, Any]
     workspace_block: str
+    environment_summary: dict[str, Any]
+    environment_block: str
+    environment_tool_context: str
     capabilities_summary: dict[str, Any]
     runtime_status_block: str
     tool_summary: dict[str, Any]
@@ -79,6 +82,9 @@ class EntityStateSnapshot:
         goals_line = "; ".join(goals[:3]) if goals else "none"
         worldview_line = self.worldview_summary.get("status_line", "no worldview profile")
         workspace_line = self.workspace_summary.get("status_line", "workspace unavailable")
+        environment_line = self.environment_summary.get("summary", {}).get("headline") if isinstance(self.environment_summary, dict) else ""
+        if not environment_line:
+            environment_line = self.environment_summary.get("headline", "environment unavailable") if isinstance(self.environment_summary, dict) else "environment unavailable"
         tools_line = ", ".join(self.tool_summary.get("enabled_names", [])[:8]) or "none"
         current_focus = self.current_focus_summary or {}
         return "\n".join([
@@ -91,6 +97,7 @@ class EntityStateSnapshot:
             f"Session continuity: {'available' if self.session_summary.get('has_prior_session') else 'none'}",
             f"Worldview: {worldview_line}",
             f"Workspace: {workspace_line}",
+            f"Environment: {environment_line}",
             f"Capabilities: {self.capabilities_summary.get('status_line', 'unavailable')}",
             f"Tools now available: {tools_line}",
         ])
@@ -111,6 +118,7 @@ class EntityStateSnapshot:
             "session": self.session_summary,
             "worldview": self.worldview_summary,
             "workspace": self.workspace_summary,
+            "environment": self.environment_summary,
             "capabilities": self.capabilities_summary,
             "tools": self.tool_summary,
             "metadata": self.metadata,
@@ -134,11 +142,14 @@ class EntityStateService:
         self._capability_registry = None
         self._tool_registry = None
         self._topology = None
+        self._runtime_discovery = None
+        self._computer_use_service = None
 
     def wire(
         self,
         *,
         topology=None,
+        runtime_discovery=None,
         lifecycle_service=None,
         session_continuity=None,
         goal_store=None,
@@ -147,8 +158,10 @@ class EntityStateService:
         worldview_service=None,
         capability_registry=None,
         tool_registry=None,
+        computer_use_service=None,
     ) -> None:
         self._topology = topology
+        self._runtime_discovery = runtime_discovery
         self._lifecycle_service = lifecycle_service
         self._session_continuity = session_continuity
         self._goal_store = goal_store
@@ -157,6 +170,7 @@ class EntityStateService:
         self._worldview_service = worldview_service
         self._capability_registry = capability_registry
         self._tool_registry = tool_registry
+        self._computer_use_service = computer_use_service
 
     def build_snapshot(
         self,
@@ -351,7 +365,43 @@ class EntityStateService:
             except Exception as exc:
                 tool_summary["error"] = str(exc)
 
+        environment_summary: dict[str, Any] = {
+            "headline": "environment model unavailable",
+            "location_count": 0,
+            "resource_count": 0,
+            "surface_count": 0,
+            "account_count": 0,
+        }
+        environment_block = ""
+        environment_tool_context = ""
+        try:
+            from runtime.environment_model import EnvironmentModelService
+
+            env_service = EnvironmentModelService(self._cfg)
+            env_service.wire(
+                topology=self._topology,
+                runtime_discovery=self._runtime_discovery,
+                workspace_service=self._workspace_service,
+                computer_use_service=self._computer_use_service,
+                capability_registry=self._capability_registry,
+                tool_registry=self._tool_registry,
+            )
+            env_model = env_service.build_model()
+            environment_summary = env_model.to_dict()
+            environment_block = env_model.prompt_block()
+            environment_tool_context = env_model.tool_context_block()
+        except Exception as exc:
+            environment_summary = {
+                "headline": "environment model unavailable",
+                "error": str(exc),
+                "location_count": 0,
+                "resource_count": 0,
+                "surface_count": 0,
+                "account_count": 0,
+            }
+
         runtime_status_block = self._build_runtime_status_block(
+            environment_summary=environment_summary,
             capabilities_summary=capabilities_summary,
             capability_entries=capability_entries,
             tool_summary=tool_summary,
@@ -380,6 +430,9 @@ class EntityStateService:
             worldview_block=worldview_block,
             workspace_summary=workspace_summary,
             workspace_block=workspace_block,
+            environment_summary=environment_summary,
+            environment_block=environment_block,
+            environment_tool_context=environment_tool_context,
             capabilities_summary=capabilities_summary,
             runtime_status_block=runtime_status_block,
             tool_summary=tool_summary,
@@ -406,11 +459,13 @@ class EntityStateService:
             "available": latest is not None,
             "latest": latest.to_dict() if latest else None,
             "history": self.history(limit=5),
+            "environment": latest.environment_summary if latest else None,
         }
 
     def _build_runtime_status_block(
         self,
         *,
+        environment_summary: dict[str, Any],
         capabilities_summary: dict[str, Any],
         capability_entries: list[dict[str, Any]],
         tool_summary: dict[str, Any],
@@ -442,6 +497,12 @@ class EntityStateService:
                 lines.append(f"  !! {p}")
         else:
             lines.append("Servers: (status unavailable)")
+
+        env_headline = ""
+        if isinstance(environment_summary, dict):
+            env_headline = environment_summary.get("summary", {}).get("headline") or environment_summary.get("headline", "")
+        if env_headline:
+            lines.append(f"Environment: {env_headline}")
 
         status_line = capabilities_summary.get("status_line")
         if status_line:

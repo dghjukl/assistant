@@ -62,6 +62,8 @@ a developing sense of self, and a specific relationship with your partner.
 
 {workspace_block}
 
+{environment_block}
+
 {session_primer}
 
 {runtime_status}
@@ -266,6 +268,13 @@ def build_system_prompt(
         else worldview_service.worldview_block() if worldview_service is not None else ""
     )
 
+    # Environment block — structured view of what exists around the entity right now
+    environment_block = (
+        entity_snapshot.environment_block
+        if entity_snapshot is not None
+        else ""
+    )
+
     # Session primer — compact excerpt of the previous conversation
     session_primer = (
         entity_snapshot.session_primer
@@ -284,6 +293,7 @@ def build_system_prompt(
         lifecycle_block=lifecycle_block,
         goals_block=goals_block,
         workspace_block=workspace_block,
+        environment_block=environment_block,
         session_primer=session_primer,
         runtime_status=runtime_status,
     )
