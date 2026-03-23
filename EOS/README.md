@@ -22,8 +22,8 @@ EOS now uses a **single canonical config**: `config.json`.
 
 That file describes the full intended system — main, tool, thinking, creativity, vision, STT, and TTS. Startup behavior is modular:
 
-- **Per-server launchers** start exactly one backend each (`start-main-gpu.bat`, `start-tools-cpu.bat`, etc.)
-- **Bundle launchers** start common backend combinations (`start-minimal.bat`, `start-standard.bat`, `start-full.bat`)
+- **Per-server launchers** start exactly one backend each (`launchers/start-main-gpu.bat`, `launchers/start-tools-cpu.bat`, etc.)
+- **Bundle launchers** start common backend combinations (`launchers/start-minimal.bat`, `launchers/start-standard.bat`, `launchers/start-full.bat`)
 - **`start-eos.bat` / `python eos.py`** never start model servers; they discover what is already running, build a capability map, and launch the WebUI
 - **`status-eos.bat` / `python eos.py --status`** reports the same capability map without restarting anything
 
@@ -62,9 +62,9 @@ The WebUI remains the relationship and safety control point at `http://127.0.0.1
 
 | Goal | Launchers |
 |---|---|
-| Minimal chat + tools | `start-minimal.bat` then `start-eos.bat` |
-| Recommended standard stack | `start-standard.bat` then `start-eos.bat` |
-| Full stack | `start-full.bat` then `start-eos.bat` |
+| Minimal chat + tools | `launchers/start-minimal.bat` then `start-eos.bat` |
+| Recommended standard stack | `launchers/start-standard.bat` then `start-eos.bat` |
+| Full stack | `launchers/start-full.bat` then `start-eos.bat` |
 | Inspect current system state | `status-eos.bat` |
 | Single backend only | Use the matching `start-*-cpu.bat` or `start-*-gpu.bat` |
 
@@ -75,15 +75,15 @@ Legacy `Start *.bat` wrappers still exist, but they now delegate to the modular 
 ## Install overview
 
 1. Install Python 3.11 from https://www.python.org/downloads/ — check "Add Python to PATH"
-2. Right-click `Setup-Full.ps1` → "Run with PowerShell" — downloads ~13 GB of models and binaries
+2. Right-click `setup/Setup-Full.ps1` → "Run with PowerShell" — downloads ~13 GB of models and binaries
 3. Run `python verify.py` to confirm everything is in place
 4. Start the desired backends
 5. Run `start-eos.bat`
 6. Open `http://127.0.0.1:7860/` in your browser
 
-Full install instructions: [INSTALL.md](INSTALL.md)
+Full install instructions: [docs/INSTALL.md](docs/INSTALL.md)
 
-Quick reference for first-time setup: [QUICK_START.md](QUICK_START.md)
+Quick reference for first-time setup: [docs/QUICK_START.md](docs/QUICK_START.md)
 
 ---
 
@@ -91,13 +91,13 @@ Quick reference for first-time setup: [QUICK_START.md](QUICK_START.md)
 
 | Document | What it covers |
 |---|---|
-| [QUICK_START.md](QUICK_START.md) | Shortest path to a running system, with a checklist of optional capabilities |
-| [INSTALL.md](INSTALL.md) | Full install instructions, alternatives, troubleshooting |
-| [USER_GUIDE.md](USER_GUIDE.md) | Every capability explained: voice, Discord, Google, computer use, workspace, worldview, cognition panel |
-| [POWER_USER_GUIDE.md](POWER_USER_GUIDE.md) | Canonical config deep-dive, autonomy system, launcher architecture, diagnostics |
-| [MODELS.md](MODELS.md) | Model directory layout, filenames, sources, and swap instructions |
-| [CREDENTIALS.md](CREDENTIALS.md) | Step-by-step Discord bot and Google OAuth setup with LLM prompt suggestions |
-| [PROFILES.md](PROFILES.md) | Startup bundle overview and per-server launcher reference |
+| [docs/QUICK_START.md](docs/QUICK_START.md) | Shortest path to a running system, with a checklist of optional capabilities |
+| [docs/INSTALL.md](docs/INSTALL.md) | Full install instructions, alternatives, troubleshooting |
+| [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | Every capability explained: voice, Discord, Google, computer use, workspace, worldview, cognition panel |
+| [docs/POWER_USER_GUIDE.md](docs/POWER_USER_GUIDE.md) | Canonical config deep-dive, autonomy system, launcher architecture, diagnostics |
+| [docs/MODELS.md](docs/MODELS.md) | Model directory layout, filenames, sources, and swap instructions |
+| [docs/CREDENTIALS.md](docs/CREDENTIALS.md) | Step-by-step Discord bot and Google OAuth setup with LLM prompt suggestions |
+| [docs/PROFILES.md](docs/PROFILES.md) | Startup bundle overview and per-server launcher reference |
 
 ---
 

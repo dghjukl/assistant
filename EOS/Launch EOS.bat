@@ -1,4 +1,3 @@
 @echo off
 cd /d "%~dp0"
-powershell -ExecutionPolicy Bypass -File "%~dp0launcher.ps1"
-pause
+call "%~dp0launchers\Launch EOS.bat"

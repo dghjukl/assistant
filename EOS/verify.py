@@ -1,7 +1,7 @@
 """
 EOS — Post-Install Verification Script
 =======================================
-Run after Setup-Full.ps1 (or Setup-Lite.ps1) to confirm EOS is ready to launch.
+Run after setup/Setup-Full.ps1 (or setup/Setup-Lite.ps1) to confirm EOS is ready to launch.
 
 Usage:
     python verify.py
@@ -127,19 +127,19 @@ piper_bin = ROOT / "Piper" / "piper" / "piper.exe"
 require(
     cpu_bin.is_file(),
     f"llama-server (CPU) at {cpu_bin.relative_to(ROOT)}",
-    "Re-run Setup-Full.ps1 to download llama.cpp"
+    "Re-run setup/Setup-Full.ps1 to download llama.cpp"
 )
 
 advisory(
     gpu_bin.is_file(),
     f"llama-server (GPU/CUDA) at {gpu_bin.relative_to(ROOT)}",
-    "Re-run Setup-Full.ps1 with an NVIDIA GPU present, or use the CPU launchers"
+    "Re-run setup/Setup-Full.ps1 with an NVIDIA GPU present, or use the CPU launchers"
 )
 
 advisory(
     piper_bin.is_file(),
     f"Piper TTS at {piper_bin.relative_to(ROOT)}",
-    "Re-run Setup-Full.ps1 to download Piper"
+    "Re-run setup/Setup-Full.ps1 to download Piper"
 )
 
 # Test that the CPU binary actually executes
@@ -186,19 +186,19 @@ tts_cfg      = ROOT / "models" / "tts" / "en_US-amy-medium.onnx.json"
 require(
     has_gguf(primary_dir),
     "Primary model in models/primary/",
-    "Re-run Setup-Full.ps1 or place a primary GGUF in models/primary/"
+    "Re-run setup/Setup-Full.ps1 or place a primary GGUF in models/primary/"
 )
 
 advisory(
     has_gguf(tool_dir),
     "Tool model in models/tool/",
-    "Re-run Setup-Full.ps1 (tool model is optional but recommended)"
+    "Re-run setup/Setup-Full.ps1 (tool model is optional but recommended)"
 )
 
 advisory(
     has_gguf(thinking_dir),
     "Thinking model in models/thinking/",
-    "Re-run Setup-Full.ps1 (thinking model is optional)"
+    "Re-run setup/Setup-Full.ps1 (thinking model is optional)"
 )
 
 advisory(
@@ -212,28 +212,28 @@ vision_mmproj = has_mmproj(vision_dir)
 advisory(
     vision_main and vision_mmproj,
     "Vision model + mmproj in models/vision/ (vision mode only)",
-    "Re-run Setup-Full.ps1 to download both vision files"
+    "Re-run setup/Setup-Full.ps1 to download both vision files"
 )
 if vision_dir.is_dir():
     if vision_main and not vision_mmproj:
         warn("Vision main model found but mmproj is missing — vision mode will fail")
-        info("Re-run Setup-Full.ps1 to download mmproj-Qwen2.5-VL-3B-Instruct-f16.gguf")
+        info("Re-run setup/Setup-Full.ps1 to download mmproj-Qwen2.5-VL-3B-Instruct-f16.gguf")
         _warnings.append("vision mmproj missing")
     elif vision_mmproj and not vision_main:
         warn("Vision mmproj found but main model is missing — vision mode will fail")
-        info("Re-run Setup-Full.ps1 to download Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf")
+        info("Re-run setup/Setup-Full.ps1 to download Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf")
         _warnings.append("vision main model missing")
 
 advisory(
     stt_file.is_file(),
     "STT model at models/stt/ggml-small.en-q8_0.bin",
-    "Re-run Setup-Full.ps1 (voice input optional)"
+    "Re-run setup/Setup-Full.ps1 (voice input optional)"
 )
 
 advisory(
     tts_file.is_file() and tts_cfg.is_file(),
     "TTS model at models/tts/en_US-amy-medium.onnx + .json",
-    "Re-run Setup-Full.ps1 (voice output optional)"
+    "Re-run setup/Setup-Full.ps1 (voice output optional)"
 )
 
 
@@ -270,13 +270,13 @@ google_glob  = list((ROOT / "AI personal files").glob("client_secret_*.json")) \
 advisory(
     discord_file.is_file(),
     "Discord credential: AI personal files/Discord.txt",
-    "See CREDENTIALS.md — required only if Discord is enabled in config"
+    "See docs/CREDENTIALS.md — required only if Discord is enabled in config"
 )
 
 advisory(
     len(google_glob) > 0,
     "Google credential: AI personal files/client_secret_*.json",
-    "See CREDENTIALS.md — required only if Google is enabled in config"
+    "See docs/CREDENTIALS.md — required only if Google is enabled in config"
 )
 
 
@@ -321,7 +321,7 @@ for d in DATA_DIRS:
     advisory(
         d.is_dir(),
         f"{d.relative_to(ROOT)}/",
-        f"Re-run Setup-Full.ps1 to create directory structure"
+        f"Re-run setup/Setup-Full.ps1 to create directory structure"
     )
 
 
