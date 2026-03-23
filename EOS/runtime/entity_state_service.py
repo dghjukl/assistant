@@ -22,6 +22,10 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
+from core.attention_preferences import (
+    build_attention_taste_block,
+    summarize_attention_taste,
+)
 from core.autonomy import build_autonomy_clause
 from core.memory import (
     count_interactions,
@@ -227,6 +231,8 @@ class EntityStateSnapshot:
     autonomy_clause: str
     current_focus_summary: dict[str, Any]
     current_focus_block: str
+    attention_summary: dict[str, Any]
+    attention_block: str
     goals_summary: dict[str, Any]
     goals_block: str
     session_summary: dict[str, Any]
@@ -259,12 +265,14 @@ class EntityStateSnapshot:
             environment_line = self.environment_summary.get("headline", "environment unavailable") if isinstance(self.environment_summary, dict) else "environment unavailable"
         tools_line = ", ".join(self.tool_summary.get("enabled_names", [])[:8]) or "none"
         current_focus = self.current_focus_summary or {}
+        attention_line = self.attention_summary.get("compact", "no durable attention profile")
         return "\n".join([
             "## Shared Entity Snapshot",
             f"Snapshot: {self.snapshot_id} · {self.scope} · source={self.source}",
             f"Name: {self.name or '(unnamed)'}",
             f"Identity: {identity_line}",
             f"Current focus: {current_focus.get('title', 'stand by')} ({current_focus.get('status', 'waiting')})",
+            f"Attention / taste: {attention_line}",
             f"Current goals: {goals_line}",
             f"Session continuity: {'available' if self.session_summary.get('has_prior_session') else 'none'}",
             f"Worldview: {worldview_line}",
@@ -286,6 +294,7 @@ class EntityStateSnapshot:
             "relational": self.relational_summary,
             "autonomy_clause": self.autonomy_clause,
             "current_focus": self.current_focus_summary,
+            "attention": self.attention_summary,
             "goals": self.goals_summary,
             "session": self.session_summary,
             "worldview": self.worldview_summary,
@@ -428,6 +437,9 @@ class EntityStateService:
                 current_focus_block = self._current_focus_service.render_agenda_block()
             except Exception as exc:
                 current_focus_summary["error"] = str(exc)
+
+        attention_summary = summarize_attention_taste()
+        attention_block = build_attention_taste_block(attention_summary)
 
         goals_block = ""
         goals_summary: dict[str, Any] = {
@@ -640,6 +652,8 @@ class EntityStateService:
             autonomy_clause=autonomy_clause,
             current_focus_summary=current_focus_summary,
             current_focus_block=current_focus_block,
+            attention_summary=attention_summary,
+            attention_block=attention_block,
             goals_summary=goals_summary,
             goals_block=goals_block,
             session_summary=session_summary,

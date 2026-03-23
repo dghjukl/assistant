@@ -262,6 +262,10 @@ def _build_presence_state(
         getattr(entity_snapshot, "current_focus_summary", None)
         if entity_snapshot is not None else None
     ) or _get_current_focus_dict()
+    attention_summary = (
+        getattr(entity_snapshot, "attention_summary", None)
+        if entity_snapshot is not None else None
+    ) or {}
     continuity = (
         getattr(entity_snapshot, "session_summary", None)
         if entity_snapshot is not None else None
@@ -312,6 +316,7 @@ def _build_presence_state(
     try:
         return build_presence_state(
             current_focus=current_focus,
+            attention_summary=attention_summary,
             continuity=continuity,
             environment=environment,
             capabilities=capabilities,
@@ -549,7 +554,17 @@ async def _initiative_loop() -> None:
                     source="initiative.loop",
                     metadata={"loop": "initiative"},
                 )
-                result = _initiative_engine.evaluate()
+                try:
+                    from runtime.orchestrator import get_initiative_attention_bias
+                    attention_bias = get_initiative_attention_bias(snapshot)
+                except Exception:
+                    attention_bias = dict(getattr(snapshot, "attention_summary", {}).get("initiative_bias") or {})
+                result = _initiative_engine.evaluate(
+                    attention_summary={
+                        **(getattr(snapshot, "attention_summary", None) or {}),
+                        "initiative_bias": attention_bias,
+                    },
+                )
                 if result.get("selected"):
                     _emit_log(
                         "info", "initiative",
