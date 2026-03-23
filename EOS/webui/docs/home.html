@@ -1,14 +1,22 @@
 <div class="page-header">
   <div class="page-eyebrow">Entity Operating System</div>
   <h1 class="page-title">EOS Documentation</h1>
-  <p class="page-lead">Everything you need to run, configure, and extend EOS — your local AI companion and non-human partner.</p>
+  <p class="page-lead">EOS is the platform. The entity is the runtime intelligence inside EOS. The entity's chosen name is not the product name.</p>
+</div>
+
+<div class="callout important">
+  <div class="callout-icon">&#9432;</div>
+  <div class="callout-title">Canonical first impression</div>
+  <div class="callout-body">
+    New here? Use the default path: <strong>Setup-Full</strong> &rarr; <strong>verify.py</strong> &rarr; <strong>start-standard</strong> &rarr; <strong>start-eos</strong>. Deviate only if you need a lighter install, manual control, or a custom backend mix.
+  </div>
 </div>
 
 <div class="guide-grid">
   <div class="cap-card" style="--card-accent:#3b82f6" onclick="nav('quick-start')">
     <div class="cap-card-icon" style="color:#3b82f6">&#128640;</div>
     <div class="cap-card-title">Quick Start</div>
-    <div class="cap-card-desc">Get from zero to a running system in under an hour.</div>
+    <div class="cap-card-desc">Follow the canonical install and launch path in order.</div>
   </div>
   <div class="cap-card" style="--card-accent:#22c55e" onclick="nav('using-eos')">
     <div class="cap-card-icon" style="color:#22c55e">&#128218;</div>
@@ -18,12 +26,12 @@
   <div class="cap-card" style="--card-accent:#a855f7" onclick="nav('admin')">
     <div class="cap-card-icon" style="color:#a855f7">&#128295;</div>
     <div class="cap-card-title">Admin Panel</div>
-    <div class="cap-card-desc">Monitor, supervise, and if needed constrain EOS from the admin panel.</div>
+    <div class="cap-card-desc">Monitor, supervise, and if needed constrain the entity through EOS.</div>
   </div>
   <div class="cap-card" style="--card-accent:#f59e0b" onclick="nav('power-user')">
     <div class="cap-card-icon" style="color:#f59e0b">&#9889;</div>
     <div class="cap-card-title">Power User Guide</div>
-    <div class="cap-card-desc">Config deep-dive, CLI, launcher architecture, and diagnostics.</div>
+    <div class="cap-card-desc">Advanced launcher control, CLI startup, config, and diagnostics.</div>
   </div>
 </div>
 
@@ -32,18 +40,18 @@
 <div class="doc-section" id="what-is-eos">
   <div class="section-eyebrow">Overview</div>
   <h2 class="section-title">What is EOS?</h2>
-  <p class="section-lead">A local AI companion and persistent non-human entity built to run entirely on your machine — no cloud required.</p>
+  <p class="section-lead">EOS is the local platform for running a persistent AI entity on your machine. The entity is the live runtime instance; EOS is the thing you install, launch, and configure.</p>
 
   <div class="card-grid">
     <div class="cap-card">
       <div class="cap-card-icon">&#127968;</div>
       <div class="cap-card-title">Fully Local</div>
-      <div class="cap-card-desc">Runs entirely on your machine. No cloud API key required. Nothing leaves your machine — ever.</div>
+      <div class="cap-card-desc">Runs entirely on your machine. No cloud API key required. Nothing leaves your machine.</div>
     </div>
     <div class="cap-card">
       <div class="cap-card-icon">&#129504;</div>
-      <div class="cap-card-title">Persistent Identity</div>
-      <div class="cap-card-desc">Maintains a consistent persona and long-term memory across every session.</div>
+      <div class="cap-card-title">Persistent Entity</div>
+      <div class="cap-card-desc">The runtime intelligence maintains identity continuity and long-term memory across sessions.</div>
     </div>
     <div class="cap-card">
       <div class="cap-card-icon">&#128274;</div>
@@ -53,113 +61,46 @@
     <div class="cap-card">
       <div class="cap-card-icon">&#128187;</div>
       <div class="cap-card-title">Windows Native</div>
-      <div class="cap-card-desc">Designed and optimised for Windows 10 and Windows 11. Runs without WSL or Docker.</div>
+      <div class="cap-card-desc">Designed and optimized for Windows 10 and Windows 11. Runs without WSL or Docker.</div>
     </div>
   </div>
 </div>
 
 <hr class="doc-rule">
 
-<div class="doc-section" id="how-it-works">
-  <div class="section-eyebrow">Architecture</div>
-  <h2 class="section-title">How It Works</h2>
-  <p class="section-lead">EOS is a coordinator. It discovers what is running and builds a capability map on startup — missing helpers degrade gracefully with no hard failures.</p>
+<div class="doc-section" id="entry-points">
+  <div class="section-eyebrow">Defaults</div>
+  <h2 class="section-title">Canonical Entry Points</h2>
+  <p class="section-lead">There are multiple scripts in the repo, but new users should treat these as the default hierarchy.</p>
 
   <ol class="step-list">
     <li class="step-card">
       <div class="step-num green">1</div>
       <div class="step-body">
-        <div class="step-title">Start backend model servers</div>
-        <div class="step-desc">Use a launcher script (e.g. <code>Launch EOS.bat</code> or <code>launchers\start-standard.bat</code>) to bring up the model servers. Each opens its own console window.</div>
+        <div class="step-title">Install with <code>setup\Setup-Full.ps1</code></div>
+        <div class="step-desc">This is the recommended install path for most users.</div>
       </div>
     </li>
     <li class="step-card">
       <div class="step-num green">2</div>
       <div class="step-body">
-        <div class="step-title">Start EOS</div>
-        <div class="step-desc">Run <code>start-eos.bat</code>. EOS initialises its memory system, loads configuration, and begins listening.</div>
+        <div class="step-title">Launch backends with <code>launchers\start-standard.bat</code></div>
+        <div class="step-desc">This is the recommended backend bundle for most users.</div>
       </div>
     </li>
     <li class="step-card">
       <div class="step-num green">3</div>
       <div class="step-body">
-        <div class="step-title">EOS discovers services and builds a capability map</div>
-        <div class="step-desc">On startup EOS probes each configured endpoint. The result is a live capability map — you can see it printed in the console and in the Admin Panel.</div>
+        <div class="step-title">Bootstrap EOS with <code>start-eos.bat</code></div>
+        <div class="step-desc">EOS discovers running services, builds the capability map, and opens the WebUI.</div>
       </div>
     </li>
     <li class="step-card">
       <div class="step-num amber">4</div>
       <div class="step-body">
-        <div class="step-title">Missing helpers degrade gracefully</div>
-        <div class="step-desc">If a backend is not running, that capability is marked unavailable or degraded. EOS keeps working at reduced capability — no crash, no hard failure.</div>
-      </div>
-    </li>
-    <li class="step-card">
-      <div class="step-num green">5</div>
-      <div class="step-body">
-        <div class="step-title">Open the interface in your browser</div>
-        <div class="step-desc">Navigate to <code>http://127.0.0.1:7860/</code>. The chat interface is ready. The Admin Panel is at <code>http://127.0.0.1:7860/admin</code>.</div>
+        <div class="step-title">Deviate only for a specific reason</div>
+        <div class="step-desc">Use Lite install, minimal/full bundles, vision, or per-server launchers only when you know why you need them.</div>
       </div>
     </li>
   </ol>
-</div>
-
-<hr class="doc-rule">
-
-<div class="doc-section" id="requirements">
-  <div class="section-eyebrow">Before You Begin</div>
-  <h2 class="section-title">System Requirements</h2>
-  <p class="section-lead">EOS is designed to run on modest consumer hardware. A GPU is recommended but not required.</p>
-
-  <div class="table-wrap">
-    <table class="doc-table">
-      <thead>
-        <tr>
-          <th>Component</th>
-          <th>Minimum</th>
-          <th>Recommended</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>Operating System</td>
-          <td>Windows 10 64-bit</td>
-          <td>Windows 11</td>
-        </tr>
-        <tr>
-          <td>Python</td>
-          <td>3.10</td>
-          <td>3.11</td>
-        </tr>
-        <tr>
-          <td>RAM</td>
-          <td>16 GB</td>
-          <td>32 GB</td>
-        </tr>
-        <tr>
-          <td>GPU</td>
-          <td>Not required (CPU inference)</td>
-          <td>NVIDIA with 8 GB+ VRAM</td>
-        </tr>
-        <tr>
-          <td>Disk Space</td>
-          <td>20 GB free</td>
-          <td>30 GB free</td>
-        </tr>
-        <tr>
-          <td>CUDA</td>
-          <td>Not required</td>
-          <td>CUDA 13.1 compatible driver</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<hr class="doc-rule">
-
-<div class="callout tip">
-  <div class="callout-icon">&#128161;</div>
-  <div class="callout-title">New to EOS?</div>
-  <div class="callout-body">Start with <a onclick="nav('quick-start')" style="cursor:pointer;text-decoration:underline">Quick Start</a> — it takes you from zero to a running system step by step.</div>
 </div>

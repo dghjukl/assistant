@@ -1,6 +1,19 @@
 # EOS — Quick Start
 
-This is the shortest path to a running system. It assumes no prior setup and uses the standard backend bundle.
+This is the canonical first-run path for a new user. It establishes the intended defaults:
+
+- **Product:** EOS
+- **Runtime intelligence:** the entity running inside EOS
+- **Recommended install path:** `setup\Setup-Full.ps1`
+- **Recommended launch path:** `launchers\start-standard.bat` then `start-eos.bat`
+
+If you do not already know that you need a different path, use this one.
+
+---
+
+## Before you start
+
+EOS is the platform. The entity inside EOS can have its own chosen name, but that chosen name is not the product name. Keep that distinction in mind when reading the UI, docs, and launcher flow.
 
 ---
 
@@ -19,13 +32,17 @@ python --version
 
 ---
 
-## Step 1 — Run Setup
+## Step 1 — Run the recommended install path
 
 Right-click `setup\Setup-Full.ps1` → **"Run with PowerShell"**
 
 If Windows asks about execution policy, click **Open** or type `Y` when prompted.
 
 This downloads approximately 13 GB of models and binaries into the EOS folder. It only needs to run once.
+
+### When to use a different install path
+
+Use `setup\Setup-Lite.ps1` only if you want to supply large model files manually or need a smaller initial download.
 
 ---
 
@@ -41,9 +58,9 @@ This checks Python packages, binaries, model files, port availability, and `conf
 
 ---
 
-## Step 3 — Start the backend servers
+## Step 3 — Start the recommended backend bundle
 
-For the recommended stack, run:
+Run:
 
 - `launchers\start-standard.bat`
 
@@ -55,15 +72,24 @@ That opens separate windows for:
 
 Wait for each window to print a ready message before proceeding.
 
+### When to choose a different backend path
+
+- `launchers\start-minimal.bat` → lower-resource fallback
+- `launchers\start-full.bat` → add creativity support
+- per-server launchers in `launchers\` → manual control over exactly what runs
+- `launchers\start-vision-gpu.bat` → add vision to any bundle
+
 ---
 
-## Step 4 — Start EOS
+## Step 4 — Bootstrap EOS
 
 Run:
 
 - `start-eos.bat`
 
-EOS discovers the running services and prints a summary like:
+`start-eos.bat` is the canonical runtime launch path. It does **not** start model servers. It discovers what is already running, builds the capability map, and launches the WebUI.
+
+EOS prints a summary like:
 
 ```
 Main model: active
@@ -93,6 +119,12 @@ When it prints `Starting WebUI at http://127.0.0.1:7860/`, EOS is ready.
 Navigate to **http://127.0.0.1:7860/** in your browser.
 
 The admin panel is at **http://127.0.0.1:7860/admin**.
+
+Remember the hierarchy:
+
+- **EOS** = the product/platform/UI you launched
+- **Entity** = the persistent runtime intelligence now active inside EOS
+- **Entity name** = that instance's chosen or configured name
 
 ---
 

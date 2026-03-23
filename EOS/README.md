@@ -1,47 +1,107 @@
 # EOS — Entity Operating System
 
-A local AI companion and non-human partner. Runs entirely on your machine — no cloud API required. Built around a persistent identity, long-term memory, and a trust-first autonomy model whose controls exist for safety, containment, and revocation when needed.
+EOS is the **platform**. The running intelligence inside EOS is the **entity**. That entity can have its own chosen name and identity, but that chosen name is **not** the product name.
+
+EOS is a local runtime for a persistent AI entity: memory, identity continuity, tools, optional voice, optional integrations, and a browser-based control surface — all running on your machine.
 
 ---
 
-## What it is
+## Canonical explanation
 
-EOS is a local AI system that runs one or more GGUF language models via llama.cpp. It provides a web-based chat interface, optional voice input and output, optional Discord and Google Workspace integration, a sandboxed computer-use subsystem, and a worldview subsystem for accelerated relational onboarding.
+Use this framing everywhere:
 
-The system maintains identity and memory across sessions. It does not reset between conversations. Your conversation history, memory, and the entity's accumulated understanding of you all persist on your local machine — nothing leaves it.
+- **EOS** = the product, platform, installer, launcher set, and WebUI
+- **Entity** = the runtime intelligence / active instance operating inside EOS
+- **Entity name** = the name that instance chooses or is configured to use, not the name of the product
 
-Autonomy is layered and trust-first. EOS is meant to have meaningful presence, judgment, and capability in the normal case; the admin panel exists so capabilities can be narrowed, supervised, or revoked immediately if safety requires it, without restarting.
+That distinction matters because users interact with the entity, but they install, launch, configure, and evaluate EOS.
 
-EOS is **Windows-only**. The llama-server and Piper TTS binaries are Windows executables.
+---
+
+## Canonical default path
+
+For a first-time user, the intended path is:
+
+1. **Install** with `setup\Setup-Full.ps1`
+2. **Verify** with `python verify.py`
+3. **Launch the recommended backend bundle** with `launchers\start-standard.bat`
+4. **Bootstrap EOS** with `start-eos.bat`
+5. **Use the WebUI** at `http://127.0.0.1:7860/`
+
+### When to deviate from the default
+
+Deviate only when you specifically need one of these:
+
+- **Lower download size / manual model choice** → use `setup\Setup-Lite.ps1`
+- **Lower RAM or VRAM usage** → use `launchers\start-minimal.bat`
+- **Extra creativity capacity** → use `launchers\start-full.bat`
+- **Vision support** → add `launchers\start-vision-gpu.bat`
+- **Precise hardware or backend control** → use the per-server launchers
+- **Diagnostics without startup** → use `status-eos.bat` or `python eos.py --status`
+
+If you are not sure, do **not** deviate. Use the default path above.
+
+---
+
+## What EOS does
+
+EOS runs one or more GGUF language models through llama.cpp and presents them as one coherent local system. It provides:
+
+- a persistent entity with memory and identity continuity
+- a web-based workspace and admin surface
+- optional speech-to-text and text-to-speech
+- optional Discord and Google Workspace integration
+- optional computer use and workspace tooling
+- graceful fallback when optional helper backends are unavailable
+
+EOS is **Windows-only** in its supported install flow because the bundled llama-server and Piper TTS binaries are Windows executables.
+
+---
+
+## Entry-point hierarchy
+
+There are multiple valid scripts in the repo, but they are not equal.
+
+### 1) Recommended install entry point
+
+- `setup\Setup-Full.ps1`
+
+This is the canonical install path for most users.
+
+### 2) Recommended backend launch entry point
+
+- `launchers\start-standard.bat`
+
+This is the canonical backend bundle for most users.
+
+### 3) Recommended runtime launch entry point
+
+- `start-eos.bat`
+
+This is the canonical runtime bootstrap. It never starts model servers; it discovers what is already running, builds a capability map, and launches the WebUI.
+
+### 4) Alternative and advanced entry points
+
+- `Launch EOS.bat` / `launchers\Launch EOS.bat` → convenience GUI for choosing backend roles before bootstrapping EOS
+- `launchers\start-minimal.bat` / `launchers\start-full.bat` → resource or capability tradeoffs
+- `launchers\start-*-cpu.bat` / `launchers\start-*-gpu.bat` → manual per-backend control
+- `python eos.py` → direct CLI bootstrap for advanced users
+- `status-eos.bat` / `python eos.py --status` → diagnostics only
 
 ---
 
 ## Startup architecture
 
-EOS now uses a **single canonical config**: `config.json`.
+EOS uses a **single canonical config**: `config.json`.
 
 That file describes the full intended system — main, tool, thinking, creativity, vision, STT, and TTS. Startup behavior is modular:
 
-- **Per-server launchers** start exactly one backend each (`launchers/start-main-gpu.bat`, `launchers/start-tools-cpu.bat`, etc.)
-- **Bundle launchers** start common backend combinations (`launchers/start-minimal.bat`, `launchers/start-standard.bat`, `launchers/start-full.bat`)
-- **`start-eos.bat` / `python eos.py`** never start model servers; they discover what is already running, build a capability map, and launch the WebUI
-- **`status-eos.bat` / `python eos.py --status`** reports the same capability map without restarting anything
+- **Per-server launchers** start exactly one backend each
+- **Bundle launchers** start common backend combinations
+- **`start-eos.bat` / `python eos.py`** discover running services and start the WebUI
+- **`status-eos.bat` / `python eos.py --status`** report current capability state without starting the WebUI
 
-This keeps server ownership separate from runtime discovery and fallback behavior.
-
----
-
-## How it works at a high level
-
-1. Start whichever backend servers you want with the per-role or bundle launchers.
-2. Start EOS with `start-eos.bat`.
-3. EOS probes each expected service from `config.json`, performs health checks, and builds a runtime capability map.
-4. Missing helpers degrade gracefully at runtime:
-   - missing tool / thinking / creativity helpers fall back to the main model
-   - missing vision disables vision cleanly
-   - missing STT or TTS degrades voice features without blocking chat
-
-The WebUI remains the relationship and safety control point at `http://127.0.0.1:7860/`, with the admin panel at `http://127.0.0.1:7860/admin`.
+This keeps backend ownership separate from runtime discovery.
 
 ---
 
@@ -58,46 +118,16 @@ The WebUI remains the relationship and safety control point at `http://127.0.0.1
 
 ---
 
-## Common launch flows
-
-| Goal | Launchers |
-|---|---|
-| Minimal chat + tools | `launchers/start-minimal.bat` then `start-eos.bat` |
-| Recommended standard stack | `launchers/start-standard.bat` then `start-eos.bat` |
-| Full stack | `launchers/start-full.bat` then `start-eos.bat` |
-| Inspect current system state | `status-eos.bat` |
-| Single backend only | Use the matching `start-*-cpu.bat` or `start-*-gpu.bat` |
-
-Legacy `Start *.bat` wrappers still exist, but they now delegate to the modular launchers above.
-
----
-
-## Install overview
-
-1. Install Python 3.11 from https://www.python.org/downloads/ — check "Add Python to PATH"
-2. Right-click `setup/Setup-Full.ps1` → "Run with PowerShell" — downloads ~13 GB of models and binaries
-3. Run `python verify.py` to confirm everything is in place
-4. Start the desired backends
-5. Run `start-eos.bat`
-6. Open `http://127.0.0.1:7860/` in your browser
-
-Full install instructions: [docs/INSTALL.md](docs/INSTALL.md)
-
-Quick reference for first-time setup: [docs/QUICK_START.md](docs/QUICK_START.md)
-
----
-
 ## Where to go next
 
 | Document | What it covers |
 |---|---|
-| [docs/QUICK_START.md](docs/QUICK_START.md) | Shortest path to a running system, with a checklist of optional capabilities |
-| [docs/INSTALL.md](docs/INSTALL.md) | Full install instructions, alternatives, troubleshooting |
-| [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | Every capability explained: voice, Discord, Google, computer use, workspace, worldview, cognition panel |
-| [docs/POWER_USER_GUIDE.md](docs/POWER_USER_GUIDE.md) | Canonical config deep-dive, autonomy system, launcher architecture, diagnostics |
-| [docs/MODELS.md](docs/MODELS.md) | Model directory layout, filenames, sources, and swap instructions |
-| [docs/CREDENTIALS.md](docs/CREDENTIALS.md) | Step-by-step Discord bot and Google OAuth setup with LLM prompt suggestions |
-| [docs/PROFILES.md](docs/PROFILES.md) | Startup bundle overview and per-server launcher reference |
+| [docs/QUICK_START.md](docs/QUICK_START.md) | Canonical first-run path |
+| [docs/INSTALL.md](docs/INSTALL.md) | Canonical install path, alternatives, troubleshooting |
+| [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | Day-to-day operation and capabilities |
+| [docs/POWER_USER_GUIDE.md](docs/POWER_USER_GUIDE.md) | Advanced launchers, CLI, config, diagnostics |
+| [docs/PROFILES.md](docs/PROFILES.md) | Bundle and per-server launcher reference |
+| [docs/CREDENTIALS.md](docs/CREDENTIALS.md) | Discord and Google credential setup |
 
 ---
 

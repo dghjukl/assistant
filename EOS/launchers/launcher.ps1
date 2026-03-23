@@ -18,7 +18,7 @@ $cConsoleBg = [System.Drawing.Color]::FromArgb(16,  16,  16 )
 $servers = @(
     @{ Name="Main";       Port=8080; CPU=$true;  GPU=$true;  Default="GPU" },
     @{ Name="Tools";      Port=8082; CPU=$true;  GPU=$true;  Default="CPU" },
-    @{ Name="Thinking";   Port=8083; CPU=$true;  GPU=$true;  Default="Off" },
+    @{ Name="Thinking";   Port=8083; CPU=$true;  GPU=$true;  Default="CPU" },
     @{ Name="Creativity"; Port=8084; CPU=$true;  GPU=$true;  Default="Off" },
     @{ Name="Vision";     Port=8081; CPU=$false; GPU=$true;  Default="Off" }
 )
@@ -35,15 +35,24 @@ $form.StartPosition   = "CenterScreen"
 
 # Title
 $lblTitle           = New-Object System.Windows.Forms.Label
-$lblTitle.Text      = "EOS  |  Server Launcher"
+$lblTitle.Text      = "EOS  |  Launcher"
 $lblTitle.Font      = New-Object System.Drawing.Font("Segoe UI", 12, [System.Drawing.FontStyle]::Bold)
 $lblTitle.ForeColor = $cText
 $lblTitle.Location  = New-Object System.Drawing.Point(20, 18)
 $lblTitle.AutoSize  = $true
 $form.Controls.Add($lblTitle)
 
+# Product shape hint
+$lblHint           = New-Object System.Windows.Forms.Label
+$lblHint.Text      = "EOS is the platform. The entity runs inside EOS. Default: Standard stack, then bootstrap EOS."
+$lblHint.Font      = New-Object System.Drawing.Font("Segoe UI", 8.5)
+$lblHint.ForeColor = $cDim
+$lblHint.Location  = New-Object System.Drawing.Point(20, 42)
+$lblHint.AutoSize  = $true
+$form.Controls.Add($lblHint)
+
 # Column headers
-$headerY = 52
+$headerY = 72
 foreach ($pair in @( @(162,"CPU"), @(232,"GPU"), @(302,"Off") )) {
     $h           = New-Object System.Windows.Forms.Label
     $h.Text      = $pair[1]
@@ -62,11 +71,11 @@ function Add-Rule($y) {
     $p.Size      = New-Object System.Drawing.Size(360, 1)
     $form.Controls.Add($p)
 }
-Add-Rule 70
+Add-Rule 90
 
 # -- Server rows --------------------------------------------------------------
 $radioMap = @{}
-$rowY     = 80
+$rowY     = 100
 
 foreach ($s in $servers) {
     $row           = New-Object System.Windows.Forms.Panel
@@ -187,7 +196,7 @@ $btn.Add_Click({
     }
 
     if ($toStart.Count -eq 0) {
-        Write-Con "Nothing selected - pick at least one server." $cYellow
+        Write-Con "Nothing selected - pick at least one server. Recommended default: Main + Tools + Thinking." $cYellow
         $btn.Text    = "Launch EOS"
         $btn.Enabled = $true
         return
@@ -215,7 +224,7 @@ $btn.Add_Click({
     }
 
     Write-Con "" $cText
-    Write-Con "  All checks done. Launching EOS..." $cGreen
+    Write-Con "  All checks done. Bootstrapping EOS..." $cGreen
     Start-Sleep -Milliseconds 600
 
     Start-Process "cmd.exe" -ArgumentList "/k `"$(Join-Path $Root 'start-eos.bat')`"" -WorkingDirectory $Root
