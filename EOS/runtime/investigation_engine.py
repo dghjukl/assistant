@@ -39,6 +39,7 @@ Admin API (used by server.py)
 from __future__ import annotations
 
 import asyncio
+import collections
 import json
 import logging
 import sqlite3
@@ -51,6 +52,9 @@ from typing import Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from runtime.topology import RuntimeTopology
+
+from runtime.capability_registry import CapabilityStatus
+from runtime.exception_observability import observe_exception
 
 logger = logging.getLogger("eos.investigation_engine")
 UTC = timezone.utc
@@ -275,7 +279,15 @@ class _InvestigationStore:
             for key in ("findings", "hypotheses", "evidence_linked"):
                 try:
                     d[key] = json.loads(d.get(key, "[]"))
-                except Exception:
+                except Exception as exc:
+                    observe_exception(
+                        logger=logger,
+                        subsystem="investigation_engine",
+                        operation="decode stored pass payload",
+                        exc=exc,
+                        level=logging.DEBUG,
+                        context={"investigation_id": investigation_id, "field": key},
+                    )
                     d[key] = []
             result.append(d)
         return result
@@ -303,6 +315,7 @@ class InvestigationEngine:
         self._pass_total:    int = 0
         self._pass_degraded: int = 0
         self._pass_failed:   int = 0
+        self._recent_failures: collections.deque[dict[str, Any]] = collections.deque(maxlen=20)
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -408,6 +421,7 @@ class InvestigationEngine:
             "pass_failed":   self._pass_failed,
             "open_count":    len(self._store.list(status="open", limit=100)),
             "active_count":  len(self._store.list(status="active", limit=100)),
+            "recent_failures": list(self._recent_failures),
         }
 
     # ── Pass execution ────────────────────────────────────────────────────────
@@ -542,6 +556,21 @@ class InvestigationEngine:
 
         except Exception as exc:
             logger.error("[InvestigationEngine] Pass %s failed: %s", pass_id, exc)
+            observe_exception(
+                logger=logger,
+                subsystem="investigation_engine",
+                operation="run investigation pass",
+                exc=exc,
+                level=logging.ERROR,
+                context={
+                    "pass_id": pass_id,
+                    "investigation_id": investigation_id,
+                    "task_type": task_type,
+                },
+                diagnostics=self._recent_failures,
+                capability_name="investigation_engine",
+                capability_status=CapabilityStatus.DEGRADED,
+            )
             result["ok"] = False
             result["outcome_status"] = "failed"
             result["error_text"] = str(exc)
@@ -567,8 +596,20 @@ class InvestigationEngine:
                         "summary":         result["summary"][:200],
                     },
                 ))
-            except Exception:
-                pass
+            except Exception as exc:
+                observe_exception(
+                    logger=logger,
+                    subsystem="investigation_engine",
+                    operation="publish pass-complete signal",
+                    exc=exc,
+                    level=logging.WARNING,
+                    context={
+                        "pass_id": pass_id,
+                        "investigation_id": investigation_id,
+                        "task_type": task_type,
+                    },
+                    diagnostics=self._recent_failures,
+                )
 
         return result
 

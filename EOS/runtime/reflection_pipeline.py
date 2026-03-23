@@ -21,7 +21,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
+from collections import deque
 from typing import TYPE_CHECKING
+
+from runtime.capability_registry import CapabilityStatus
+from runtime.exception_observability import observe_exception
 
 if TYPE_CHECKING:
     from runtime.topology import RuntimeTopology
@@ -64,6 +68,8 @@ class ReflectionPipeline:
         self._last_relational_run_time: float = 0.0
         self._running: bool = False
         self._cfg = cfg
+        self._recent_failures: deque[dict] = deque(maxlen=20)
+        self._failure_count: int = 0
 
     # ──────────────────────────────────────────────────────────────────────────
     # Public API
@@ -99,8 +105,17 @@ class ReflectionPipeline:
                 import webui.server as _srv  # type: ignore
                 continuity_monitor = getattr(_srv, "_identity_continuity", None)
                 current_focus_service = getattr(_srv, "_current_focus_service", None)
-            except Exception:
-                pass
+            except Exception as exc:
+                self._failure_count += 1
+                observe_exception(
+                    logger=logger,
+                    subsystem="reflection_pipeline",
+                    operation="resolve runtime wiring",
+                    exc=exc,
+                    level=logging.DEBUG,
+                    context={"reflection_id": reflection_id, "phase": "identity"},
+                    diagnostics=self._recent_failures,
+                )
 
             if current_focus_service is not None:
                 current_focus_service.set_background_focus(
@@ -126,6 +141,26 @@ class ReflectionPipeline:
                 results.get("cycle", 0),
                 reflection_id,
             )
+            try:
+                import webui.server as _srv  # type: ignore
+                registry = getattr(_srv, "_capability_registry", None)
+                if registry is not None:
+                    registry.set_status(
+                        "reflection_pipeline",
+                        CapabilityStatus.ENABLED,
+                        f"identity cycle {results.get('cycle', 0)} complete",
+                    )
+            except Exception as exc:
+                self._failure_count += 1
+                observe_exception(
+                    logger=logger,
+                    subsystem="reflection_pipeline",
+                    operation="update capability status",
+                    exc=exc,
+                    level=logging.DEBUG,
+                    context={"reflection_id": reflection_id, "status": "enabled"},
+                    diagnostics=self._recent_failures,
+                )
 
             # ── Record in tracer ───────────────────────────────────────────
             if tracer:
@@ -229,6 +264,18 @@ class ReflectionPipeline:
 
         except Exception as exc:
             logger.error("[ReflectionPipeline] Eval failed: %s", exc)
+            self._failure_count += 1
+            observe_exception(
+                logger=logger,
+                subsystem="reflection_pipeline",
+                operation="identity eval cycle",
+                exc=exc,
+                level=logging.ERROR,
+                context={"reflection_id": reflection_id},
+                diagnostics=self._recent_failures,
+                capability_name="reflection_pipeline",
+                capability_status=CapabilityStatus.DEGRADED,
+            )
             try:
                 if current_focus_service is not None:
                     current_focus_service.set_background_focus(
@@ -240,8 +287,17 @@ class ReflectionPipeline:
                         source="maintenance",
                         metadata={"error": str(exc)},
                     )
-            except Exception:
-                pass
+            except Exception as focus_exc:
+                self._failure_count += 1
+                observe_exception(
+                    logger=logger,
+                    subsystem="reflection_pipeline",
+                    operation="publish failed identity focus state",
+                    exc=focus_exc,
+                    level=logging.WARNING,
+                    context={"reflection_id": reflection_id},
+                    diagnostics=self._recent_failures,
+                )
             return {"error": str(exc), "reflection_id": reflection_id}
         finally:
             # Reset counters regardless of success
@@ -263,8 +319,17 @@ class ReflectionPipeline:
             try:
                 import webui.server as _srv  # type: ignore
                 current_focus_service = getattr(_srv, "_current_focus_service", None)
-            except Exception:
-                pass
+            except Exception as exc:
+                self._failure_count += 1
+                observe_exception(
+                    logger=logger,
+                    subsystem="reflection_pipeline",
+                    operation="resolve runtime wiring",
+                    exc=exc,
+                    level=logging.DEBUG,
+                    context={"phase": "relational"},
+                    diagnostics=self._recent_failures,
+                )
             if current_focus_service is not None:
                 current_focus_service.set_background_focus(
                     focus_id="reflection-relational",
@@ -283,6 +348,26 @@ class ReflectionPipeline:
                 "[ReflectionPipeline] Relational cycle complete (%s).",
                 "skipped" if results.get("skipped") else f"cycle {results.get('cycle', '?')}",
             )
+            try:
+                import webui.server as _srv  # type: ignore
+                registry = getattr(_srv, "_capability_registry", None)
+                if registry is not None:
+                    registry.set_status(
+                        "reflection_pipeline",
+                        CapabilityStatus.ENABLED,
+                        "relational cycle complete",
+                    )
+            except Exception as exc:
+                self._failure_count += 1
+                observe_exception(
+                    logger=logger,
+                    subsystem="reflection_pipeline",
+                    operation="update capability status",
+                    exc=exc,
+                    level=logging.DEBUG,
+                    context={"phase": "relational", "status": "enabled"},
+                    diagnostics=self._recent_failures,
+                )
             if current_focus_service is not None:
                 current_focus_service.set_background_focus(
                     focus_id="reflection-relational",
@@ -296,6 +381,18 @@ class ReflectionPipeline:
             return results
         except Exception as exc:
             logger.error("[ReflectionPipeline] Relational eval failed: %s", exc)
+            self._failure_count += 1
+            observe_exception(
+                logger=logger,
+                subsystem="reflection_pipeline",
+                operation="relational eval cycle",
+                exc=exc,
+                level=logging.ERROR,
+                context={"phase": "relational"},
+                diagnostics=self._recent_failures,
+                capability_name="reflection_pipeline",
+                capability_status=CapabilityStatus.DEGRADED,
+            )
             try:
                 if current_focus_service is not None:
                     current_focus_service.set_background_focus(
@@ -307,12 +404,31 @@ class ReflectionPipeline:
                         source="maintenance",
                         metadata={"error": str(exc)},
                     )
-            except Exception:
-                pass
+            except Exception as focus_exc:
+                self._failure_count += 1
+                observe_exception(
+                    logger=logger,
+                    subsystem="reflection_pipeline",
+                    operation="publish failed relational focus state",
+                    exc=focus_exc,
+                    level=logging.WARNING,
+                    context={"phase": "relational"},
+                    diagnostics=self._recent_failures,
+                )
             return {"error": str(exc)}
         finally:
             import time as _t
             self._last_relational_run_time = _t.time()
+
+    def diagnostics(self) -> dict:
+        return {
+            "running": self._running,
+            "turn_counter": self._turn_counter,
+            "last_run_time": self._last_run_time,
+            "last_relational_run_time": self._last_relational_run_time,
+            "failure_count": self._failure_count,
+            "recent_failures": list(self._recent_failures),
+        }
 
     async def run_loop(
         self,

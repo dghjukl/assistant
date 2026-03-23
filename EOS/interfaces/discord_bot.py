@@ -33,6 +33,8 @@ import discord
 from discord.ext import commands
 from PIL import Image
 
+from runtime.capability_registry import CapabilityStatus
+from runtime.exception_observability import observe_exception
 from core.memory import log_interaction
 from services.retrieval import remember
 from core.autonomy import can
@@ -163,8 +165,17 @@ def _notify_turns() -> None:
     for fn in _turn_notifiers:
         try:
             fn()
-        except Exception:
-            pass
+        except Exception as exc:
+            observe_exception(
+                logger=logger,
+                subsystem="discord",
+                operation="run turn notifier",
+                exc=exc,
+                level=logging.WARNING,
+                context={"notifier": getattr(fn, "__name__", repr(fn))},
+                capability_name="discord",
+                capability_status=CapabilityStatus.DEGRADED,
+            )
 
 
 def _publish_message_signal(content: str, author: str, guild: str | None) -> None:
@@ -184,8 +195,17 @@ def _publish_message_signal(content: str, author: str, guild: str | None) -> Non
                 "preview": content[:100],
             },
         ))
-    except Exception:
-        pass
+    except Exception as exc:
+        observe_exception(
+            logger=logger,
+            subsystem="discord",
+            operation="publish discord message signal",
+            exc=exc,
+            level=logging.WARNING,
+            context={"author": author, "guild": guild, "preview": content[:80]},
+            capability_name="discord",
+            capability_status=CapabilityStatus.DEGRADED,
+        )
 
 
 # ── Bot events ────────────────────────────────────────────────────────────────
@@ -198,6 +218,20 @@ async def on_ready():
     _start_time   = time.time()
     logger.info("Discord bot connected as %s (%s) in %d guild(s)",
                 bot.user, bot.user.id, _guilds_count)
+    try:
+        import webui.server as _srv  # type: ignore
+        registry = getattr(_srv, "_capability_registry", None)
+        if registry is not None:
+            registry.set_status("discord", CapabilityStatus.ENABLED, "bot connected")
+    except Exception as exc:
+        observe_exception(
+            logger=logger,
+            subsystem="discord",
+            operation="update connector capability status",
+            exc=exc,
+            level=logging.DEBUG,
+            context={"state": "connected"},
+        )
 
     # Sync the discord_send tool with the first usable channel
     try:
@@ -222,6 +256,20 @@ async def on_disconnect():
     global _connected
     _connected = False
     logger.warning("Discord bot disconnected")
+    try:
+        import webui.server as _srv  # type: ignore
+        registry = getattr(_srv, "_capability_registry", None)
+        if registry is not None:
+            registry.set_status("discord", CapabilityStatus.DEGRADED, "bot disconnected")
+    except Exception as exc:
+        observe_exception(
+            logger=logger,
+            subsystem="discord",
+            operation="update connector capability status",
+            exc=exc,
+            level=logging.DEBUG,
+            context={"state": "disconnected"},
+        )
 
 
 @bot.event
@@ -581,12 +629,32 @@ async def start(
         await bot.start(token)
     except discord.errors.LoginFailure as exc:
         logger.error("Discord login failed (bad token?): %s", exc)
+        observe_exception(
+            logger=logger,
+            subsystem="discord",
+            operation="start discord bot",
+            exc=exc,
+            level=logging.ERROR,
+            context={"phase": "login"},
+            capability_name="discord",
+            capability_status=CapabilityStatus.OFFLINE,
+        )
         _errors += 1
     except asyncio.CancelledError:
         logger.info("Discord bot task cancelled — shutting down")
         await bot.close()
     except Exception as exc:
         logger.error("Discord bot crashed: %s", exc)
+        observe_exception(
+            logger=logger,
+            subsystem="discord",
+            operation="run discord bot",
+            exc=exc,
+            level=logging.ERROR,
+            context={"phase": "runtime"},
+            capability_name="discord",
+            capability_status=CapabilityStatus.OFFLINE,
+        )
         _errors += 1
 
 
