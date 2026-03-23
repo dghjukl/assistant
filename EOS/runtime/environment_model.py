@@ -670,16 +670,21 @@ class EnvironmentModelService:
                 get_account_info,
                 get_credentials,
                 is_authorized,
-                _client_secret_path,
+                validate_client_secret_path,
                 _token_path,
             )
 
             oauth_configure(self._cfg)
             creds = get_credentials()
+            try:
+                validate_client_secret_path()
+                client_secret_exists = True
+            except FileNotFoundError:
+                client_secret_exists = False
             info = {
                 "authorized": is_authorized(),
                 "account": get_account_info() if creds is not None else {},
-                "client_secret_exists": _client_secret_path() is not None,
+                "client_secret_exists": client_secret_exists,
                 "token_exists": _token_path().is_file(),
                 "overall_status": "connected" if creds is not None else "not_connected",
             }

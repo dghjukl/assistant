@@ -73,7 +73,7 @@
         <tr><td>STT model</td><td><span class="badge unavail">unavailable</span></td><td>Voice input disabled. Text chat unaffected.</td></tr>
         <tr><td>TTS model</td><td><span class="badge unavail">unavailable</span></td><td>Voice output disabled. Text chat unaffected.</td></tr>
         <tr><td>Discord credential</td><td><span class="badge unavail">unavailable</span></td><td>Discord integration silently skipped at boot</td></tr>
-        <tr><td>Google credential</td><td><span class="badge unavail">unavailable</span></td><td>Google integration silently skipped at boot</td></tr>
+        <tr><td>Google credential</td><td><span class="badge unavail">unavailable</span></td><td>Google integration reports a configuration error at boot and on OAuth actions</td></tr>
         <tr><td>Embedding model</td><td><span class="badge unavail">unavailable</span></td><td>Memory retrieval disabled. Conversation continues without memory context.</td></tr>
       </tbody>
     </table>
@@ -92,7 +92,7 @@
       <tbody>
         <tr><td><code>config.json</code></td><td>Main configuration file. The one EOS loads.</td></tr>
         <tr><td><code>AI personal files\Discord.txt</code></td><td>Discord bot token (one line)</td></tr>
-        <tr><td><code>AI personal files\client_secret_*.json</code></td><td>Google OAuth client secret</td></tr>
+        <tr><td><code>config\google\*.json</code></td><td>Google OAuth client secret</td></tr>
         <tr><td><code>data\entity_state.db</code></td><td>SQLite: identity state, relational model, memory metadata</td></tr>
         <tr><td><code>data\memory_store\</code></td><td>ChromaDB vector memory (semantic retrieval)</td></tr>
         <tr><td><code>data\google_token.json</code></td><td>Google OAuth refresh token (generated at runtime)</td></tr>

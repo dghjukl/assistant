@@ -233,7 +233,7 @@
   },
   "google": {
     "enabled": true,
-    "client_secret_path": "AI personal files/client_secret_*.json",
+    "client_secret_path": "config/google/*.json",
     "token_path": "data/google_token.json",
     "calendar_enabled": true,
     "gmail_enabled": true,

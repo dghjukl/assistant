@@ -24,8 +24,8 @@
 //       - Application type: Desktop app
 //       - Name: EOS (or anything)
 //  6. Download the JSON file
-//  7. Rename it to match the pattern:  client_secret_XXXX.apps.googleusercontent.com.json
-//     (or any name matching client_secret_*.json)
+//  7. Store it under config/google/ using the downloaded filename, or point
+//     google.client_secret_path at the exact JSON file you want EOS to use
 //  8. Place it in this folder:  AI personal files/
 //
 //  On first run with Google enabled, EOS will open a browser window for you

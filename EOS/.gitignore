@@ -8,6 +8,8 @@
 AI personal files/*
 !AI personal files/*.example.txt
 !AI personal files/*.example.json
+config/google/*.json
+!config/google/README.md
 
 # ── Runtime auth tokens ───────────────────────────────────────────────────────
 data/google_token.json

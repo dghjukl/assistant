@@ -21,7 +21,8 @@ Credentials are serialised as JSON and stored in  data/google_token.json
 disk-level encryption or Credential Manager for additional protection.
 
 The client-secrets file path is read from  google.client_secret_path  in the
-loaded config.  The path may use globs; the first match is used.
+loaded config. If that config key is unset, EOS only searches  config/google/*.json.
+There is no legacy fallback path.
 
 Account information
 -------------------
@@ -30,7 +31,6 @@ Google OAuth UserInfo endpoint and cached in memory for the process lifetime.
 """
 from __future__ import annotations
 
-import glob
 import hashlib
 import json
 import logging
@@ -68,9 +68,12 @@ DEFAULT_SCOPES = [
 # ── Configuration ─────────────────────────────────────────────────────────────
 
 def configure(cfg: dict) -> None:
-    """Inject the loaded config dict.  Call once at startup."""
+    """Inject the loaded config dict and validate Google credential configuration."""
     global _cfg
     _cfg = cfg
+    gcfg = _cfg.get("google", {}) if isinstance(_cfg, dict) else {}
+    if gcfg.get("enabled", False):
+        validate_client_secret_path()
 
 
 def _token_path() -> Path:
@@ -78,20 +81,67 @@ def _token_path() -> Path:
     return Path(gcfg.get("token_path", "data/google_token.json"))
 
 
-def _client_secret_path() -> Optional[Path]:
-    gcfg = _cfg.get("google", {})
-    pattern = gcfg.get(
-        "client_secret_path",
-        gcfg.get("client_secret_glob", "config/google/client_secret*.json"),
+DEFAULT_CLIENT_SECRET_DIR = Path("config/google")
+
+
+def _credential_error_message(configured_path: str | None = None) -> str:
+    if configured_path:
+        return (
+            "[google_oauth] Google OAuth client secret not found or invalid at "
+            f"'{configured_path}'. Allowed locations: config/google/*.json or an explicit "
+            "google.client_secret_path pointing to an existing JSON file."
+        )
+    return (
+        "[google_oauth] Google OAuth client secret not found. Place the credential JSON in "
+        "config/google/*.json or set google.client_secret_path to an existing JSON file."
     )
-    matches = glob.glob(str(pattern))
+
+
+
+def _resolve_client_secret_path() -> Path:
+    gcfg = _cfg.get("google", {})
+    configured = gcfg.get("client_secret_path")
+    if configured:
+        normalized = str(configured).replace("\\", "/")
+        candidate = Path(normalized).expanduser()
+        if any(ch in str(candidate) for ch in "*?["):
+            allowed_glob_dir = DEFAULT_CLIENT_SECRET_DIR
+            if candidate.parent != allowed_glob_dir:
+                msg = _credential_error_message(str(configured))
+                logger.error(msg)
+                raise FileNotFoundError(msg)
+            matches = sorted(
+                path.resolve()
+                for path in allowed_glob_dir.glob(candidate.name)
+                if path.is_file() and path.suffix.lower() == ".json"
+            )
+            if not matches:
+                msg = _credential_error_message(str(configured))
+                logger.error(msg)
+                raise FileNotFoundError(msg)
+            return matches[0]
+        if not candidate.is_file() or candidate.suffix.lower() != ".json":
+            msg = _credential_error_message(str(configured))
+            logger.error(msg)
+            raise FileNotFoundError(msg)
+        return candidate
+
+    matches = sorted(
+        path.resolve() for path in DEFAULT_CLIENT_SECRET_DIR.glob("*.json")
+        if path.is_file() and path.suffix.lower() == ".json"
+    )
     if matches:
-        return Path(matches[0])
-    # Also check the old location used by tools/calendar.py
-    legacy = glob.glob("AI personal files/client_secret_*.json")
-    if legacy:
-        return Path(legacy[0])
-    return None
+        return matches[0]
+
+    msg = _credential_error_message()
+    logger.error(msg)
+    raise FileNotFoundError(msg)
+
+
+
+def validate_client_secret_path() -> Path:
+    """Validate Google OAuth client secret configuration and return the resolved path."""
+    return _resolve_client_secret_path()
 
 
 # ── Credential helpers ────────────────────────────────────────────────────────
@@ -114,10 +164,12 @@ def _import_google() -> tuple:
 def get_credentials(scopes: list[str] | None = None) -> Optional[object]:
     """Return valid Google Credentials, refreshing if necessary.
 
+    Raises FileNotFoundError when the OAuth client secret configuration is invalid.
     Returns None if no token has been stored yet (user must authorise first).
     """
     Credentials, Request, _, _ = _import_google()
     scopes = scopes or DEFAULT_SCOPES
+    validate_client_secret_path()
     tp = _token_path()
 
     if not tp.exists():
@@ -193,13 +245,7 @@ def build_authorize_url(
     Credentials, _, Flow, _ = _import_google()
     scopes = scopes or DEFAULT_SCOPES
 
-    secret_path = _client_secret_path()
-    if secret_path is None:
-        raise FileNotFoundError(
-            "Google OAuth client secret file not found.  "
-            "Place client_secret_*.json in config/google/ and set "
-            "google.client_secret_path in config.json."
-        )
+    secret_path = validate_client_secret_path()
 
     state = secrets.token_urlsafe(32)
 
@@ -268,9 +314,10 @@ def exchange_code(
     if pending["redirect_uri"] != redirect_uri:
         return {"ok": False, "error": "redirect_uri mismatch — possible CSRF attack"}
 
-    secret_path = _client_secret_path()
-    if secret_path is None:
-        return {"ok": False, "error": "Client secret file not found"}
+    try:
+        secret_path = validate_client_secret_path()
+    except FileNotFoundError as exc:
+        return {"ok": False, "error": str(exc)}
 
     try:
         flow = Flow.from_client_secrets_file(
@@ -400,7 +447,7 @@ def build_service(service_name: str, version: str, scopes: list[str] | None = No
     creds = get_credentials(scopes)
     if creds is None:
         raise PermissionError(
-            "Google credentials not available — "
-            "authorize via /api/google_workspace/authorize first"
+            "Google credentials not available — authorize via /api/google_workspace/authorize first "
+            "after configuring config/google/*.json or google.client_secret_path"
         )
     return build_fn(service_name, version, credentials=creds)

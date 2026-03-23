@@ -103,7 +103,7 @@ After the core system is running, set up any optional capabilities you want:
 | Capability | What to do |
 |---|---|
 | Discord bot | Create a bot token and put it in `AI personal files\Discord.txt` |
-| Google Calendar / Gmail / Drive | Download an OAuth JSON and put it in `AI personal files\` |
+| Google Calendar / Gmail / Drive | Download an OAuth JSON and put it in `config\google\` or set an explicit `google.client_secret_path` |
 | Computer Use | Enable in admin panel → Control & Permissions → Capabilities |
 | Vision | Run `launchers\start-vision-gpu.bat` alongside your normal backend bundle |
 
@@ -131,4 +131,4 @@ Another application is using one of the required ports (8080–8084 or 7860).
 Make sure `models\vision\` contains both the main `.gguf` and the matching `mmproj*.gguf`.
 
 **Discord or Google not connecting**  
-Check that the credential file is in `AI personal files\` and that `"enabled": true` is set in `config.json`. See [CREDENTIALS.md](CREDENTIALS.md) for the exact file names and locations.
+Check that the credential file is in `config\google\` (or that `google.client_secret_path` points to it) and that `"enabled": true` is set in `config.json`. See [CREDENTIALS.md](CREDENTIALS.md) for the exact file names and locations.

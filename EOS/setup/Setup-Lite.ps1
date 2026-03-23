@@ -465,7 +465,7 @@ Write-Host ""
 
 Write-Host "  Optional integrations (manual setup):" -ForegroundColor DarkGray
 Write-Host "    Discord: create 'AI personal files\Discord.txt' with your bot token" -ForegroundColor DarkGray
-Write-Host "    Google:  place client_secret_*.json in 'AI personal files\'" -ForegroundColor DarkGray
+Write-Host "    Google:  place client_secret_*.json in 'config\google\' or set google.client_secret_path" -ForegroundColor DarkGray
 
 
 # -- Done ----------------------------------------------------------------------
