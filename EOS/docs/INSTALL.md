@@ -1,5 +1,27 @@
 # EOS — Installation Guide
 
+This guide defines the canonical install entry point and when to use alternatives.
+
+## Canonical install path
+
+For most users, the intended install path is:
+
+1. Install Python 3.11
+2. Run `setup\Setup-Full.ps1`
+3. Run `python verify.py`
+4. Run `launchers\start-standard.bat`
+5. Run `start-eos.bat`
+
+Use a different path only if you need lighter downloads, manual model control, or custom backend behavior.
+
+---
+
+## Product naming and runtime naming
+
+EOS is the platform. The running intelligence inside EOS is the entity. The entity may use a chosen name, but that name is not the product name and should not replace EOS in docs, install flow, launcher labels, or packaging.
+
+---
+
 ## Step 1 — Install Python
 
 Install Python 3.11 or newer from https://www.python.org/downloads/ and enable **Add Python to PATH**.
@@ -8,10 +30,15 @@ Install Python 3.11 or newer from https://www.python.org/downloads/ and enable *
 
 ## Step 2 — Run setup
 
-Use one of these scripts:
+### Recommended
 
-- `setup\Setup-Full.ps1` — downloads the full recommended model/binary set
+- `setup\Setup-Full.ps1` — downloads the full recommended model and binary set
+
+### Alternate
+
 - `setup\Setup-Lite.ps1` — downloads supporting assets but expects you to provide large models yourself
+
+Choose `Setup-Lite` only if you explicitly want manual model control or need a smaller initial download.
 
 ---
 
@@ -29,14 +56,20 @@ This checks Python packages, binaries, model files, port availability, and the c
 
 ## Step 4 — Launch EOS
 
-### Recommended flow
+### Recommended launch path
 
-1. Start the backend bundle you want:
-   - `launchers\start-minimal.bat`
+1. Start the recommended backend bundle:
    - `launchers\start-standard.bat`
-   - `launchers\start-full.bat`
 2. Start the runtime bootstrap:
    - `start-eos.bat`
+
+### When to deviate from the recommended launch path
+
+- `launchers\start-minimal.bat` — use when you need a lower-resource stack
+- `launchers\start-full.bat` — use when you want creativity support in the default bundle
+- `launchers\start-vision-gpu.bat` — add vision to any normal stack
+- per-server launchers — use when you need exact hardware or backend control
+- `python eos.py` — use for direct CLI control
 
 ### Per-server launchers
 
@@ -77,20 +110,20 @@ Full instructions for all capabilities: **[USER_GUIDE.md](USER_GUIDE.md)**
 
 ## Troubleshooting
 
-**"python is not recognized"**
+**"python is not recognized"**  
 Python is not on your PATH. Re-install Python and enable the PATH option.
 
-**A launcher window closes immediately**
+**A launcher window closes immediately**  
 Open a command prompt and run the same `.bat` script manually to read the error output.
 
-**A backend is missing from EOS startup summary**
+**A backend is missing from EOS startup summary**  
 Run `status-eos.bat` to see whether it is `active`, `degraded`, or `unavailable`.
 
-**Port already in use**
+**Port already in use**  
 Another application is using one of the required ports (8080–8084 or 7860).
 
-**Vision unavailable**
+**Vision unavailable**  
 Make sure `models\vision\` contains both the main `.gguf` and the matching `mmproj*.gguf`.
 
-**Discord or Google not connecting**
+**Discord or Google not connecting**  
 Check that the credential file is in `AI personal files\` and that `"enabled": true` is set in `config.json`. See [CREDENTIALS.md](CREDENTIALS.md) for the exact file names and locations.

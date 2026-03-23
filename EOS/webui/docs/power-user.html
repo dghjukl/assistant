@@ -1,298 +1,32 @@
 <div class="page-header">
   <div class="page-eyebrow">Advanced</div>
   <h1 class="page-title">Power User Guide</h1>
-  <p class="page-lead">The canonical config in depth, launcher architecture, runtime discovery, autonomy system configuration, and diagnostic commands.</p>
+  <p class="page-lead">Canonical config, entry-point hierarchy, launcher architecture, and diagnostics.</p>
 </div>
 
 <div class="doc-section" id="config">
   <div class="section-eyebrow">Configuration</div>
-  <h2 class="section-title">The Canonical Config</h2>
-  <p class="section-lead">EOS uses a single config file: <code>config.json</code>. It describes the full intended system.</p>
-
-  <p class="doc-p">You don't switch between multiple config variants or maintain separate files per environment. The intended workflow is:</p>
+  <h2 class="section-title">Canonical Product Shape</h2>
+  <p class="section-lead">EOS is the platform. The entity is the runtime intelligence inside EOS. The entity's chosen name is never the product name.</p>
+  <p class="doc-p">Operationally, this means:</p>
   <ul class="doc-list">
-    <li>Launch the backends you want running</li>
-    <li>Let <code>eos.py</code> discover what is available at startup</li>
-    <li>Rely on runtime fallback for missing helpers</li>
-    <li>Use the admin panel for live adjustments during a session</li>
+    <li>You install, launch, package, and document <strong>EOS</strong></li>
+    <li>You interact with and supervise the <strong>entity</strong></li>
+    <li>You may configure or observe an <strong>entity name</strong> without renaming the product</li>
   </ul>
-
-  <div class="callout tip">
-    <div class="callout-icon">&#128161;</div>
-    <div class="callout-title">The other config files are reference snapshots</div>
-    <div class="callout-body">The files <code>configs/profiles/config.base.json</code>, <code>configs/profiles/config.standard.json</code>, and similar variants are reference snapshots — they document known-good configurations for different hardware profiles. <code>config.json</code> is the file EOS actually loads. Edit <code>config.json</code> directly; the snapshot files are read-only references.</div>
-  </div>
-</div>
-
-<hr class="doc-rule">
-
-<div class="doc-section" id="cli">
-  <div class="section-eyebrow">Advanced</div>
-  <h2 class="section-title">CLI Reference</h2>
-  <p class="section-lead">All supported command-line flags for <code>eos.py</code>.</p>
-
-  <div class="code-wrap"><pre># Discover services, print summary, and start the WebUI (normal startup)
-python eos.py
-
-# Print discovery + capability map only — no WebUI started
-python eos.py --status
-
-# Override the WebUI port (default: 7860)
-python eos.py --port 9000
-
-# Bind to all interfaces for LAN access
-python eos.py --host 0.0.0.0
-
-# Explicitly specify the config file path
-python eos.py --config config.json</pre></div>
-
-  <div class="callout important">
-    <div class="callout-icon">&#9432;</div>
-    <div class="callout-title">eos.py never starts model servers</div>
-    <div class="callout-body"><code>eos.py</code> is the coordinator and WebUI host. It discovers running backends but does not start them. Use a launcher script or <code>runtime.server_launcher</code> to bring up model servers before running <code>eos.py</code>.</div>
-  </div>
 </div>
 
 <hr class="doc-rule">
 
 <div class="doc-section" id="launchers">
   <div class="section-eyebrow">Advanced</div>
-  <h2 class="section-title">Launcher Architecture</h2>
-  <p class="section-lead">Launchers are organized into three categories. Mix and match freely to build the stack you want.</p>
-
-  <h3 class="sub-title" id="launchers-per-server">Per-Server Launchers</h3>
-  <p class="doc-p">Each launcher starts exactly one backend. Use these when you want precise control over which models run and on which hardware.</p>
+  <h2 class="section-title">Entry-Point Hierarchy</h2>
+  <p class="section-lead">There are many valid scripts, but only one default hierarchy for new users.</p>
   <ul class="doc-list">
-    <li><code>launchers\start-main-gpu.bat</code> / <code>launchers\start-main-cpu.bat</code> — main language model (port 8080)</li>
-    <li><code>launchers\start-vision-gpu.bat</code> / <code>start-vision-cpu.bat</code> — vision helper (port 8081)</li>
-    <li><code>launchers\start-tools-gpu.bat</code> / <code>launchers\start-tools-cpu.bat</code> — tool helper (port 8082)</li>
-    <li><code>launchers\start-thinking-gpu.bat</code> / <code>launchers\start-thinking-cpu.bat</code> — thinking helper (port 8083)</li>
-    <li><code>launchers\start-creativity-gpu.bat</code> / <code>launchers\start-creativity-cpu.bat</code> — creativity helper (port 8084)</li>
+    <li><code>setup\Setup-Full.ps1</code> — recommended install entry point</li>
+    <li><code>launchers\start-standard.bat</code> — recommended backend launch entry point</li>
+    <li><code>start-eos.bat</code> — recommended runtime bootstrap entry point</li>
+    <li><code>status-eos.bat</code> — diagnostics without starting the WebUI</li>
   </ul>
-
-  <h3 class="sub-title" id="launchers-bundle">Bundle Launchers</h3>
-  <p class="doc-p">Each bundle launcher starts a predefined set of backends in one click.</p>
-  <ul class="doc-list">
-    <li><code>launchers\start-minimal.bat</code> — main + tools (minimum viable stack)</li>
-    <li><code>launchers\start-standard.bat</code> — main + tools + thinking (recommended for most users)</li>
-    <li><code>launchers\start-full.bat</code> — main + tools + thinking + creativity (full stack, highest resource use)</li>
-  </ul>
-
-  <h3 class="sub-title" id="launchers-bootstrap">Bootstrap &amp; Status</h3>
-  <ul class="doc-list">
-    <li><code>start-eos.bat</code> — runtime discovery + WebUI (run after backends are up)</li>
-    <li><code>status-eos.bat</code> — discovery only, no WebUI started</li>
-  </ul>
-
-  <h3 class="sub-title" id="launchers-gui">GUI Launcher</h3>
-  <ul class="doc-list">
-    <li><code>Launch EOS.bat</code> — graphical launcher with profile selection, starts backends and EOS in the correct order</li>
-  </ul>
-
-  <div class="callout tip">
-    <div class="callout-icon">&#128161;</div>
-    <div class="callout-title">Mix GPU and CPU freely</div>
-    <div class="callout-body">You can run the main model on GPU and the tool helper on CPU simultaneously — just use the corresponding per-server launchers. There is no requirement for all backends to use the same hardware. A common pattern is main on GPU for speed, helpers on CPU to conserve VRAM.</div>
-  </div>
-</div>
-
-<hr class="doc-rule">
-
-<div class="doc-section" id="ports">
-  <div class="section-eyebrow">Advanced</div>
-  <h2 class="section-title">Port Assignments</h2>
-  <p class="section-lead">Fixed ports used by each EOS component.</p>
-
-  <div class="table-wrap">
-    <table class="doc-table">
-      <thead>
-        <tr>
-          <th>Port</th>
-          <th>Component</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><code>8080</code></td>
-          <td>Main model</td>
-        </tr>
-        <tr>
-          <td><code>8081</code></td>
-          <td>Vision helper</td>
-        </tr>
-        <tr>
-          <td><code>8082</code></td>
-          <td>Tool helper</td>
-        </tr>
-        <tr>
-          <td><code>8083</code></td>
-          <td>Thinking helper</td>
-        </tr>
-        <tr>
-          <td><code>8084</code></td>
-          <td>Creativity helper</td>
-        </tr>
-        <tr>
-          <td><code>7860</code></td>
-          <td>WebUI (chat interface + admin panel)</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<hr class="doc-rule">
-
-<div class="doc-section" id="config-deep">
-  <div class="section-eyebrow">Advanced</div>
-  <h2 class="section-title">Config Deep-Dive</h2>
-  <p class="section-lead">Key blocks in <code>config.json</code> and what each field governs.</p>
-
-  <h3 class="sub-title" id="config-servers">servers block</h3>
-  <p class="doc-p">Defines each backend: its endpoint URL, the path to the llama binary, the model file location, and layer counts. The <code>n_gpu_layers</code> field is the key control — set it to <code>0</code> for full CPU inference, or to a positive integer to offload that many transformer layers to the GPU. EOS uses this value to select the correct binary (GPU build vs CPU build) at launch time.</p>
-  <div class="code-wrap"><pre>"servers": {
-  "main": {
-    "endpoint": "http://127.0.0.1:8080",
-    "binary_gpu": "bin\\llama-server-cuda.exe",
-    "binary_cpu": "bin\\llama-server.exe",
-    "model": "models\\primary\\model.gguf",
-    "n_gpu_layers": 35,
-    "context_size": 8192
-  },
-  "tools": {
-    "endpoint": "http://127.0.0.1:8082",
-    "binary_gpu": "bin\\llama-server-cuda.exe",
-    "binary_cpu": "bin\\llama-server.exe",
-    "model": "models\\tools\\model.gguf",
-    "n_gpu_layers": 0,
-    "context_size": 4096
-  }
-}</pre></div>
-
-  <h3 class="sub-title" id="config-autonomy">autonomy_defaults block</h3>
-  <p class="doc-p">Sets the starting state of the four autonomy dimensions when EOS boots. All four default to <code>true</code>. Admin panel changes override these at runtime but reset to these values on restart.</p>
-  <div class="code-wrap"><pre>"autonomy_defaults": {
-  "perception": true,   // observe environment passively
-  "cognition": true,    // run background reflection loops
-  "action": true,       // use tools and external integrations
-  "initiative": true    // act proactively without being asked
-}</pre></div>
-
-  <h3 class="sub-title" id="config-computer-use">computer_use block</h3>
-  <p class="doc-p"><code>enabled</code> is the master safety toggle — computer use cannot occur when this is <code>false</code> regardless of mode. <code>default_mode</code> sets how much supervision EOS operates under when computer use is active: <code>command_only</code> requires explicit user requests with per-action confirmation; <code>supervised_session</code> allows a bounded sequence of actions before pausing for review. <code>approved_shortcuts_path</code> points to the folder of approved application shortcuts that EOS is permitted to launch.</p>
-  <div class="code-wrap"><pre>"computer_use": {
-  "enabled": true,
-  "default_mode": "command_only",
-  "approved_shortcuts_path": "data\\computer_use\\approved_shortcuts",
-  "app_policy_path": "data\\computer_use\\app_policy.json"
-}</pre></div>
-
-  <h3 class="sub-title" id="config-workspace">workspace_tools block</h3>
-  <p class="doc-p">Controls what EOS can do inside the workspace directory. Both flags default to <code>false</code>. <code>allow_delete</code> permits permanent file deletion within the workspace. <code>allow_exec</code> permits EOS to run shell commands — only enable this if you explicitly need scripted automation.</p>
-  <div class="code-wrap"><pre>"workspace_tools": {
-  "allow_delete": false,
-  "allow_exec": false
-}</pre></div>
-
-  <h3 class="sub-title" id="config-creativity">creativity block</h3>
-  <p class="doc-p"><code>injection_frequency</code> controls how often creative reframes are injected: <code>"off"</code>, <code>"low"</code>, <code>"medium"</code>, or <code>"high"</code>. <code>intensity</code> controls how strongly the reframes influence the response (float 0.0–1.0). <code>invocation_domains</code> lists the conversation domains where creativity injection is active — remove a domain to suppress creative reframes in that context. <code>autonomous_idle</code> allows the creativity subsystem to run between conversations during idle cognition cycles.</p>
-  <div class="code-wrap"><pre>"creativity": {
-  "enabled": true,
-  "injection_frequency": "medium",
-  "intensity": 0.6,
-  "autonomous_idle": false,
-  "invocation_domains": [
-    "problem_solving",
-    "creative_writing",
-    "brainstorming",
-    "open_ended_questions"
-  ]
-}</pre></div>
-
-  <h3 class="sub-title" id="config-google">google block</h3>
-  <p class="doc-p">Controls which Google Workspace services EOS uses. <code>calendar_enabled</code>, <code>gmail_enabled</code>, and <code>drive_enabled</code> gate each service independently — set any to <code>false</code> to disable that service even when credentials are present.</p>
-  <div class="code-wrap"><pre>"google": {
-  "calendar_enabled": true,
-  "gmail_enabled": true,
-  "drive_enabled": true
-}</pre></div>
-</div>
-
-<hr class="doc-rule">
-
-<div class="doc-section" id="discovery">
-  <div class="section-eyebrow">Advanced</div>
-  <h2 class="section-title">Runtime Discovery</h2>
-  <p class="section-lead">At startup, <code>eos.py</code> probes each expected service and builds a live capability map before opening the WebUI.</p>
-
-  <p class="doc-p">The discovery process:</p>
-  <ol class="doc-list">
-    <li>Read the <code>servers</code> block from <code>config.json</code> to get expected endpoints</li>
-    <li>Probe each endpoint with a lightweight health check</li>
-    <li>Classify each service as <span class="badge active">active</span>, <span class="badge degraded">degraded</span>, or <span class="badge unavail">unavailable</span></li>
-    <li>Build the effective capability map using the fallback rules below</li>
-    <li>Print the summary to the console and make it available in the Admin Panel Overview tab</li>
-  </ol>
-
-  <p class="doc-p">Fallback rules applied during discovery:</p>
-  <ul class="doc-list">
-    <li><strong>Tool helper missing</strong> → tool calls fall back to main model (degraded)</li>
-    <li><strong>Thinking helper missing</strong> → reasoning falls back to main model (degraded)</li>
-    <li><strong>Creativity helper missing</strong> → creativity falls back to main model or degrades cleanly</li>
-    <li><strong>Vision helper missing</strong> → vision features cleanly disabled (unavailable)</li>
-    <li><strong>STT/TTS missing</strong> → voice degrades without blocking chat</li>
-  </ul>
-
-  <h3 class="sub-title" id="discovery-example">Example Discovery Output</h3>
-  <div class="code-wrap"><pre>EOS Runtime Discovery
-─────────────────────────────────────────
-  Main model       active        port 8080    GPU
-  Tool helper      active        port 8082    CPU
-  Thinking helper  active        port 8083    GPU
-  Creativity       unavailable   (fallback: main)
-  Vision           unavailable
-  STT              active
-  TTS              active
-
-Effective Capabilities
-  chat             available
-  tools            available
-  reasoning        available
-  creativity       degraded      (using main model fallback)
-  vision           unavailable
-  voice            available
-─────────────────────────────────────────
-Starting WebUI at http://127.0.0.1:7860/</pre></div>
-</div>
-
-<hr class="doc-rule">
-
-<div class="doc-section" id="data-layout">
-  <div class="section-eyebrow">Advanced</div>
-  <h2 class="section-title">Data Directory Layout</h2>
-  <p class="section-lead">Complete layout of the <code>data/</code> directory, with each file and folder explained.</p>
-
-  <div class="dir-tree"><pre>data/
-├── entity_state.db                 <span class="dir-comment"># SQLite: persistent identity state and long-term memory</span>
-├── google_token.json               <span class="dir-comment"># Google OAuth token (auto-created on first auth)</span>
-├── memory_store/                   <span class="dir-comment"># ChromaDB vector memory — grows over time, do not delete</span>
-│   └── ...                         <span class="dir-comment"># ChromaDB internal files managed automatically</span>
-├── workspace/                      <span class="dir-comment"># EOS's sandboxed file environment</span>
-│   ├── context/                    <span class="dir-comment"># Files here are auto-injected into EOS's context</span>
-│   ├── output/                     <span class="dir-comment"># Files EOS writes during sessions</span>
-│   └── scratch/                    <span class="dir-comment"># Temporary working files</span>
-├── worldview/                      <span class="dir-comment"># Worldview personalization subsystem</span>
-│   ├── sources/                    <span class="dir-comment"># Drop source documents here for worldview extraction</span>
-│   ├── profile.md                  <span class="dir-comment"># Extracted worldview profile applied to EOS's context</span>
-│   └── extraction_log.json         <span class="dir-comment"># Log of worldview extraction runs</span>
-├── computer_use/                   <span class="dir-comment"># Computer use subsystem data</span>
-│   ├── approved_shortcuts/         <span class="dir-comment"># Shortcuts EOS is permitted to launch</span>
-│   └── app_policy.json             <span class="dir-comment"># Application permission policy</span>
-└── backups/                        <span class="dir-comment"># Automatic state snapshots (created on major state changes)</span></pre></div>
-
-  <div class="callout tip">
-    <div class="callout-icon">&#128161;</div>
-    <div class="callout-title">Backing up EOS state</div>
-    <div class="callout-body">To fully back up EOS, copy the entire <code>data/</code> directory and <code>config.json</code>. The <code>data/</code> directory contains everything persistent: identity, memory, OAuth tokens, worldview, and workspace files. Model files in <code>models/</code> do not need to be backed up — they can always be re-downloaded with <code>setup\Setup-Full.ps1</code>.</div>
-  </div>
+  <p class="doc-p">Deviate only for lower resource usage, manual model control, extra creativity, vision support, or exact backend/hardware selection.</p>
 </div>
