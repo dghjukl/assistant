@@ -23,9 +23,10 @@ Gates
 6.  Config credential key normalization: no config file uses the old
     client_secret_glob key.
 7.  Survival mode imports cleanly and activates/deactivates without error.
-8.  Test suite runs and passes (pytest exit code 0).
+8.  Startup observability guards exist for import failures and background health-loop failures.
+9.  Test suite runs and passes (pytest exit code 0).
 
-Gates 1-7 are fast static checks.  Gate 8 runs the full test suite and may
+Gates 1-8 are fast static checks.  Gate 9 runs the full test suite and may
 take longer.  Pass --skip-tests to run only the static checks.
 """
 from __future__ import annotations
@@ -351,7 +352,64 @@ def check_survival_mode() -> None:
                 "Fix runtime/survival_mode.py")
 
 
-# ── Gate 8: Test suite ────────────────────────────────────────────────────────
+def check_startup_observability_guards() -> None:
+    section("Startup Observability Guards")
+
+    try:
+        sys.path.insert(0, str(ROOT))
+        from runtime.startup_health import (
+            START_BACKENDS_MESSAGE,
+            detect_startup_guidance,
+            google_unavailable_payload,
+        )
+        from webui.app_state import AppState
+        import webui.app_runtime as app_runtime
+
+        require(
+            google_unavailable_payload() == {"status": "unavailable", "reason": "not_configured"},
+            "Google unavailable payload is structured for release surface",
+            "Return {'status': 'unavailable', 'reason': 'not_configured'} from Google stubs",
+        )
+
+        discovery = type(
+            "DiscoveryStub",
+            (),
+            {
+                "services": {
+                    "primary": type("Probe", (), {"status": "unavailable"})(),
+                    "tool": type("Probe", (), {"status": "unavailable"})(),
+                }
+            },
+        )()
+        require(
+            detect_startup_guidance(discovery) == START_BACKENDS_MESSAGE,
+            "Startup guidance detects all-backend-offline condition",
+            "Ensure detect_startup_guidance() flags the no-backends-running state",
+        )
+
+        require(
+            hasattr(AppState, "__dataclass_fields__")
+            and "startup_issues" in AppState.__dataclass_fields__
+            and "startup_guidance" in AppState.__dataclass_fields__,
+            "AppState exposes startup issue and guidance fields",
+            "Add startup_issues and startup_guidance to webui.app_state.AppState",
+        )
+        require(
+            hasattr(app_runtime, "_track_background_task"),
+            "app_runtime tracks background task failures",
+            "Add a shared background-task tracker in webui.app_runtime",
+        )
+        require(
+            hasattr(app_runtime, "_record_startup_issue"),
+            "app_runtime records startup/import failures",
+            "Add a startup issue recorder in webui.app_runtime",
+        )
+    except Exception as exc:
+        require(False, f"Startup observability guard check: {exc}",
+                "Fix runtime/startup_health.py or webui/app_runtime.py")
+
+
+# ── Gate 9: Test suite ────────────────────────────────────────────────────────
 
 def check_test_suite() -> None:
     section("Test Suite")
@@ -396,6 +454,7 @@ def main() -> None:
     check_requirements_completeness()
     check_config_key_normalization()
     check_survival_mode()
+    check_startup_observability_guards()
 
     if not args.skip_tests:
         check_test_suite()

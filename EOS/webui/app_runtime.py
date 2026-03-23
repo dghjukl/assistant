@@ -60,6 +60,7 @@ from webui.schemas import (
 from core.audit import init_audit_store, get_audit_store
 from core.secrets import init_secrets, secrets_manager as _secrets_manager_ref
 from runtime.service_discovery import discover_runtime
+from runtime.startup_health import detect_startup_guidance, issue_record
 from runtime.topology import RuntimeTopology
 from webui.app_state import app_state
 
@@ -156,6 +157,39 @@ def _emit_log(level: str, source: str, message: str, detail: Any = None) -> None
     app_state.log_ring.append(entry)
     # Schedule async broadcast
     asyncio.create_task(_broadcast_log_to_admins(entry))
+
+
+def _record_startup_issue(category: str, component: str, reason: str, detail: Any = None) -> dict[str, Any]:
+    issue = issue_record(category, component, reason, detail=detail)
+    app_state.startup_issues.append(issue)
+    return issue
+
+
+def _track_background_task(name: str, task: asyncio.Task) -> asyncio.Task:
+    def _on_done(done: asyncio.Task) -> None:
+        app_state.background_tasks.discard(done)
+        if done.cancelled():
+            return
+        try:
+            exc = done.exception()
+        except asyncio.CancelledError:
+            return
+        except Exception as callback_exc:
+            exc = callback_exc
+        if exc is None:
+            return
+        issue = _record_startup_issue(
+            "background_task_failure",
+            name,
+            "task_exited",
+            {"error": str(exc)},
+        )
+        logger.error("Background task %s exited unexpectedly: %s", name, exc)
+        _emit_log("error", "startup", f"Background task '{name}' failed", issue)
+
+    app_state.background_tasks.add(task)
+    task.add_done_callback(_on_done)
+    return task
 
 
 async def _broadcast_log_to_admins(entry: dict) -> None:
@@ -988,6 +1022,9 @@ async def startup_event(app=None, config_path: str | Path | None = None):
     """Initialize the server: load config, discover topology, init tracer."""
 
     try:
+        app_state.startup_issues.clear()
+        app_state.startup_guidance = None
+
         # 1. Load config
         config_path = _resolve_startup_config_path(app=app, config_path=config_path)
         config_file = str(config_path)
@@ -1048,8 +1085,13 @@ async def startup_event(app=None, config_path: str | Path | None = None):
             from core.google_oauth import configure as google_oauth_configure
             google_oauth_configure(app_state.cfg)
             _emit_log("info", "startup", "Google OAuth manager configured")
+        except ImportError as exc:
+            issue = _record_startup_issue("import_failure", "google_oauth", "import_failed", {"error": str(exc)})
+            _emit_log("error", "startup", "Google OAuth import failed", issue)
+            logger.error("Google OAuth import failed: %s", exc)
         except Exception as exc:
-            _emit_log("error", "startup", "Google OAuth configure failed", {"error": str(exc)})
+            issue = _record_startup_issue("startup_failure", "google_oauth", "configure_failed", {"error": str(exc)})
+            _emit_log("error", "startup", "Google OAuth configure failed", issue)
             logger.error("Google OAuth configure failed: %s", exc)
 
         # 2. Init memory/db
@@ -1065,16 +1107,19 @@ async def startup_event(app=None, config_path: str | Path | None = None):
         app_state.runtime_discovery = discover_runtime(config_path, root=config_path.parent)
         app_state.topology = app_state.runtime_discovery.topology
         app_state.primary_degraded = app_state.topology.server("primary") is None or not app_state.topology.server("primary").is_ready()
+        app_state.startup_guidance = detect_startup_guidance(app_state.runtime_discovery)
         _emit_log("info", "startup", "Runtime discovery complete", app_state.runtime_discovery.to_dict())
         logger.info("Runtime discovery complete: %s", app_state.topology)
+        if app_state.startup_guidance:
+            issue = _record_startup_issue("runtime_guidance", "backends", "no_backends_running", {"message": app_state.startup_guidance})
+            _emit_log("warn", "startup", app_state.startup_guidance, issue)
 
         # 3a. On-demand server manager (tool / thinking / creativity start only when needed)
         try:
             from runtime.on_demand import init_on_demand_manager
             _on_demand_manager = init_on_demand_manager(app_state.cfg, config_path.parent, app_state.topology)
             idle_task = _on_demand_manager.start_idle_loop()
-            app_state.background_tasks.add(idle_task)
-            idle_task.add_done_callback(app_state.background_tasks.discard)
+            _track_background_task("on_demand_idle_loop", idle_task)
             _emit_log("info", "startup", "OnDemandServerManager initialised")
         except Exception as exc:
             logger.warning("OnDemandServerManager init failed: %s", exc)
@@ -1335,6 +1380,10 @@ async def startup_event(app=None, config_path: str | Path | None = None):
             app_state.sensor_poller = SensorPoller(cfg=app_state.cfg, topology=app_state.topology)
             app_state.sensor_poller.start()
             _emit_log("info", "startup", "SensorPoller started")
+        except ImportError as exc:
+            issue = _record_startup_issue("import_failure", "system_sensors", "import_failed", {"error": str(exc)})
+            _emit_log("error", "startup", "SensorPoller import failed", issue)
+            logger.warning("SensorPoller import failed: %s", exc)
         except Exception as exc:
             logger.warning("SensorPoller init failed: %s", exc)
 
@@ -1350,6 +1399,10 @@ async def startup_event(app=None, config_path: str | Path | None = None):
             )
             app_state.backend_probe.start()
             _emit_log("info", "startup", "BackendHealthProbe started")
+        except ImportError as exc:
+            issue = _record_startup_issue("import_failure", "backend_health_probe", "import_failed", {"error": str(exc)})
+            _emit_log("error", "startup", "BackendHealthProbe import failed", issue)
+            logger.warning("BackendHealthProbe import failed: %s", exc)
         except Exception as exc:
             logger.warning("BackendHealthProbe init failed: %s", exc)
 
@@ -1560,25 +1613,15 @@ async def startup_event(app=None, config_path: str | Path | None = None):
             logger.warning("Capability reconciliation failed: %s", exc)
 
         # 8. Start background tasks
-        task1 = asyncio.create_task(_server_health_loop())
-        app_state.background_tasks.add(task1)
-        task1.add_done_callback(app_state.background_tasks.discard)
+        task1 = _track_background_task("server_health_loop", asyncio.create_task(_server_health_loop()))
 
-        task2 = asyncio.create_task(_bus_poll_loop())
-        app_state.background_tasks.add(task2)
-        task2.add_done_callback(app_state.background_tasks.discard)
+        task2 = _track_background_task("bus_poll_loop", asyncio.create_task(_bus_poll_loop()))
 
-        task4 = asyncio.create_task(_initiative_loop())
-        app_state.background_tasks.add(task4)
-        task4.add_done_callback(app_state.background_tasks.discard)
+        task4 = _track_background_task("initiative_loop", asyncio.create_task(_initiative_loop()))
 
-        task5 = asyncio.create_task(_memory_maintenance_loop())
-        app_state.background_tasks.add(task5)
-        task5.add_done_callback(app_state.background_tasks.discard)
+        task5 = _track_background_task("memory_maintenance_loop", asyncio.create_task(_memory_maintenance_loop()))
 
-        task6 = asyncio.create_task(_backup_loop())
-        app_state.background_tasks.add(task6)
-        task6.add_done_callback(app_state.background_tasks.discard)
+        task6 = _track_background_task("backup_loop", asyncio.create_task(_backup_loop()))
 
         # Reflection pipeline (identity eval on schedule)
         try:
@@ -1593,8 +1636,7 @@ async def startup_event(app=None, config_path: str | Path | None = None):
                         entity_state_service=app_state.entity_state_service,
                     )
                 )
-                app_state.background_tasks.add(task3)
-                task3.add_done_callback(app_state.background_tasks.discard)
+                _track_background_task("reflection_pipeline", task3)
                 _emit_log("info", "startup", "ReflectionPipeline started")
                 if app_state.current_focus_service is not None:
                     app_state.current_focus_service.set_background_focus(
@@ -1647,9 +1689,7 @@ async def startup_event(app=None, config_path: str | Path | None = None):
                 except Exception as _exc:
                     logger.debug("idle_cognition loop error: %s", _exc)
 
-        task_idle = asyncio.create_task(_idle_cognition_loop())
-        app_state.background_tasks.add(task_idle)
-        task_idle.add_done_callback(app_state.background_tasks.discard)
+        task_idle = _track_background_task("idle_cognition_loop", asyncio.create_task(_idle_cognition_loop()))
 
         # Discord bot (optional, config-gated)
         if app_state.cfg.get("discord", {}).get("enabled", False) and app_state.topology:
@@ -1663,8 +1703,7 @@ async def startup_event(app=None, config_path: str | Path | None = None):
                         turn_notifiers=[_build_discord_turn_notifier()],
                     )
                 )
-                app_state.background_tasks.add(task_discord)
-                task_discord.add_done_callback(app_state.background_tasks.discard)
+                _track_background_task("discord_bot", task_discord)
                 _emit_log("info", "startup", "Discord bot started")
             except Exception as exc:
                 logger.warning("Discord bot start failed: %s", exc)
@@ -1861,6 +1900,8 @@ async def get_status_endpoint():
             "topology": topology_summary,
             "capabilities": app_state.runtime_discovery.capabilities if app_state.runtime_discovery else {},
             "services": app_state.runtime_discovery.to_dict().get("services", {}) if app_state.runtime_discovery else {},
+            "startup_guidance": app_state.startup_guidance,
+            "startup_issues": list(app_state.startup_issues),
             "current_focus": _get_current_focus_dict(),
             "overnight": _get_overnight_status(),
             "entity_state": snapshot.to_dict() if snapshot is not None else None,
@@ -2312,11 +2353,12 @@ async def post_identity_eval():
             status_code=503
         )
     try:
-        task = asyncio.create_task(
-            run_evaluation_cycle(app_state.topology, app_state.cfg, tracer=app_state.tracer)
+        _track_background_task(
+            "identity_evaluation",
+            asyncio.create_task(
+                run_evaluation_cycle(app_state.topology, app_state.cfg, tracer=app_state.tracer)
+            ),
         )
-        app_state.background_tasks.add(task)
-        task.add_done_callback(app_state.background_tasks.discard)
 
         return JSONResponse({
             "ok": True,
@@ -2989,6 +3031,8 @@ async def admin_runtime_diagnostics():
             "uptime_seconds": time.time() - app_state.topology._boot_time,
             "python_version": platform.python_version(),
             "platform": sys.platform,
+            "startup_guidance": app_state.startup_guidance,
+            "startup_issues": list(app_state.startup_issues),
             "behavior_mode": getattr(latest_snapshot, "behavior_mode", None),
             "behavior": getattr(latest_snapshot, "behavior_summary", None),
             "signal_bus": _signal_bus_health_summary(),
@@ -4405,8 +4449,7 @@ async def discord_connect():
                 turn_notifiers=[_build_discord_turn_notifier()],
             )
         )
-        app_state.background_tasks.add(task_discord)
-        task_discord.add_done_callback(app_state.background_tasks.discard)
+        _track_background_task("discord_bot", task_discord)
         _emit_log("info", "discord", "Discord bot connect requested")
         return JSONResponse({"ok": True, "data": {"message": "Discord bot starting"}})
     except Exception as exc:

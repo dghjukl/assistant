@@ -12,6 +12,8 @@ import pytest
 import webui.app_runtime as app_runtime
 from webui.app_state import app_state
 
+pytestmark = pytest.mark.release_gate
+
 
 class _HealthResponse:
     def __init__(self, status_code: int):
@@ -89,6 +91,24 @@ def test_server_health_loop_uses_runtime_discovery_endpoint(runtime_topology_fac
     assert app_state.primary_degraded is False
 
 
+def test_background_task_tracker_records_health_loop_failure():
+    async def _boom():
+        raise RuntimeError("health loop failed")
+
+    async def _run():
+        task = app_runtime._track_background_task("server_health_loop", asyncio.create_task(_boom()))
+        await asyncio.sleep(0)
+        await asyncio.gather(task, return_exceptions=True)
+
+    asyncio.run(_run())
+
+    assert any(
+        issue["category"] == "background_task_failure"
+        and issue["component"] == "server_health_loop"
+        for issue in app_state.startup_issues
+    )
+
+
 def test_admin_degradation_status_returns_state_backed_service_data(runtime_topology_factory):
     app_state.topology = runtime_topology_factory(primary="ready", tool="error")
     app_state.topology.server("primary").pid = 4242
@@ -152,3 +172,17 @@ def test_vision_module_imports_without_optional_dependencies(runtime_topology_fa
 
     result = asyncio.run(module.describe_screen(topology))
     assert "Vision unavailable" in result
+
+
+def test_startup_guidance_detects_missing_backends():
+    from runtime.startup_health import START_BACKENDS_MESSAGE, detect_startup_guidance
+
+    runtime_discovery = SimpleNamespace(
+        services={
+            "primary": SimpleNamespace(status="unavailable"),
+            "tool": SimpleNamespace(status="unavailable"),
+            "thinking": SimpleNamespace(status="unavailable"),
+        }
+    )
+
+    assert detect_startup_guidance(runtime_discovery) == START_BACKENDS_MESSAGE

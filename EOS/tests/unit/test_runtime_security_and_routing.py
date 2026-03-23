@@ -90,31 +90,8 @@ def test_admin_token_auth_respects_external_origin(tmp_path):
     assert response.json()["error"] == "Admin access from external is disabled"
 
 
-def test_dispatcher_execute_routes_through_tool_executor(registry):
-    import tools.dispatcher as dispatcher
-    import runtime.orchestrator as orch
-    from tests.conftest import make_spec
-
-    registry.register(make_spec(
-        "compat_tool",
-        handler=lambda params: {"echo": params["text"]},
-        trust_level="verified_user",
-        parameters={
-            "type": "object",
-            "properties": {"text": {"type": "string"}},
-            "required": ["text"],
-        },
-    ))
-    orch.wire_executor(registry)
-
-    result = asyncio.run(dispatcher.execute("compat_tool", {"text": "hello"}, topology=None, cfg={}))
-
-    assert result == '{"echo": "hello"}'
-
-
-def test_dispatcher_execute_reports_legacy_path_disabled():
+def test_dispatcher_no_longer_exports_execution_path():
     import tools.dispatcher as dispatcher
 
-    result = asyncio.run(dispatcher.execute("legacy_only_tool", {}, topology=None, cfg={}))
-
-    assert "Legacy TOOL_REGISTRY execution is disabled" in result
+    assert not hasattr(dispatcher, "execute")
+    assert not hasattr(dispatcher, "run_tool_intent")

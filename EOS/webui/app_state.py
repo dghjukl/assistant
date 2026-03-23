@@ -45,6 +45,8 @@ class AppState:
     vision_sessions: dict[str, bool] = field(default_factory=dict)
     background_tasks: set[Any] = field(default_factory=set)
     bus_seen_signals: set[str] = field(default_factory=set)
+    startup_issues: list[dict[str, Any]] = field(default_factory=list)
+    startup_guidance: str | None = None
 
 
 app_state = AppState()
