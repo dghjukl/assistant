@@ -27,7 +27,7 @@ Raw materials: essays, reflections, frameworks, notes, papers, personal writing.
 A structured, extracted, uncertainty-preserving document that compresses the signal from Layer 1 into stable orientation. This is the crucial artifact. It represents what the entity has *understood* from those materials, not a pointer to them. The profile is updated whenever new source documents are added, but it is never overwritten wholesale — it accumulates and refines.
 
 **Layer 3 — Controlled Contextual Injection**
-A compact distillation of the profile is injected into the system prompt on every turn. This is not the full profile — it is a compressed signal that shapes interpretation without filling the context window. The full profile remains available for deeper reference via `workspace_read`.
+A compact distillation of the profile is injected into the system prompt on every turn. This is not the full profile — it is a compressed signal that shapes interpretation without filling the context window. The full profile remains available for deeper reference via `worldview_read`, which exposes `data/worldview/profile.md` without broadening workspace sandbox access.
 
 ### Critical Behavioral Distinction
 
@@ -172,10 +172,10 @@ interpretive calibration, not as a script to quote back.
 
 [4–6 most stable, high-signal statements from the profile]
 
-Full profile: data/worldview/profile.md
+Read full profile with worldview_read: data/worldview/profile.md
 ```
 
-The key design constraint: **the block is small**. It provides enough signal to orient interpretation without dominating the context window. The entity knows the full profile exists and can read it when a task demands it.
+The key design constraint: **the block is small**. It provides enough signal to orient interpretation without dominating the context window. The entity knows the full profile exists and can read it with `worldview_read` when a task demands it.
 
 ---
 

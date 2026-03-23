@@ -50,6 +50,10 @@ def register(registry: Any, config: Dict[str, Any]) -> None:
     project_root = Path(config.get("project_root", ".")).resolve()
     workspace_root_str = ws_cfg.get("workspace_root", "data/workspace")
     workspace_root = (project_root / workspace_root_str).resolve()
+    worldview_cfg = config.get("worldview", {}) if isinstance(config, dict) else {}
+    worldview_enabled = bool(worldview_cfg.get("enabled", True))
+    worldview_root = (project_root / worldview_cfg.get("worldview_path", "data/worldview")).resolve()
+    worldview_profile = (worldview_root / "profile.md").resolve()
 
     def _confine(p: Path) -> Optional[Tuple[Path, Optional[str]]]:
         """Resolve and confine a path to workspace root. Returns (resolved_path, error)."""
@@ -192,6 +196,61 @@ def register(registry: Any, config: Dict[str, Any]) -> None:
         trust_level=ToolTrustLevel.PUBLIC,
         confirmation_policy=ConfirmationPolicy.NONE,
         enabled=enabled,
+    ))
+
+    def worldview_read_handler(params: Dict[str, Any]) -> str:
+        requested_path = str(params.get("path") or "data/worldview/profile.md").strip()
+        normalized = requested_path.replace("\\", "/")
+        allowed_paths = {"profile.md", "data/worldview/profile.md"}
+        if normalized not in allowed_paths:
+            return _jdump({
+                "error": "worldview_read only supports data/worldview/profile.md",
+                "supported_path": "data/worldview/profile.md",
+            })
+
+        if not worldview_enabled:
+            return _jdump({"error": "worldview subsystem is disabled"})
+
+        try:
+            worldview_profile.relative_to(worldview_root)
+        except ValueError:
+            return _jdump({"error": "worldview profile path is outside worldview root"})
+
+        if not worldview_profile.exists():
+            return _jdump({"error": "Not found: data/worldview/profile.md"})
+        if not worldview_profile.is_file():
+            return _jdump({"error": "Not a file: data/worldview/profile.md"})
+
+        try:
+            text = worldview_profile.read_text(encoding="utf-8", errors="replace")
+            lines = _safe_int(params.get("lines"), -1)
+            if lines > 0:
+                text = "\n".join(text.splitlines()[:lines])
+            return _jdump({
+                "path": "data/worldview/profile.md",
+                "size_bytes": len(text.encode("utf-8")),
+                "content": text,
+            })
+        except Exception as e:
+            return _jdump({"error": str(e)})
+
+    registry.register(ToolSpec(
+        name="worldview_read",
+        description="Read the extracted worldview profile at data/worldview/profile.md.",
+        pack="workspace_tools",
+        tags=["files", "worldview"],
+        parameters={
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "Only data/worldview/profile.md is supported."},
+                "lines": {"type": "integer"},
+            },
+        },
+        handler=worldview_read_handler,
+        risk_level=ToolRiskLevel.READ_ONLY,
+        trust_level=ToolTrustLevel.PUBLIC,
+        confirmation_policy=ConfirmationPolicy.NONE,
+        enabled=enabled and worldview_enabled,
     ))
 
     # ── Write operations ───────────────────────────────────────────────────

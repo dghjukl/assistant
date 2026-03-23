@@ -18,7 +18,7 @@ Layer 2 — Extracted profile  (data/worldview/profile.md)
 Layer 3 — Contextual injection  (worldview_block())
     Compact distillation of Layer 2 injected into the system prompt each turn.
     Shapes interpretation without dominating the context window or being quoted back.
-    Full profile remains available for explicit reading via filesystem tools.
+    Full profile remains available for explicit reading via worldview_read.
 
 Behavioral contract (enforced via the injected block)
 ------------------------------------------------------
@@ -255,7 +255,7 @@ class WorldviewService:
                     f"{pending}. Source documents are passive context and should not trigger "
                     "unprompted acknowledgment. Extraction remains human-triggered; only mention "
                     "pending material if explicitly asked.\n"
-                    "Full profile path when ready: data/worldview/profile.md"
+                    "Read full profile with worldview_read: data/worldview/profile.md"
                 )
 
         # Extraction has been run — profile exists
@@ -280,7 +280,7 @@ class WorldviewService:
             lines.append("")
             lines.extend(excerpt)
         lines.append("")
-        lines.append("Full profile: data/worldview/profile.md")
+        lines.append("Read full profile with worldview_read: data/worldview/profile.md")
 
         return "\n".join(lines)
 

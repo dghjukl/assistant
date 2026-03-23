@@ -106,6 +106,7 @@ def test_worldview_block_pending_sources_is_internal_only(tmp_path):
     assert "pending extraction" in block
     assert "should not trigger unprompted acknowledgment" in block
     assert "only mention pending material if explicitly asked" in block
+    assert "worldview_read" in block
     assert "ask your partner" not in block
     assert "would like you to run extraction" not in block
 
