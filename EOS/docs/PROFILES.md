@@ -4,10 +4,11 @@ EOS uses a single canonical config file: `config.json`. There are no separate li
 
 The canonical launch hierarchy is:
 
-1. **Recommended backend bundle:** `launchers\start-standard.bat`
-2. **Recommended runtime bootstrap:** `start-eos.bat`
-3. **Fallback diagnostics:** `status-eos.bat`
-4. **Advanced control:** per-server launchers or direct `python eos.py`
+1. **Recommended Windows launcher:** `launchers\Launch EOS.bat`
+2. **Recommended non-interactive backend bundle:** `launchers\start-standard.bat`
+3. **Recommended runtime bootstrap:** `start-eos.bat`
+4. **Fallback diagnostics:** `status-eos.bat`
+5. **Advanced control:** per-server launchers or direct `python eos.py`
 
 Missing backends degrade gracefully — they do not prevent startup.
 
@@ -19,10 +20,11 @@ For capability governance (autonomy, computer use, workspace permissions, etc.) 
 
 Use:
 
-- `launchers\start-standard.bat`
-- `start-eos.bat`
+- `launchers\Launch EOS.bat` for the easiest Windows path
+- or `launchers\start-standard.bat` for the hardened non-interactive default
+- `start-eos.bat` only if you launched backends yourself
 
-That gives the main model, tool helper, and thinking helper with runtime discovery and graceful fallback.
+The Windows launcher detects whether the machine should run the recommended tier, a CPU-first compatibility tier, or a fuller installed stack. Degraded modes are presented as supported profiles, not implicit failure states.
 
 ---
 
@@ -43,9 +45,9 @@ That gives the main model, tool helper, and thinking helper with runtime discove
 
 | Bundle | Launchers | Backends started |
 |---|---|---|
-| Minimal | `launchers\start-minimal.bat` | main + tools |
-| Standard | `launchers\start-standard.bat` | main + tools + thinking |
-| Full | `launchers\start-full.bat` | main + tools + thinking + creativity |
+| Minimal | `launchers\start-minimal.bat` | main only, using the safest detected accelerator |
+| Standard | `launchers\start-standard.bat` | main + tools + thinking, auto-adapted to the detected machine tier |
+| Full | `launchers\start-full.bat` | main + tools + thinking + creativity, only when installed and supported |
 
 Vision is additive: start `launchers\start-vision-gpu.bat` alongside whichever bundle you want.
 

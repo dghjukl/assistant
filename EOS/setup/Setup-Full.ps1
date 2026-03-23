@@ -513,25 +513,33 @@ Write-Host ""
 Write-Host $Divider -ForegroundColor Cyan
 
 if ($allGood) {
-    Write-Host "  Setup complete! EOS is ready to launch." -ForegroundColor Green
+    Write-Host "  Setup complete. EOS assets are in place." -ForegroundColor Green
 } else {
-    Write-Host "  Setup finished with some missing files (see above)." -ForegroundColor Yellow
-    Write-Host "  You can re-run this script to retry failed downloads." -ForegroundColor Gray
+    Write-Host "  Setup finished with some missing or optional items (see above)." -ForegroundColor Yellow
 }
 
 Write-Host ""
-Write-Host "  Launchers:" -ForegroundColor White
-Write-Host "    'Start Base Mode.bat'            - Primary + Tool only (lightest)" -ForegroundColor Gray
-Write-Host "    'Start Base+Thinking Mode.bat'   - + background thinking worker" -ForegroundColor Gray
-Write-Host "    'Start Base+Creativity Mode.bat' - + creativity (place model in models\creativity\)" -ForegroundColor Gray
-Write-Host "    'Start Full Mode.bat'            - Thinking + Creativity both active" -ForegroundColor Gray
-Write-Host "    'Start Vision Mode.bat'          - Base+Thinking + vision model" -ForegroundColor Gray
-Write-Host "    'Start Standard Mode.bat'        - legacy launcher (same as Base+Thinking)" -ForegroundColor Gray
-Write-Host "    'Start No-Boot Mode.bat'         - WebUI only (if servers already running)" -ForegroundColor Gray
+Write-Host "  Post-setup machine assessment:" -ForegroundColor White
+try {
+    python -m runtime.windows_deployment --root $Root --config (Join-Path $Root 'config.json')
+} catch {
+    Write-Warn "Automatic launch assessment failed. Run: python verify.py"
+}
 Write-Host ""
-Write-Host "  Web interface opens at:  http://127.0.0.1:7860/" -ForegroundColor Cyan
-Write-Host "  Admin panel at:          http://127.0.0.1:7860/admin" -ForegroundColor Cyan
+Write-Host "  Recommended next steps:" -ForegroundColor White
+Write-Host "    1. Run: python verify.py" -ForegroundColor Gray
+Write-Host "    2. Run: launchers\Launch EOS.bat" -ForegroundColor Gray
+Write-Host "       The launcher will detect the supported machine tier and pre-select a safe profile." -ForegroundColor DarkGray
+Write-Host "    3. If the launcher reports a degraded or CPU-only tier, that is a supported mode, not a failure." -ForegroundColor DarkGray
+Write-Host ""
+Write-Host "  Direct launchers (advanced/manual control):" -ForegroundColor White
+Write-Host "    launchers\start-minimal.bat    - start only the main model" -ForegroundColor Gray
+Write-Host "    launchers\start-standard.bat   - recommended default bundle" -ForegroundColor Gray
+Write-Host "    launchers\start-full.bat       - enable every installed helper" -ForegroundColor Gray
+Write-Host "    start-eos.bat                   - bootstrap WebUI after backends are running" -ForegroundColor Gray
+Write-Host ""
+Write-Host "  Web interface: http://127.0.0.1:7860/" -ForegroundColor Cyan
+Write-Host "  Admin panel:    http://127.0.0.1:7860/admin" -ForegroundColor Cyan
 Write-Host $Divider -ForegroundColor Cyan
 Write-Host ""
-
 Read-Host "  Press Enter to close"

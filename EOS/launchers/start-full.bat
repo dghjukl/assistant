@@ -1,5 +1,5 @@
 @echo off
 set "ROOT=%~dp0.."
 cd /d "%ROOT%"
-echo [EOS] Launching full mode (main model only — all helpers start on-demand)
-call "%ROOT%\launchers\start-minimal.bat"
+echo [EOS] Launching hardened full profile (main + tools + thinking + creativity)
+python -m runtime.launch_profile full --root "%ROOT%" --config "%ROOT%\config.json"

@@ -19,6 +19,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from runtime.windows_deployment import assess_windows_deployment
+
 ROOT = Path(__file__).parent.resolve()
 
 # ── Formatting helpers ────────────────────────────────────────────────────────
@@ -236,6 +238,14 @@ advisory(
     "Re-run setup/Setup-Full.ps1 (voice output optional)"
 )
 
+deployment = assess_windows_deployment(ROOT, ROOT / "config.json")
+for role_key in ("primary", "tool", "thinking", "creativity", "vision"):
+    role = deployment.roles.get(role_key)
+    if role and role.selected_model:
+        ok(f"{role.label} selection resolves to {role.selected_model}")
+    if role and role.selected_mmproj:
+        ok(f"{role.label} mmproj resolves to {role.selected_mmproj}")
+
 
 # ── 5. Config files ───────────────────────────────────────────────────────────
 
@@ -323,6 +333,39 @@ for d in DATA_DIRS:
         f"{d.relative_to(ROOT)}/",
         f"Re-run setup/Setup-Full.ps1 to create directory structure"
     )
+
+
+# ── 9. Launch readiness ──────────────────────────────────────────────────────
+
+section("Windows Launch Readiness")
+
+if deployment.hardware.has_nvidia_gpu:
+    ok(f"NVIDIA GPU detected: {deployment.hardware.gpu_name}")
+else:
+    warn("No NVIDIA GPU detected — compatibility / CPU-first mode is the supported tier")
+    _warnings.append("launch:cpu-tier")
+
+if deployment.hardware.total_memory_gb is not None:
+    info(f"System RAM detected: ~{deployment.hardware.total_memory_gb:.1f} GB")
+
+ok(f"Recommended launcher profile: {deployment.recommended_profile}")
+for line in deployment.summary:
+    info(line)
+
+for profile in deployment.profiles:
+    if profile.supported:
+        ok(f"{profile.label} profile supported")
+    else:
+        warn(f"{profile.label} profile not supported: {'; '.join(profile.issues)}")
+        _warnings.append(f"profile:{profile.key}")
+
+for issue in deployment.blocking_issues:
+    fail(issue)
+    _failures.append(issue)
+
+for warning in deployment.warnings:
+    warn(warning)
+    _warnings.append(warning)
 
 
 # ── Summary ───────────────────────────────────────────────────────────────────
