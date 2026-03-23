@@ -12,6 +12,7 @@ from runtime.boot import (
     _wait_for_health_with_retry,
     load_config,
 )
+from runtime.launch_catalog import normalize_role_name
 
 logging.basicConfig(
     level=logging.INFO,
@@ -22,22 +23,12 @@ logger = logging.getLogger("eos.server_launcher")
 
 ROOT = Path(__file__).resolve().parent.parent
 
-ROLE_ALIASES = {
-    "main": "primary",
-    "primary": "primary",
-    "tool": "tool",
-    "tools": "tool",
-    "thinking": "thinking",
-    "creativity": "creativity",
-    "vision": "vision",
-}
-
 
 def _normalize_role(role: str) -> str:
-    key = role.strip().lower()
-    if key not in ROLE_ALIASES:
-        raise BootError(f"Unknown server role: {role}")
-    return ROLE_ALIASES[key]
+    try:
+        return normalize_role_name(role)
+    except KeyError as exc:
+        raise BootError(f"Unknown server role: {role}") from exc
 
 
 def _apply_accelerator(role: str, srv_cfg: dict, accel: str) -> dict:

@@ -88,6 +88,8 @@ This is the canonical runtime bootstrap. It never starts model servers; it disco
 - `python eos.py` → direct CLI bootstrap for advanced users
 - `status-eos.bat` / `python eos.py --status` → diagnostics only
 
+Legacy launchers under `launchers\legacy\` are now compatibility shims only. They remain callable, but new launch behavior should be added through `runtime/launch_catalog.py`, the first-class `start-*.bat` scripts, and the launcher UI.
+
 ---
 
 ## Startup architecture

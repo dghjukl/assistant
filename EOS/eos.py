@@ -17,6 +17,7 @@ import os
 import sys
 from pathlib import Path
 
+from runtime.launch_catalog import LEGACY_SURFACES
 from runtime.service_discovery import discover_runtime, format_runtime_summary
 
 logging.basicConfig(
@@ -73,9 +74,9 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.profile:
-        logger.warning("--profile is deprecated and ignored. Launch the desired backends with the start-*-cpu/gpu scripts.")
+        logger.warning("--profile is deprecated and ignored. Use %s.", LEGACY_SURFACES["eos.py --profile"]["replacement"])
     if args.no_boot:
-        logger.warning("--no-boot is deprecated and ignored. eos.py never launches model servers.")
+        logger.warning("--no-boot is deprecated and ignored. Use %s.", LEGACY_SURFACES["eos.py --no-boot"]["replacement"])
 
     config_path = _find_config(args.config)
     discovery = discover_runtime(config_path, root=ROOT)

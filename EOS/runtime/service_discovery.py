@@ -10,17 +10,10 @@ from typing import Any
 import httpx
 
 from runtime.boot import load_config
+from runtime.launch_catalog import service_label
 from runtime.topology import RuntimeTopology, build_topology_from_config
 
 logger = logging.getLogger("eos.discovery")
-
-ROLE_LABELS = {
-    "primary": "Main model",
-    "tool": "Tool helper",
-    "thinking": "Thinking helper",
-    "creativity": "Creativity helper",
-    "vision": "Vision",
-}
 
 
 @dataclass
@@ -90,7 +83,10 @@ def discover_runtime(config_path: str | Path, root: Path | None = None) -> Runti
 
     services: dict[str, ServiceProbe] = {}
     for role, srv_cfg in cfg.get("servers", {}).items():
-        label = ROLE_LABELS.get(role, role.replace("_", " ").title())
+        try:
+            label = service_label(role)
+        except KeyError:
+            label = role.replace("_", " ").title()
         host = srv_cfg.get("host", "127.0.0.1")
         port = srv_cfg.get("port", 0)
         endpoint = f"http://{host}:{port}"
