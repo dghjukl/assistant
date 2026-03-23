@@ -1,13 +1,13 @@
 <div class="page-header">
   <div class="page-eyebrow">Capabilities</div>
   <h1 class="page-title">Computer Use</h1>
-  <p class="page-lead">EOS can launch and interact with approved desktop applications. This is a layered, opt-in system — you control which apps are allowed and what EOS can do in them.</p>
+  <p class="page-lead">EOS can launch and interact with approved desktop applications. This is a layered safety system — you define which apps remain entrusted and what EOS can do in them.</p>
 </div>
 
 <div class="callout important">
   <div class="callout-icon">!</div>
-  <div class="callout-title">Off by default</div>
-  <div class="callout-body">Computer Use is off by default. Nothing happens until you explicitly enable it and set a mode.</div>
+  <div class="callout-title">Safety first</div>
+  <div class="callout-body">Computer Use is powerful. The admin controls exist so you can move EOS into a narrower or safer posture immediately whenever trust, context, or risk changes.</div>
 </div>
 
 <div class="doc-rule"></div>
@@ -15,7 +15,7 @@
 <div class="doc-section" id="modes">
   <div class="section-eyebrow">Modes</div>
   <h2 class="section-title">Operating Modes</h2>
-  <p class="doc-p">Computer Use has three modes. The active mode determines what EOS is allowed to do even when the capability is enabled.</p>
+  <p class="doc-p">Computer Use has three modes. The active mode determines how much supervision and continuation EOS has when acting through the desktop.</p>
   <div class="mode-grid">
     <div class="mode-card off">
       <div class="mode-name">Off</div>
@@ -23,7 +23,7 @@
     </div>
     <div class="mode-card on">
       <div class="mode-name">Command Only</div>
-      <div class="mode-desc">Approved apps only. EOS takes single actions in direct response to explicit user-requested tasks. Nothing runs autonomously.</div>
+      <div class="mode-desc">Approved apps only. EOS takes single actions in direct response to explicit user-requested tasks and pauses after each step.</div>
     </div>
     <div class="mode-card warn">
       <div class="mode-name">Supervised Session</div>
@@ -34,7 +34,7 @@
   <div class="callout tip">
     <div class="callout-icon">💡</div>
     <div class="callout-title">Recommended starting point</div>
-    <div class="callout-body">Start with Command Only. It gives you a clear feel for what EOS does before you consider allowing multi-step sessions.</div>
+    <div class="callout-body">Command Only is the easiest way to narrow EOS into a safer, more supervised posture when you want hands-on oversight.</div>
   </div>
 </div>
 
@@ -42,19 +42,19 @@
 
 <div class="doc-section" id="enabling">
   <div class="section-eyebrow">Configuration</div>
-  <h2 class="section-title">Enabling Computer Use</h2>
+  <h2 class="section-title">Configuring Computer Use</h2>
   <ol class="step-list">
     <li class="step-card">
       <div class="step-num green">1</div>
       <div class="step-body">
-        <div class="step-title">Toggle on in the Admin Panel</div>
-        <div class="step-desc">Admin Panel → Control &amp; Permissions → Capabilities → Computer Use → toggle <strong>Enabled</strong> on.</div>
+        <div class="step-title">Set the runtime posture in the Admin Panel</div>
+        <div class="step-desc">Admin Panel → Control &amp; Permissions → Capabilities → Computer Use → set <strong>Enabled</strong> and choose the supervision mode that matches the current level of trust and risk.</div>
       </div>
     </li>
     <li class="step-card">
       <div class="step-num green">2</div>
       <div class="step-body">
-        <div class="step-title">Set the default mode</div>
+        <div class="step-title">Set the persisted default mode</div>
         <div class="step-desc">Set <strong>Default Mode</strong> to Command Only or Supervised Session in the Admin Panel. Alternatively, edit <span class="file-path">config.json</span> directly:</div>
         <div class="code-wrap"><pre>"computer_use": {
   "enabled": true,
@@ -66,8 +66,8 @@
     <li class="step-card">
       <div class="step-num green">3</div>
       <div class="step-body">
-        <div class="step-title">Change mode at any time</div>
-        <div class="step-desc">The active mode can be changed from the Admin Panel at any time without restarting EOS.</div>
+        <div class="step-title">Narrow or revoke at any time</div>
+        <div class="step-desc">The active mode can be changed from the Admin Panel at any time without restarting EOS. Move to a narrower mode or to Off whenever you need a safer posture.</div>
       </div>
     </li>
   </ol>
@@ -99,7 +99,7 @@
   <div class="section-eyebrow">Emergency Stop</div>
   <h2 class="section-title">The HALT Button</h2>
   <p class="doc-p">The Admin Panel's <strong>Computer Use</strong> tab has a red <strong>HALT</strong> button. Pressing it immediately stops all active computer-use activity and sets the mode to Off.</p>
-  <p class="doc-p">Use HALT if EOS does something unexpected or you want an immediate, unconditional stop. You can re-enable and set a mode again from the Admin Panel after investigating.</p>
+  <p class="doc-p">Use HALT if EOS does something unexpected, unsafe, or simply too autonomous for the current moment. You can re-enable and set a mode again from the Admin Panel after investigating.</p>
 
   <div class="callout important">
     <div class="callout-icon">!</div>

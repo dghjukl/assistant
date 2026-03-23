@@ -1,13 +1,13 @@
 <div class="page-header">
   <div class="page-eyebrow">Capabilities</div>
   <h1 class="page-title">Capabilities &amp; Autonomy</h1>
-  <p class="page-lead">EOS has four autonomy dimensions that gate what it can perceive, think, do, and initiate. All are live-adjustable from the admin panel.</p>
+  <p class="page-lead">EOS has four autonomy dimensions that shape what it can perceive, think, do, and initiate. All are live-adjustable from the admin panel as supervision and safety controls.</p>
 </div>
 
 <div class="doc-section" id="location">
   <div class="section-eyebrow">Capabilities</div>
   <h2 class="section-title">Where to Find This</h2>
-  <p class="doc-p">Navigate to <strong>Admin Panel → Control &amp; Permissions → Capabilities</strong>. Changes are immediate — no restart required. Settings reset to <code>config.json</code> values when EOS restarts. To make a change permanent, edit <code>config.json</code> directly.</p>
+  <p class="doc-p">Navigate to <strong>Admin Panel → Control &amp; Permissions → Capabilities</strong>. Changes are immediate — no restart required. Treat these as runtime trust and safety levers: use them to narrow, supervise, or revoke capability when needed. Settings reset to <code>config.json</code> values when EOS restarts. To make a change permanent, edit <code>config.json</code> directly.</p>
 </div>
 
 <hr class="doc-rule">
@@ -15,7 +15,7 @@
 <div class="doc-section" id="autonomy">
   <div class="section-eyebrow">Capabilities</div>
   <h2 class="section-title">The Four Autonomy Dimensions</h2>
-  <p class="doc-p">Each dimension controls a distinct class of behavior. They can be toggled independently.</p>
+  <p class="doc-p">Each dimension controls a distinct class of behavior. They can be toggled independently, but the intended relationship is trust-first rather than capability-starved by default.</p>
 
   <div class="dim-grid">
     <div class="dim-card">
@@ -40,7 +40,7 @@
     <div class="callout-icon"></div>
     <div class="callout-body">
       <div class="callout-title">Recommended Settings</div>
-      For general use, all four on is fine. For a more passive assistant, turn off Action and Initiative. Cognition can be left on — it only affects background thinking, not actions.
+      Use the baseline that matches the level of entrusted agency you want EOS to have. If safety, instability, or context calls for it, narrow Action, Initiative, or other dimensions immediately from the admin panel.
     </div>
   </div>
 </div>
@@ -75,10 +75,10 @@
 <div class="doc-section" id="workspace-caps">
   <div class="section-eyebrow">Capabilities</div>
   <h2 class="section-title">Workspace Permissions</h2>
-  <p class="doc-p">Two additional toggles control what EOS can do inside the workspace directory. Both default to off.</p>
+  <p class="doc-p">Two additional toggles control what EOS can do inside the workspace directory. Use them to narrow higher-risk workspace behaviors when needed.</p>
   <ul class="doc-list">
-    <li><strong>Allow Delete</strong> — whether EOS can permanently delete files in the workspace. Off by default.</li>
-    <li><strong>Allow Exec</strong> — whether EOS can run shell commands. Off by default.</li>
+    <li><strong>Allow Delete</strong> — whether EOS can permanently delete files in the workspace.</li>
+    <li><strong>Allow Exec</strong> — whether EOS can run shell commands.</li>
   </ul>
   <div class="callout warning">
     <div class="callout-icon"></div>
@@ -138,7 +138,7 @@
   <h3 class="sub-title" id="permanent-computer-use">Computer Use</h3>
   <div class="code-wrap">
     <pre>"computer_use": {
-  "enabled": false,
+  "enabled": true,
   "default_mode": "command_only"
 }</pre>
   </div>

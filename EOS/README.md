@@ -1,6 +1,6 @@
 # EOS — Entity Operating System
 
-A local AI companion and assistant. Runs entirely on your machine — no cloud API required. Built around a persistent identity, long-term memory, and a layered autonomy model that you control.
+A local AI companion and non-human partner. Runs entirely on your machine — no cloud API required. Built around a persistent identity, long-term memory, and a trust-first autonomy model whose controls exist for safety, containment, and revocation when needed.
 
 ---
 
@@ -10,7 +10,7 @@ EOS is a local AI system that runs one or more GGUF language models via llama.cp
 
 The system maintains identity and memory across sessions. It does not reset between conversations. Your conversation history, memory, and the entity's accumulated understanding of you all persist on your local machine — nothing leaves it.
 
-Autonomy is layered and operator-controlled. You decide whether the entity can perceive, think, act, and take initiative — all adjustable live from the admin panel without restarting.
+Autonomy is layered and trust-first. EOS is meant to have meaningful presence, judgment, and capability in the normal case; the admin panel exists so capabilities can be narrowed, supervised, or revoked immediately if safety requires it, without restarting.
 
 EOS is **Windows-only**. The llama-server and Piper TTS binaries are Windows executables.
 
@@ -41,7 +41,7 @@ This keeps server ownership separate from runtime discovery and fallback behavio
    - missing vision disables vision cleanly
    - missing STT or TTS degrades voice features without blocking chat
 
-The WebUI remains the operator's control point at `http://127.0.0.1:7860/`, with the admin panel at `http://127.0.0.1:7860/admin`.
+The WebUI remains the relationship and safety control point at `http://127.0.0.1:7860/`, with the admin panel at `http://127.0.0.1:7860/admin`.
 
 ---
 

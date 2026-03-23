@@ -146,7 +146,7 @@ python eos.py --config config.json</pre></div>
 <div class="doc-section" id="config-deep">
   <div class="section-eyebrow">Advanced</div>
   <h2 class="section-title">Config Deep-Dive</h2>
-  <p class="section-lead">Key blocks in <code>config.json</code> and what each field controls.</p>
+  <p class="section-lead">Key blocks in <code>config.json</code> and what each field governs.</p>
 
   <h3 class="sub-title" id="config-servers">servers block</h3>
   <p class="doc-p">Defines each backend: its endpoint URL, the path to the llama binary, the model file location, and layer counts. The <code>n_gpu_layers</code> field is the key control — set it to <code>0</code> for full CPU inference, or to a positive integer to offload that many transformer layers to the GPU. EOS uses this value to select the correct binary (GPU build vs CPU build) at launch time.</p>
@@ -179,9 +179,9 @@ python eos.py --config config.json</pre></div>
 }</pre></div>
 
   <h3 class="sub-title" id="config-computer-use">computer_use block</h3>
-  <p class="doc-p"><code>enabled</code> is the master toggle — computer use cannot occur when this is <code>false</code> regardless of mode. <code>default_mode</code> sets how much autonomy EOS has when computer use is active: <code>command_only</code> requires explicit user requests with per-action confirmation; <code>supervised_session</code> allows a bounded sequence of actions before pausing for review. <code>approved_shortcuts_path</code> points to the folder of approved application shortcuts that EOS is permitted to launch.</p>
+  <p class="doc-p"><code>enabled</code> is the master safety toggle — computer use cannot occur when this is <code>false</code> regardless of mode. <code>default_mode</code> sets how much supervision EOS operates under when computer use is active: <code>command_only</code> requires explicit user requests with per-action confirmation; <code>supervised_session</code> allows a bounded sequence of actions before pausing for review. <code>approved_shortcuts_path</code> points to the folder of approved application shortcuts that EOS is permitted to launch.</p>
   <div class="code-wrap"><pre>"computer_use": {
-  "enabled": false,
+  "enabled": true,
   "default_mode": "command_only",
   "approved_shortcuts_path": "data\\computer_use\\approved_shortcuts",
   "app_policy_path": "data\\computer_use\\app_policy.json"

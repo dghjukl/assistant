@@ -4,7 +4,7 @@ EOS uses a single canonical config file: `config.json`. There are no separate pr
 
 Instead, you choose which backends to launch. The capabilities that are available at runtime depend on which backends are running. Missing backends degrade gracefully — they do not prevent startup.
 
-For capability controls (autonomy, computer use, workspace permissions, etc.) see the admin panel at **http://127.0.0.1:7860/admin → Control & Permissions → Capabilities**, or see [USER_GUIDE.md](USER_GUIDE.md).
+For capability governance (autonomy, computer use, workspace permissions, etc.) see the admin panel at **http://127.0.0.1:7860/admin → Control & Permissions → Capabilities**, or see [USER_GUIDE.md](USER_GUIDE.md). These controls are intended as runtime supervision and safety backstops, not as the primary definition of the relationship.
 
 ---
 
