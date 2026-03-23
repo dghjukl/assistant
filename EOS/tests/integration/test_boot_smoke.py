@@ -105,6 +105,20 @@ class TestBootConfigLoader:
         cfg = load_config(p)
         assert cfg["deployment_mode"] == "vision"
 
+    def test_model_directory_selection_warns_when_multiple_ggufs_exist(self, tmp_path, caplog):
+        models_dir = tmp_path / "models" / "primary"
+        models_dir.mkdir(parents=True)
+        (models_dir / "a-model.gguf").write_text("", encoding="utf-8")
+        (models_dir / "b-model.gguf").write_text("", encoding="utf-8")
+
+        from runtime.boot import _resolve_model_path
+
+        with caplog.at_level("WARNING", logger="eos.boot"):
+            selected = _resolve_model_path("models/primary", tmp_path, role="primary")
+
+        assert selected == models_dir / "a-model.gguf"
+        assert "Multiple GGUF files found" in caplog.text
+
 
 # ── Auth token lifecycle ──────────────────────────────────────────────────────
 

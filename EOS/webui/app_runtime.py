@@ -3,7 +3,7 @@ EOS WebUI Server
 FastAPI server for user chat interface and admin panel.
 
 Startup sequence:
-  1. Load config from EOS_CONFIG env var (default: config.json)
+  1. Load config from an explicitly passed config path (fallback: EOS_CONFIG env var, then config.json)
   2. Call orchestrator.startup(cfg) — init memory + db
   3. Discover already-running backends and build RuntimeTopology
   4. Init CognitionTracer
@@ -970,15 +970,27 @@ def _ensure_runtime_dirs(root: Path) -> None:
 
 # ── Startup & Shutdown ────────────────────────────────────────────────────
 
-async def startup_event():
+def _resolve_startup_config_path(app=None, config_path: str | Path | None = None) -> Path:
+    """Resolve the canonical config path, preferring explicit parameter passing."""
+    if config_path is not None:
+        candidate = Path(config_path)
+    elif app is not None and getattr(app.state, "config_path", None) is not None:
+        candidate = Path(app.state.config_path)
+    else:
+        candidate = Path(os.environ.get("EOS_CONFIG", "config.json"))
+
+    if not candidate.is_absolute():
+        candidate = Path(__file__).parent.parent / candidate
+    return candidate
+
+
+async def startup_event(app=None, config_path: str | Path | None = None):
     """Initialize the server: load config, discover topology, init tracer."""
 
     try:
         # 1. Load config
-        config_file = os.environ.get("EOS_CONFIG", "config.json")
-        config_path = Path(config_file)
-        if not config_path.is_absolute():
-            config_path = Path(__file__).parent.parent / config_path
+        config_path = _resolve_startup_config_path(app=app, config_path=config_path)
+        config_file = str(config_path)
 
         if not config_path.is_file():
             _emit_log("error", "startup", f"Config not found: {config_path}")

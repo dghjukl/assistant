@@ -284,7 +284,6 @@ async def test_fastapi_startup_path_uses_runtime_discovery_and_degrades_optional
     )
 
     _patch_lightweight_startup(monkeypatch)
-    monkeypatch.setenv("EOS_CONFIG", str(config_path))
     monkeypatch.setenv("EOS_ADMIN_TOKEN", "test-admin-token")
 
     import core.google_oauth as google_oauth
@@ -295,7 +294,7 @@ async def test_fastapi_startup_path_uses_runtime_discovery_and_degrades_optional
 
     monkeypatch.setitem(sys.modules, "interfaces.discord_bot", SimpleNamespace(start=_discord_fail))
 
-    app = create_app()
+    app = create_app(config_path=config_path)
     with TestClient(app, raise_server_exceptions=False, headers={"X-Admin-Token": "test-admin-token"}) as client:
         status_resp = client.get("/api/auth/verify")
         assert status_resp.status_code == 200
@@ -329,6 +328,48 @@ def test_eos_main_status_prints_runtime_summary_without_booting_uvicorn(monkeypa
     output = capsys.readouterr().out
     assert "Runtime Discovery" in output
     assert "Main model: active" in output
-    assert "Tool helper: active" in output
-    assert "Thinking helper: active" in output
+    assert "tools: available" in output
+    assert "reasoning: available" in output
     assert "voice: unavailable" in output
+
+
+def test_eos_main_passes_config_path_directly_to_webui(monkeypatch, tmp_path, backend_server_factory):
+    import eos
+
+    primary = backend_server_factory(chat_reply="primary response")
+    tool = backend_server_factory(chat_reply="tool response")
+    thinking = backend_server_factory(chat_reply="thinking response")
+
+    config_path = _write_runtime_config(
+        tmp_path,
+        primary_port=primary.port,
+        tool_port=tool.port,
+        thinking_port=thinking.port,
+    )
+
+    monkeypatch.setattr(
+        argparse.ArgumentParser,
+        "parse_args",
+        lambda self: argparse.Namespace(
+            config=str(config_path),
+            host=None,
+            port=None,
+            status=False,
+            profile=None,
+            no_boot=False,
+        ),
+    )
+
+    captured = {}
+
+    def _fake_run(app, **kwargs):
+        captured["config_path"] = Path(app.state.config_path)
+        captured["kwargs"] = kwargs
+
+    monkeypatch.setattr("uvicorn.run", _fake_run)
+
+    eos.main()
+
+    assert captured["config_path"] == config_path
+    assert captured["kwargs"]["host"] == "127.0.0.1"
+    assert captured["kwargs"]["port"] == 7860
