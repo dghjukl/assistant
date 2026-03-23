@@ -1001,16 +1001,36 @@ class SignalBus:
     # Admin / diagnostics
     # ------------------------------------------------------------------
 
+    def health_summary(self) -> dict[str, Any]:
+        """Compact health summary for admin status and diagnostics."""
+        with self._lock:
+            registry_size = len(self._registry)
+            suppressed_count = len(self._suppressed)
+            active_entity_count = len(self._active_entities)
+            durable_write_failures = self._durable_write_failures
+        with self._subs_lock:
+            subscriber_count = len(self._subscriptions)
+
+        return {
+            "healthy": durable_write_failures == 0,
+            "registry_size": registry_size,
+            "suppressed_count": suppressed_count,
+            "active_entity_count": active_entity_count,
+            "subscriber_count": subscriber_count,
+            "durable_write_failures": durable_write_failures,
+            "durable_log_healthy": durable_write_failures == 0,
+        }
+
     def diagnostics(self) -> dict[str, Any]:
         """Full admin-visible diagnostic snapshot."""
+        summary = self.health_summary()
         with self._lock:
             all_sigs = list(self._registry)
             suppressed = list(self._suppressed)
             salient = sorted(all_sigs, key=lambda e: e.salience_score, reverse=True)[:20]
 
             return {
-                "registry_size": len(all_sigs),
-                "suppressed_count": len(suppressed),
+                **summary,
                 "active_entities": sorted(self._active_entities),
                 "recent_signals": [e.to_dict() for e in all_sigs[-50:]],
                 "salient_signals": [e.to_dict() for e in salient],
@@ -1034,9 +1054,6 @@ class SignalBus:
                     "window_minutes": self._loop_guard.config.window_minutes,
                     "cooldown_minutes": self._loop_guard.config.cooldown_minutes,
                 },
-                # R-01: expose durable write failures so the health dashboard can alert
-                "durable_write_failures": self._durable_write_failures,
-                "durable_log_healthy": self._durable_write_failures == 0,
             }
 
     def clear_cooldown(self, correlation_key: str) -> bool:
@@ -1114,5 +1131,4 @@ def reset_default_bus() -> None:
     global _DEFAULT_BUS
     with _BUS_LOCK:
         _DEFAULT_BUS = None
-
 

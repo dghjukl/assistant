@@ -52,6 +52,8 @@ from typing import Any, TYPE_CHECKING
 if TYPE_CHECKING:
     from runtime.topology import RuntimeTopology
 
+from runtime.exception_observability import observe_exception
+
 logger = logging.getLogger("eos.memory_maintenance")
 UTC = timezone.utc
 
@@ -448,8 +450,21 @@ async def run_maintenance(
                     "entries_created": consolidation_result.get("entries_created", 0),
                 },
             ))
-        except Exception:
-            pass
+        except Exception as exc:
+            observe_exception(
+                logger=logger,
+                subsystem="memory_maintenance",
+                operation="publish_maintenance_health_signal",
+                exc=exc,
+                level=logging.WARNING,
+                context={
+                    "elapsed_ms": elapsed_ms,
+                    "interactions_pruned": prune_result.get("pruned", 0),
+                    "vectors_pruned": vector_result.get("pruned", 0),
+                    "entries_created": consolidation_result.get("entries_created", 0),
+                    "advisory_signal": True,
+                },
+            )
 
     # Record in tracer
     if tracer:
@@ -467,8 +482,21 @@ async def run_maintenance(
                 "suggestions": [],
                 "similar_before": True,
             })
-        except Exception:
-            pass
+        except Exception as exc:
+            observe_exception(
+                logger=logger,
+                subsystem="memory_maintenance",
+                operation="record_maintenance_reflection",
+                exc=exc,
+                level=logging.WARNING,
+                context={
+                    "elapsed_ms": elapsed_ms,
+                    "interactions_pruned": prune_result.get("pruned", 0),
+                    "vectors_pruned": vector_result.get("pruned", 0),
+                    "entries_created": consolidation_result.get("entries_created", 0),
+                    "advisory_record": True,
+                },
+            )
 
     logger.info(
         "[MemMaint] Done in %dms — "
