@@ -3813,9 +3813,9 @@ async def google_authorize(request: Request):
     """Begin the Google OAuth web flow.
 
     Returns {"ok": True, "data": {"auth_url": "https://accounts.google.com/..."}}
-    The frontend should open auth_url in a new tab.  After the user grants
-    access, Google redirects to /api/google_workspace/callback which finalises
-    the flow automatically.
+    The Admin Panel frontend opens auth_url in a new tab when the operator
+    clicks Connect Google Account. After the user grants access, Google
+    redirects to /api/google_workspace/callback which finalises the flow automatically.
     """
     try:
         if not _google_cfg().get("enabled", False):
@@ -3904,7 +3904,7 @@ async def google_account():
         oauth_cfg(app_state.cfg)
         if not is_authorized():
             return JSONResponse(
-                {"ok": False, "error": "Not authorized — call /api/google_workspace/authorize first"},
+                {"ok": False, "error": "Not authorized — open Admin Panel → Integrations and click Connect Google Account first"},
                 status_code=401,
             )
         return JSONResponse({"ok": True, "data": {"account": get_account_info()}})
