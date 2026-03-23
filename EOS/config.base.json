@@ -169,7 +169,25 @@
     "enable_cognition_trace": true,
     "turn_ring_size": 200,
     "reflection_ring_size": 100,
-    "state_ring_size": 100
+    "state_ring_size": 100,
+    "relational_interval_turns": 40,
+    "relational_interval_seconds": 1800
+  },
+
+  "idle_cognition": {
+    "_comment": "Base mode — minimal footprint. Idle cognition fires rarely; no thinking server available so uses primary model directly.",
+    "enabled": true,
+    "resting_threshold_hours": 3.0,
+    "drifting_threshold_hours": 8.0,
+    "deep_threshold_hours": 24.0,
+    "resting_fire_prob": 0.15,
+    "drifting_fire_prob": 0.30,
+    "deep_fire_prob": 0.55,
+    "min_gap_hours": 2.0,
+    "max_cognitions_per_day": 3,
+    "memory_context_count": 4,
+    "max_tokens": 140,
+    "temperature": 0.80
   },
 
   "stt": {

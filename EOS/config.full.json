@@ -139,7 +139,25 @@
     "enable_cognition_trace": true,
     "turn_ring_size": 200,
     "reflection_ring_size": 100,
-    "state_ring_size": 100
+    "state_ring_size": 100,
+    "relational_interval_turns": 40,
+    "relational_interval_seconds": 1800
+  },
+
+  "idle_cognition": {
+    "_comment": "Full mode — most frequent idle cognition. All cognitive subsystems active; higher daily cap and token budget.",
+    "enabled": true,
+    "resting_threshold_hours": 1.5,
+    "drifting_threshold_hours": 5.0,
+    "deep_threshold_hours": 20.0,
+    "resting_fire_prob": 0.35,
+    "drifting_fire_prob": 0.65,
+    "deep_fire_prob": 0.85,
+    "min_gap_hours": 1.0,
+    "max_cognitions_per_day": 10,
+    "memory_context_count": 8,
+    "max_tokens": 220,
+    "temperature": 0.85
   },
 
   "stt": {

@@ -362,6 +362,49 @@ def should_run_identity_eval(cfg: dict) -> bool:
     return n > 0 and n % threshold == 0
 
 
+def should_run_relational_eval(cfg: dict) -> bool:
+    """
+    Check if it's time to dispatch a relational evaluation cycle.
+
+    Fires when EITHER condition is met:
+      - turn-count threshold reached (every N interactions)
+      - time threshold reached (every M seconds since last eval)
+
+    Both thresholds are configurable under cfg["cognition"]:
+      relational_interval_turns   (default 40)
+      relational_interval_seconds (default 1800)
+    """
+    import time as _time
+    from core.memory import get_db
+
+    cog = cfg.get("cognition", {})
+    turn_interval = int(cog.get("relational_interval_turns", 40))
+    sec_interval = float(cog.get("relational_interval_seconds", 1800))
+
+    n = count_interactions()
+    if n < 5:   # mirror _MIN_INTERACTIONS_REQUIRED in relational.py
+        return False
+
+    # Turn-count gate
+    if turn_interval > 0 and n % turn_interval == 0:
+        return True
+
+    # Time-since-last-eval gate
+    if sec_interval > 0:
+        try:
+            with get_db() as conn:
+                row = conn.execute(
+                    "SELECT value FROM entity_meta WHERE key='relational_last_eval_ts'"
+                ).fetchone()
+            last_ts = float(row["value"]) if row else 0.0
+            if (_time.time() - last_ts) >= sec_interval:
+                return True
+        except Exception:
+            pass
+
+    return False
+
+
 # ── Status ────────────────────────────────────────────────────────────────────
 
 def get_status(cfg: dict) -> dict:

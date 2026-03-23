@@ -140,7 +140,25 @@
     "enable_cognition_trace": true,
     "turn_ring_size": 200,
     "reflection_ring_size": 100,
-    "state_ring_size": 100
+    "state_ring_size": 100,
+    "relational_interval_turns": 40,
+    "relational_interval_seconds": 1800
+  },
+
+  "idle_cognition": {
+    "_comment": "Vision mode — same as standard; vision server is perceptual only and doesn't affect idle cognition behaviour.",
+    "enabled": true,
+    "resting_threshold_hours": 2.0,
+    "drifting_threshold_hours": 6.0,
+    "deep_threshold_hours": 24.0,
+    "resting_fire_prob": 0.25,
+    "drifting_fire_prob": 0.50,
+    "deep_fire_prob": 0.75,
+    "min_gap_hours": 1.5,
+    "max_cognitions_per_day": 6,
+    "memory_context_count": 6,
+    "max_tokens": 180,
+    "temperature": 0.82
   },
 
   "stt": {

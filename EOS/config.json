@@ -206,7 +206,25 @@
     "enable_cognition_trace": true,
     "turn_ring_size": 200,
     "reflection_ring_size": 100,
-    "state_ring_size": 100
+    "state_ring_size": 100,
+    "_relational_comment": "Relational eval runs every N turns OR every M seconds, whichever comes first.",
+    "relational_interval_turns": 40,
+    "relational_interval_seconds": 1800
+  },
+  "idle_cognition": {
+    "_comment": "Spontaneous thought during unattended periods. Four tiers (ACTIVE/RESTING/DRIFTING/DEEP) based on idle duration. Firing is probabilistic, not mechanical.",
+    "enabled": true,
+    "resting_threshold_hours": 2.0,
+    "drifting_threshold_hours": 6.0,
+    "deep_threshold_hours": 24.0,
+    "resting_fire_prob": 0.25,
+    "drifting_fire_prob": 0.50,
+    "deep_fire_prob": 0.75,
+    "min_gap_hours": 1.5,
+    "max_cognitions_per_day": 6,
+    "memory_context_count": 6,
+    "max_tokens": 180,
+    "temperature": 0.82
   },
   "stt": {
     "model_path": "models/stt/ggml-small.en-q8_0.bin",
@@ -297,12 +315,26 @@
       "recovery_tools",
       "secrets_tools",
       "service_control_tools",
-      "system_cmd_tools"
+      "system_cmd_tools",
+      "privileged_tools"
     ],
     "required_packs": [],
     "notifications_tools": {
       "discord_credential_file": "AI personal files/Discord.txt"
     }
+  },
+  "privileged_tools": {
+    "_comment": "High-risk system operations. Master gate must be true AND each sub-gate must be individually enabled. All tools require OPERATOR_ONLY trust. Write/control/terminate tools require HARD_CONFIRM.",
+    "enabled": false,
+    "_enabled_hint": "Set to true to allow any privileged tool to be enabled. Individual sub-gates below still control each tool.",
+    "registry_read_enabled": false,
+    "registry_write_enabled": false,
+    "service_list_enabled": false,
+    "service_control_enabled": false,
+    "system_file_read_enabled": false,
+    "network_config_enabled": false,
+    "process_list_enabled": false,
+    "process_terminate_enabled": false
   },
   "deployment_mode": "standard",
   "on_demand": {

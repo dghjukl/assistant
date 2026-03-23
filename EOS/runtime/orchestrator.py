@@ -78,7 +78,7 @@ from typing import Any, Callable
 import httpx
 
 from core.attention_preferences import record_turn_attention
-from core.entity  import build_system_prompt, should_think, should_use_tool, should_run_identity_eval
+from core.entity  import build_system_prompt, should_think, should_use_tool, should_run_identity_eval, should_run_relational_eval
 from core.memory  import init_db, log_interaction, get_recent_interactions, search_memory, store_memory
 from core.identity import run_evaluation_cycle, request_self_name
 from core.memory   import get_entity_name, get_relational_model
@@ -1025,6 +1025,12 @@ async def process_turn(
                 _run_identity_eval_background(topology, cfg, bus, tracer=tracer)
             )
 
+        # ── Relational eval dispatch (non-blocking background task) ───────────
+        if should_run_relational_eval(cfg):
+            asyncio.create_task(
+                _run_relational_eval_background(topology, cfg, bus)
+            )
+
     except Exception as exc:
         logger.error("Turn pipeline error: %s", exc)
         final_response = "[Something went wrong processing that. Please try again.]"
@@ -1136,6 +1142,45 @@ async def _run_identity_eval_background(
 
     except Exception as exc:
         logger.error("[Identity] Evaluation error: %s", exc)
+
+
+# ── Background relational eval ────────────────────────────────────────────────
+
+async def _run_relational_eval_background(
+    topology: RuntimeTopology,
+    cfg: dict,
+    bus=None,
+) -> None:
+    """Run a relational evaluation cycle in the background without blocking the main loop."""
+    import time as _time
+    logger.info("[Relational] Background evaluation starting...")
+    try:
+        from core.relational import run_relational_cycle
+        results = await run_relational_cycle(
+            primary_endpoint=topology.primary_endpoint(),
+            cfg=cfg,
+            signal_bus=bus,
+        )
+        if results.get("skipped"):
+            logger.info("[Relational] Cycle skipped: %s", results.get("reason", "unknown"))
+            return
+
+        logger.info("[Relational] Cycle %d complete.", results.get("cycle", 0))
+
+        # Stamp last-eval timestamp so the time-based gate resets correctly
+        try:
+            from core.memory import get_db
+            with get_db() as conn:
+                conn.execute(
+                    "INSERT OR REPLACE INTO entity_meta VALUES ('relational_last_eval_ts', ?)",
+                    (str(_time.time()),)
+                )
+                conn.commit()
+        except Exception as exc:
+            logger.warning("[Relational] Could not update last-eval timestamp: %s", exc)
+
+    except Exception as exc:
+        logger.error("[Relational] Evaluation error: %s", exc)
 
 
 # ── Voice loop ─────────────────────────────────────────────────────────────────

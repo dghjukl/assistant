@@ -1712,15 +1712,31 @@ async def get_presence():
 
 
 async def get_initiative():
-    """Stub: initiative queue and enabled app_state."""
+    """Return current initiative queue state and engine status."""
     try:
         enabled = can("initiative")
+        data: dict = {"enabled": enabled, "queue": [], "engine_available": False}
+
+        if app_state.initiative_engine is not None:
+            data["engine_available"] = True
+            try:
+                queue = app_state.initiative_engine.get_queue()
+                data["queue"] = queue if isinstance(queue, list) else []
+                data["queue_depth"] = len(data["queue"])
+            except Exception:
+                data["queue"] = []
+                data["queue_depth"] = 0
+
+            if hasattr(app_state.initiative_engine, "get_status"):
+                try:
+                    data.update(app_state.initiative_engine.get_status())
+                except Exception:
+                    pass
+
         return JSONResponse({
             "ok": True,
-            "data": {
-                "queue": [],
-                "enabled": enabled,
-            }
+            "data": data,
+            "current_focus": _get_current_focus_dict(),
         })
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
