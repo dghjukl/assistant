@@ -252,8 +252,9 @@ class WorldviewService:
                 pending = f"{n_sources} source document{'s' if n_sources != 1 else ''} pending extraction"
                 return (
                     "## Partner Orientation\n"
-                    f"{pending}. Ask your partner if they'd like you to run extraction "
-                    "to build the worldview profile from these materials.\n"
+                    f"{pending}. Source documents are passive context and should not trigger "
+                    "unprompted acknowledgment. Extraction remains human-triggered; only mention "
+                    "pending material if explicitly asked.\n"
                     "Full profile path when ready: data/worldview/profile.md"
                 )
 
