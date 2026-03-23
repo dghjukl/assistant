@@ -56,6 +56,7 @@ from webui.schemas import (
     GoalCreateRequest, GoalNoteRequest, GoalAbandonRequest,
     AccessTierUpdateRequest, LanPairRequest, LanSessionRevokeRequest,
     OvernightReturnTimeRequest, OvernightCancelRequest,
+    ExternalInferenceConfigUpdate, ExternalInferenceApiKeyRequest,
 )
 from core.audit import init_audit_store, get_audit_store
 from core.secrets import init_secrets, secrets_manager as _secrets_manager_ref
@@ -1036,6 +1037,7 @@ async def startup_event(app=None, config_path: str | Path | None = None):
 
         with config_path.open(encoding="utf-8") as f:
             app_state.cfg = json.load(f)
+        app_state.config_path = str(config_path)   # stored for config persistence by subsystems
         _emit_log("info", "startup", f"Config loaded: {config_file}")
 
         # 1b. Ensure all required runtime directories and seed files exist
@@ -1079,6 +1081,19 @@ async def startup_event(app=None, config_path: str | Path | None = None):
             _emit_log("info", "startup", "Secrets manager ready")
         except Exception as exc:
             logger.warning("Secrets manager init failed: %s", exc)
+
+        # 2c2. External Inference — ledger + policy engine (optional; never required)
+        try:
+            from runtime.external_inference_ledger import init_ledger
+            from runtime.external_inference_policy import init_policy
+            from core.secrets import secrets_manager as _sm
+            ei_ledger = init_ledger(db_path=db_dir / "entity_state.db")
+            ei_policy = init_policy(cfg=app_state.cfg, secrets_manager=_sm)
+            app_state.ei_policy = ei_policy
+            _emit_log("info", "startup", "External inference subsystem ready (disabled by default)")
+        except Exception as exc:
+            logger.warning("External inference init failed (non-fatal): %s", exc)
+            _emit_log("warn", "startup", "External inference subsystem init failed (non-fatal)", {"error": str(exc)})
 
         # 2d. Google OAuth manager (configure token/secret paths from loaded config)
         try:
@@ -2036,7 +2051,7 @@ async def get_initiative():
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
 
-async def post_chat(body: ChatRequest):
+async def post_chat(body: ChatRequest, request: Request):
     """Process chat turn synchronously."""
     if not app_state.topology:
         return JSONResponse(
@@ -2079,12 +2094,15 @@ async def post_chat(body: ChatRequest):
                 except Exception as _exc:
                     logger.warning("Could not read attachment %s: %s", file_id, _exc)
 
+        _ot, _ip = _get_request_origin(request)
         response = await process_turn(
             app_state.topology,
             user_input,
             app_state.cfg,
             tracer=app_state.tracer,
             bus=app_state.bus,
+            origin_tier=_ot,
+            origin_ip=_ip,
         )
         _emit_log("info", "chat", "Turn processed", {"user": user_input[:50]})
 
@@ -2123,6 +2141,9 @@ async def websocket_chat(websocket: WebSocket):
         return
 
     await websocket.accept()
+    # Resolve origin once for the whole WS session
+    _ws_ip   = extract_client_ip(websocket)
+    _ws_tier = classify_origin(_ws_ip)
     try:
         while True:
             data = await websocket.receive_json()
@@ -2160,6 +2181,8 @@ async def websocket_chat(websocket: WebSocket):
                     app_state.cfg,
                     tracer=app_state.tracer,
                     bus=app_state.bus,
+                    origin_tier=_ws_tier,
+                    origin_ip=_ws_ip,
                 )
                 _notify_turn_completed()
                 from core.memory import count_interactions
@@ -5115,6 +5138,299 @@ async def api_lan_status(request: Request):
             },
         })
     except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+# ── External Inference Admin Handlers ─────────────────────────────────────────
+#
+# All handlers enforce backend-side policy.  The UI is a convenience layer;
+# the backend is the sole source of truth for budget, origin, and gating.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _get_ei_policy():
+    """Return the active ExternalInferencePolicy, or None."""
+    return getattr(app_state, "ei_policy", None)
+
+
+async def admin_ei_status(request: Request):
+    """Return the current external inference config and budget state."""
+    try:
+        policy = _get_ei_policy()
+        if policy is None:
+            return JSONResponse({"ok": True, "data": {"available": False,
+                "reason": "External inference subsystem not initialised"}})
+
+        cfg_safe    = policy.get_ei_config_safe()
+        budget      = policy.get_budget_state()
+
+        return JSONResponse({
+            "ok": True,
+            "data": {
+                "available":     True,
+                "config":        cfg_safe,
+                "budget": {
+                    "cycle_start":          budget.cycle_start,
+                    "cycle_end":            budget.cycle_end,
+                    "monthly_budget_usd":   budget.monthly_budget_usd,
+                    "effective_budget_usd": budget.effective_budget_usd,
+                    "spent_usd":            budget.spent_usd,
+                    "remaining_usd":        budget.remaining_usd,
+                    "request_count":        budget.request_count,
+                    "denied_count":         budget.denied_count,
+                    "daily_count_today":    budget.daily_count_today,
+                    "daily_cap":            budget.daily_cap,
+                    "per_request_cap_usd":  budget.per_request_cap_usd,
+                    "warning_level":        budget.warning_level,
+                    "thresholds":           budget.thresholds,
+                },
+            },
+        })
+    except Exception as exc:
+        logger.error("admin_ei_status: %s", exc)
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+async def admin_ei_config_update(body: ExternalInferenceConfigUpdate, request: Request):
+    """Partially update the external_inference config block."""
+    from runtime.external_inference_policy import VALID_APPROVAL_MODES, VALID_ESCALATION_MODES
+    try:
+        policy = _get_ei_policy()
+        if policy is None:
+            return JSONResponse({"ok": False, "error": "External inference not initialised"}, status_code=503)
+
+        updates: dict = body.model_dump(exclude_none=True)
+
+        # Validate enum fields
+        if "approval_mode" in updates and updates["approval_mode"] not in VALID_APPROVAL_MODES:
+            return JSONResponse({"ok": False, "error": f"Invalid approval_mode. Must be one of: {sorted(VALID_APPROVAL_MODES)}"}, status_code=422)
+        if "escalation_mode" in updates and updates["escalation_mode"] not in VALID_ESCALATION_MODES:
+            return JSONResponse({"ok": False, "error": f"Invalid escalation_mode. Must be one of: {sorted(VALID_ESCALATION_MODES)}"}, status_code=422)
+
+        # Remap model_id / timeout_sec / max_retries into the huggingface sub-dict
+        hf_updates: dict = {}
+        for hf_key in ("model_id", "timeout_sec", "max_retries"):
+            if hf_key in updates:
+                hf_updates[hf_key] = updates.pop(hf_key)
+        if hf_updates:
+            updates["huggingface"] = hf_updates
+
+        # Resolve config path for persistence
+        config_path = getattr(app_state, "config_path", None)
+        persist_path = Path(config_path) if config_path else None
+
+        policy.update_ei_config(updates, persist_path=persist_path)
+
+        _emit_log("info", "ext_inference", "External inference config updated",
+                  {k: v for k, v in updates.items() if "key" not in k.lower()})
+        return JSONResponse({"ok": True, "data": policy.get_ei_config_safe()})
+    except Exception as exc:
+        logger.error("admin_ei_config_update: %s", exc)
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+async def admin_ei_set_api_key(body: ExternalInferenceApiKeyRequest, request: Request):
+    """Store the HuggingFace API key in the secrets manager.
+
+    The key value is NEVER returned in any response after this call.
+    """
+    from runtime.external_inference_policy import HF_SECRET_KEY
+    from core.secrets import secrets_manager as sm
+    try:
+        api_key = body.api_key.strip()
+        if not api_key:
+            return JSONResponse({"ok": False, "error": "API key must not be empty"}, status_code=422)
+        # Never log the key itself
+        ok = sm.set(HF_SECRET_KEY, api_key)
+        if not ok:
+            return JSONResponse({"ok": False, "error": "Keyring not available — secret could not be stored"}, status_code=503)
+        _emit_log("info", "ext_inference", "HuggingFace API key stored in secrets manager")
+        return JSONResponse({"ok": True, "data": {"api_key_configured": True,
+            "note": "Key stored in system keyring. It is not returned by any API."}})
+    except Exception as exc:
+        logger.error("admin_ei_set_api_key: %s", exc)
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+async def admin_ei_delete_api_key(request: Request):
+    """Remove the HuggingFace API key from the secrets manager."""
+    from runtime.external_inference_policy import HF_SECRET_KEY
+    from core.secrets import secrets_manager as sm
+    try:
+        sm.delete(HF_SECRET_KEY)
+        _emit_log("info", "ext_inference", "HuggingFace API key removed from secrets manager")
+        return JSONResponse({"ok": True, "data": {"api_key_configured": False}})
+    except Exception as exc:
+        logger.error("admin_ei_delete_api_key: %s", exc)
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+async def admin_ei_test_connection(request: Request):
+    """Test the configured HuggingFace API key and model reachability."""
+    try:
+        policy = _get_ei_policy()
+        if policy is None:
+            return JSONResponse({"ok": False, "error": "External inference not initialised"}, status_code=503)
+        result = policy.test_connection()
+        return JSONResponse({"ok": result.get("ok", False), "data": result})
+    except Exception as exc:
+        logger.error("admin_ei_test_connection: %s", exc)
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+async def admin_ei_usage_history(request: Request):
+    """Return recent external inference usage records from the ledger."""
+    from runtime.external_inference_ledger import get_ledger
+    try:
+        limit = int(request.query_params.get("limit", 50))
+        limit = max(1, min(limit, 200))
+        ledger = get_ledger()
+        if ledger is None:
+            return JSONResponse({"ok": True, "data": {"records": [], "total_rows": 0}})
+        rows   = ledger.recent_history(limit=limit)
+        total  = ledger.total_rows()
+        return JSONResponse({"ok": True, "data": {"records": rows, "total_rows": total}})
+    except Exception as exc:
+        logger.error("admin_ei_usage_history: %s", exc)
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+async def admin_ei_budget_state(request: Request):
+    """Return just the budget summary for the current billing cycle."""
+    try:
+        policy = _get_ei_policy()
+        if policy is None:
+            return JSONResponse({"ok": True, "data": None})
+        budget = policy.get_budget_state()
+        return JSONResponse({"ok": True, "data": {
+            "cycle_start":          budget.cycle_start,
+            "cycle_end":            budget.cycle_end,
+            "monthly_budget_usd":   budget.monthly_budget_usd,
+            "effective_budget_usd": budget.effective_budget_usd,
+            "spent_usd":            budget.spent_usd,
+            "remaining_usd":        budget.remaining_usd,
+            "request_count":        budget.request_count,
+            "denied_count":         budget.denied_count,
+            "daily_count_today":    budget.daily_count_today,
+            "daily_cap":            budget.daily_cap,
+            "per_request_cap_usd":  budget.per_request_cap_usd,
+            "warning_level":        budget.warning_level,
+            "thresholds":           budget.thresholds,
+        }})
+    except Exception as exc:
+        logger.error("admin_ei_budget_state: %s", exc)
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+# ── External inference pending approvals (ask_for_paid_calls flow) ──────────
+
+
+async def admin_ei_pending_list(request: Request):
+    """Return all pending external inference approval requests."""
+    try:
+        pending = app_state.ei_pending_approvals
+        now = time.time()
+        rows = [
+            {
+                "approval_id":    aid,
+                "reason":         entry.get("reason", ""),
+                "local_severity": entry.get("local_outcome_severity", ""),
+                "estimated_cost": entry.get("estimated_cost", 0.0),
+                "origin_tier":    entry.get("origin_tier", ""),
+                "requested_at":   entry.get("requested_at", 0.0),
+                "age_seconds":    round(now - entry.get("requested_at", now), 1),
+            }
+            for aid, entry in list(pending.items())
+        ]
+        return JSONResponse({"ok": True, "data": {"pending": rows, "count": len(rows)}})
+    except Exception as exc:
+        logger.error("admin_ei_pending_list: %s", exc)
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+async def admin_ei_pending_confirm(approval_id: str, request: Request):
+    """
+    Approve a pending external inference call and execute it.
+
+    The EI call is executed exactly once.  The response is returned in this
+    endpoint's body.  The pending entry is removed regardless of success.
+    """
+    try:
+        entry = app_state.ei_pending_approvals.pop(approval_id, None)
+        if entry is None:
+            return JSONResponse(
+                {"ok": False, "error": f"Approval ID '{approval_id}' not found or already resolved"},
+                status_code=404,
+            )
+        policy = _get_ei_policy()
+        if policy is None:
+            return JSONResponse({"ok": False, "error": "External inference not initialised"}, status_code=503)
+
+        from runtime.external_inference_policy import APPROVAL_ALWAYS
+        # Execute with approval_mode forced to "always" for this one call
+        saved_mode = policy._ei_cfg.get("approval_mode")
+        policy._ei_cfg["approval_mode"] = APPROVAL_ALWAYS
+        decision, result = policy.call_external(
+            entry["messages"],
+            origin_tier=entry.get("origin_tier", "localhost"),
+            origin_ip=entry.get("origin_ip", "127.0.0.1"),
+            reason=entry.get("reason", "admin_approved"),
+            local_outcome_severity=entry.get("local_outcome_severity", "hard_fail"),
+        )
+        policy._ei_cfg["approval_mode"] = saved_mode
+
+        _ot, _ip = _get_request_origin(request)
+        _audit = get_audit_store()
+        if _audit:
+            _audit.record_admin_action(
+                "ei_approval_confirmed", target=approval_id,
+                details={"ok": result.ok if result else False},
+                origin_tier=_ot, client_ip=_ip,
+            )
+        _emit_log("info", "ext_inference", f"Pending EI call approved and executed: {approval_id}")
+
+        if result is None or not result.ok:
+            err = (result.error if result else "Policy denied after approval")
+            return JSONResponse({"ok": False, "error": err,
+                                 "data": {"approval_id": approval_id, "executed": True, "succeeded": False}})
+        return JSONResponse({
+            "ok": True,
+            "data": {
+                "approval_id":  approval_id,
+                "executed":     True,
+                "succeeded":    True,
+                "response":     result.content,
+                "model_id":     result.model_id,
+                "tokens_input": result.tokens_input,
+                "tokens_output": result.tokens_output,
+                "latency_ms":   result.latency_ms,
+            },
+        })
+    except Exception as exc:
+        logger.error("admin_ei_pending_confirm: %s", exc)
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+async def admin_ei_pending_deny(approval_id: str, request: Request):
+    """Reject and discard a pending external inference call without executing it."""
+    try:
+        entry = app_state.ei_pending_approvals.pop(approval_id, None)
+        if entry is None:
+            return JSONResponse(
+                {"ok": False, "error": f"Approval ID '{approval_id}' not found or already resolved"},
+                status_code=404,
+            )
+        _ot, _ip = _get_request_origin(request)
+        _audit = get_audit_store()
+        if _audit:
+            _audit.record_admin_action(
+                "ei_approval_denied", target=approval_id,
+                origin_tier=_ot, client_ip=_ip,
+            )
+        _emit_log("info", "ext_inference", f"Pending EI call denied: {approval_id}")
+        return JSONResponse({"ok": True, "data": {"approval_id": approval_id, "denied": True}})
+    except Exception as exc:
+        logger.error("admin_ei_pending_deny: %s", exc)
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
 

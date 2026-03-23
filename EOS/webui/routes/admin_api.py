@@ -30,6 +30,11 @@ from webui.app_runtime import (
     admin_integrity_check,
     admin_access_tiers_list, admin_access_tier_update,
     admin_lan_generate_pairing_code, admin_lan_sessions_list, admin_lan_session_revoke,
+    # External Inference
+    admin_ei_status, admin_ei_config_update, admin_ei_set_api_key,
+    admin_ei_delete_api_key, admin_ei_test_connection,
+    admin_ei_usage_history, admin_ei_budget_state,
+    admin_ei_pending_list, admin_ei_pending_confirm, admin_ei_pending_deny,
 )
 
 router = APIRouter()
@@ -121,3 +126,14 @@ router.add_api_route('/admin/access-tiers/{tier}', admin_access_tier_update, met
 router.add_api_route('/admin/access-tiers/lan/pairing-code', admin_lan_generate_pairing_code, methods=['POST'])
 router.add_api_route('/admin/access-tiers/lan/sessions', admin_lan_sessions_list, methods=['GET'])
 router.add_api_route('/admin/access-tiers/lan/sessions/{token_prefix}', admin_lan_session_revoke, methods=['DELETE'])
+# External Inference routes
+router.add_api_route('/admin/external-inference/status',                               admin_ei_status,           methods=['GET'])
+router.add_api_route('/admin/external-inference/config',                               admin_ei_config_update,    methods=['PATCH'])
+router.add_api_route('/admin/external-inference/api-key',                              admin_ei_set_api_key,      methods=['POST'])
+router.add_api_route('/admin/external-inference/api-key',                              admin_ei_delete_api_key,   methods=['DELETE'])
+router.add_api_route('/admin/external-inference/test',                                 admin_ei_test_connection,  methods=['POST'])
+router.add_api_route('/admin/external-inference/usage-history',                        admin_ei_usage_history,    methods=['GET'])
+router.add_api_route('/admin/external-inference/budget',                               admin_ei_budget_state,     methods=['GET'])
+router.add_api_route('/admin/external-inference/pending',                              admin_ei_pending_list,     methods=['GET'])
+router.add_api_route('/admin/external-inference/pending/{approval_id}/confirm',        admin_ei_pending_confirm,  methods=['POST'])
+router.add_api_route('/admin/external-inference/pending/{approval_id}/deny',           admin_ei_pending_deny,     methods=['POST'])

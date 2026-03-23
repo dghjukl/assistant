@@ -97,6 +97,151 @@ from runtime.creativity_service import (
 logger = logging.getLogger("eos.orchestrator")
 
 
+# ── External inference — outcome classification ────────────────────────────────
+
+from runtime.external_inference_policy import (
+    SEVERITY_HARD_FAIL, SEVERITY_FAILED, SEVERITY_DEGRADED, SEVERITY_SUCCESS,
+    escalation_allows,
+)
+
+# Response prefixes that identify a hard-failure string returned by call_qwen3
+_LOCAL_HARD_FAIL_PREFIXES = (
+    "I can't reach my brain right now.",
+    "[Error communicating with primary model:",
+)
+
+
+def _classify_local_outcome(response: str, primary_endpoint_available: bool) -> str:
+    """
+    Classify the quality of a local inference response into a severity string.
+
+    Returns one of SEVERITY_HARD_FAIL / SEVERITY_FAILED / SEVERITY_DEGRADED /
+    SEVERITY_SUCCESS.  Used to gate escalation-mode checks.
+    """
+    if not primary_endpoint_available:
+        return SEVERITY_HARD_FAIL
+    r = (response or "").strip()
+    if not r:
+        return SEVERITY_HARD_FAIL
+    if any(r.startswith(p) for p in _LOCAL_HARD_FAIL_PREFIXES):
+        return SEVERITY_HARD_FAIL
+    # Structured error bracket that is NOT one of the well-known hard-fail prefixes
+    if r.startswith("[") and len(r) < 120:
+        return SEVERITY_FAILED
+    # Very short response — likely degraded / empty after stripping markup
+    if len(r) < 20:
+        return SEVERITY_DEGRADED
+    return SEVERITY_SUCCESS
+
+
+def _get_ei_policy_safe():
+    """Return the active ExternalInferencePolicy from app_state, or None."""
+    try:
+        from webui.app_state import app_state as _as
+        return _as.ei_policy
+    except Exception:
+        return None
+
+
+def _build_ei_messages(user_input: str, history: list[dict]) -> list[dict]:
+    """
+    Build a minimal message list for an external inference call.
+
+    Uses the last 6 conversation turns so the external model has context,
+    then appends the current user input if it is not already the last message.
+    """
+    recent = [m for m in history if m.get("role") in ("user", "assistant")][-6:]
+    # Avoid duplicating the current user message if it is already in history
+    if recent and recent[-1].get("role") == "user" and recent[-1].get("content", "").strip() == user_input.strip():
+        return recent
+    recent.append({"role": "user", "content": user_input})
+    return recent
+
+
+async def _try_ei_fallback(
+    messages: list[dict],
+    *,
+    origin_tier: str,
+    origin_ip: str,
+    reason: str,
+    local_outcome_severity: str,
+) -> tuple[str | None, bool]:
+    """
+    Attempt an external inference call through the policy engine.
+
+    Returns (response_text, used_ei):
+      - response_text  — the EI response string, a pending-approval notice, or None
+      - used_ei        — True only when an actual external call was made and succeeded
+    """
+    try:
+        from webui.app_state import app_state as _as
+        policy = _as.ei_policy
+        if policy is None:
+            return None, False
+
+        approval_mode = policy._ei_cfg.get("approval_mode", "never")
+
+        if approval_mode == "ask_for_paid_calls":
+            # Pre-flight: would the call be allowed if approval were "always"?
+            # Temporarily swap approval mode for the check only.
+            from runtime.external_inference_policy import APPROVAL_ALWAYS
+            policy._ei_cfg["approval_mode"] = APPROVAL_ALWAYS
+            pre = policy.check(
+                origin_tier=origin_tier,
+                origin_ip=origin_ip,
+                reason=reason,
+                local_outcome_severity=local_outcome_severity,
+            )
+            policy._ei_cfg["approval_mode"] = approval_mode  # restore
+
+            if not pre.allowed:
+                logger.debug("[EI] Pre-check denied (%s); skipping approval queue.", pre.denial_reason)
+                return None, False
+
+            # Register the pending approval in shared state
+            approval_id = _uuid_mod.uuid4().hex[:12]
+            _as.ei_pending_approvals[approval_id] = {
+                "messages":              messages,
+                "origin_tier":           origin_tier,
+                "origin_ip":             origin_ip,
+                "reason":                reason,
+                "local_outcome_severity": local_outcome_severity,
+                "requested_at":          time.time(),
+                "estimated_cost":        pre.estimated_cost,
+            }
+            logger.info("[EI] Pending approval registered %s (reason=%s, severity=%s)",
+                        approval_id, reason, local_outcome_severity)
+            return (
+                f"[This response requires external inference — pending operator approval. "
+                f"Approval ID: {approval_id}. "
+                f"An operator can approve or reject this in the admin panel "
+                f"under Ext. Inference → Pending Approvals.]",
+                False,
+            )
+
+        # approval_mode == "never" or "always" — call directly
+        decision, result = policy.call_external(
+            messages,
+            origin_tier=origin_tier,
+            origin_ip=origin_ip,
+            reason=reason,
+            local_outcome_severity=local_outcome_severity,
+        )
+        if not decision.allowed or result is None or not result.ok:
+            if decision.denial_reason:
+                logger.debug("[EI] Denied by policy: %s", decision.denial_reason)
+            return None, False
+
+        content = (result.content or "").strip()
+        if not content:
+            return None, False
+        return content, True
+
+    except Exception as exc:
+        logger.warning("[EI] _try_ei_fallback error: %s", exc)
+        return None, False
+
+
 # ── Tool executor (wired by WebUI server after ToolRegistry loads) ──────────────
 
 _tool_executor = None  # ToolExecutor | None
@@ -718,8 +863,10 @@ async def process_turn(
     user_input: str,
     cfg: dict,
     *,
-    tracer=None,   # optional CognitionTracer
-    bus=None,      # optional SignalBus
+    tracer=None,       # optional CognitionTracer
+    bus=None,          # optional SignalBus
+    origin_tier: str = "localhost",
+    origin_ip:   str  = "127.0.0.1",
 ) -> str:
     """
     Full turn pipeline with epistemic decision policy:
@@ -975,6 +1122,33 @@ async def process_turn(
                     topology, user_input, cfg, use_think=False, entity_snapshot=entity_snapshot
                 )
 
+        # ── External inference fallback ───────────────────────────────────────
+        # Attempt EI when the local response indicates a failure/degradation
+        # and the configured escalation mode permits it for that severity.
+        # This runs after ALL branches so it uniformly covers every path.
+        _ei_used = False
+        _primary_up = topology.primary_endpoint() is not None
+        _local_severity = _classify_local_outcome(final_response, _primary_up)
+        if _local_severity != SEVERITY_SUCCESS:
+            _ei_policy = _get_ei_policy_safe()
+            if _ei_policy is not None:
+                _esc_mode = _ei_policy._ei_cfg.get("escalation_mode", "disabled")
+                if escalation_allows(_esc_mode, _local_severity):
+                    _ei_messages = _build_ei_messages(user_input, _conv.history[:-1])
+                    _ei_response, _ei_used = await _try_ei_fallback(
+                        _ei_messages,
+                        origin_tier=origin_tier,
+                        origin_ip=origin_ip,
+                        reason=f"local_{_local_severity}",
+                        local_outcome_severity=_local_severity,
+                    )
+                    if _ei_response is not None:
+                        final_response = _ei_response
+                        # Keep conversation history consistent: replace the
+                        # failed local response with what was actually returned.
+                        if _conv.history and _conv.history[-1].get("role") == "assistant":
+                            _conv.history[-1]["content"] = _ei_response
+
         final_response = _append_optional_closing(
             final_response,
             _build_attention_biased_closing(
@@ -1018,7 +1192,9 @@ async def process_turn(
                     "creativity_degraded":  creativity_artifact.degraded if creativity_artifact else None,
                     "latency_ms":           elapsed_ms,
                     "memories_used":        len(mem_results),
-                    "model_server":         "primary",
+                    "model_server":         "external_huggingface" if _ei_used else "primary",
+                    "ei_used":              _ei_used,
+                    "ei_local_severity":    _local_severity,
                 })
                 tracer.record_state_delta({
                     "turn_id": turn_id,

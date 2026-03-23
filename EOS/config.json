@@ -336,6 +336,36 @@
     "process_list_enabled": false,
     "process_terminate_enabled": false
   },
+  "external_inference": {
+    "_comment": "Optional external inference via Hugging Face. Disabled by default. localhost-only. Never required for system operation.",
+    "enabled": false,
+    "provider": "huggingface",
+    "_provider_options": ["huggingface"],
+    "localhost_only": true,
+    "_localhost_only_note": "Hard-enforced in backend. External inference will never be triggered by Discord, LAN, or any remote origin.",
+    "monthly_budget_usd": 0.0,
+    "_monthly_budget_note": "Set to any numeric value. 0 = no external spend permitted. Budget is enforced locally before any call is made.",
+    "monthly_budget_override_usd": null,
+    "_monthly_budget_override_note": "Override for the current cycle only. Null = use monthly_budget_usd.",
+    "per_request_cap_usd": null,
+    "_per_request_cap_note": "Maximum USD for a single external request. Null = no cap beyond the monthly budget.",
+    "daily_request_cap": null,
+    "_daily_request_cap_note": "Maximum number of external requests per calendar day. Null = unlimited (budget still applies).",
+    "approval_mode": "ask_for_paid_calls",
+    "_approval_mode_options": ["never", "ask_for_paid_calls", "always"],
+    "escalation_mode": "disabled",
+    "_escalation_mode_options": ["disabled", "emergency_only", "constrained", "balanced", "permissive"],
+    "current_billing_cycle_start": null,
+    "_current_billing_cycle_start_note": "YYYY-MM-DD. Null = auto-set to the 1st of the current month.",
+    "soft_warning_thresholds": [50, 80, 95],
+    "_soft_warning_thresholds_note": "Percent of monthly budget at which the UI shows a warning.",
+    "huggingface": {
+      "model_id": "mistralai/Mistral-7B-Instruct-v0.2",
+      "_model_id_note": "Any HuggingFace model repo ID that supports the Inference API chat completions endpoint.",
+      "timeout_sec": 30.0,
+      "max_retries": 1
+    }
+  },
   "deployment_mode": "standard",
   "on_demand": {
     "_comment": "Helper servers (tool, thinking, creativity) start only when the primary model needs them and shut down after idle_ttl_seconds of inactivity.",

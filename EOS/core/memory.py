@@ -118,6 +118,7 @@ def init_db() -> None:
                 metadata      TEXT,
                 PRIMARY KEY (category, topic)
             );
+
         """)
 
         # Seed identity domains

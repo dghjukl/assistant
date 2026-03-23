@@ -198,3 +198,29 @@ class OvernightReturnTimeRequest(BaseModel):
 
 class OvernightCancelRequest(BaseModel):
     reason: str = Field("user_request", description="Reason for cancelling the active overnight cycle.")
+
+
+# ── External Inference ────────────────────────────────────────────────────────
+
+class ExternalInferenceConfigUpdate(BaseModel):
+    """Partial update to the external_inference config block.
+
+    Only provided fields are changed.  The API key is handled separately via
+    the secrets endpoint — it must never appear in this payload.
+    """
+    enabled:                     Optional[bool]  = Field(None, description="Enable or disable external inference.")
+    monthly_budget_usd:          Optional[float] = Field(None, ge=0.0, description="Monthly spend cap in USD (0 = no spend allowed).")
+    monthly_budget_override_usd: Optional[float] = Field(None, ge=0.0, description="Override for the current cycle. Set to null to clear.")
+    per_request_cap_usd:         Optional[float] = Field(None, ge=0.0, description="Per-request hard cap in USD. Null = no cap.")
+    daily_request_cap:           Optional[int]   = Field(None, ge=0, description="Max non-denied requests per calendar day. Null = unlimited.")
+    approval_mode:               Optional[str]   = Field(None, description="'never' | 'ask_for_paid_calls' | 'always'")
+    escalation_mode:             Optional[str]   = Field(None, description="'disabled' | 'emergency_only' | 'constrained' | 'balanced' | 'permissive'")
+    current_billing_cycle_start: Optional[str]   = Field(None, description="YYYY-MM-DD billing cycle start. Null = auto (1st of month).")
+    model_id:                    Optional[str]   = Field(None, min_length=1, description="HuggingFace model repo ID.")
+    timeout_sec:                 Optional[float] = Field(None, gt=0, description="Per-request timeout in seconds.")
+    max_retries:                 Optional[int]   = Field(None, ge=0, le=3, description="Retry count on transient errors.")
+
+
+class ExternalInferenceApiKeyRequest(BaseModel):
+    """Set or replace the HuggingFace API key in the secrets store."""
+    api_key: str = Field(..., min_length=1, description="HuggingFace API token (hf_...).")

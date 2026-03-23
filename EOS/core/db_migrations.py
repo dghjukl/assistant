@@ -83,6 +83,40 @@ def _entity_m004_interaction_log_indexes(conn: sqlite3.Connection) -> None:
     )
 
 
+def _entity_m005_add_external_inference_ledger(conn: sqlite3.Connection) -> None:
+    """Create the external_inference_ledger table for upgrades from pre-EI installs.
+
+    Fresh installs have this table created by init_db(); this migration ensures
+    existing databases are upgraded transparently.
+    """
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS external_inference_ledger (
+            id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+            ts                   TEXT    NOT NULL,
+            epoch_ts             REAL    NOT NULL,
+            provider             TEXT    NOT NULL DEFAULT 'huggingface',
+            request_origin_tier  TEXT    NOT NULL DEFAULT 'localhost',
+            request_origin_ip    TEXT    NOT NULL DEFAULT '',
+            request_reason       TEXT    NOT NULL DEFAULT '',
+            model_id             TEXT    NOT NULL DEFAULT '',
+            estimated_cost_usd   REAL    NOT NULL DEFAULT 0.0,
+            actual_cost_usd      REAL,
+            tokens_input         INTEGER,
+            tokens_output        INTEGER,
+            approval_mode        TEXT    NOT NULL DEFAULT '',
+            auto_approved        INTEGER NOT NULL DEFAULT 0,
+            succeeded            INTEGER NOT NULL DEFAULT 0,
+            denied               INTEGER NOT NULL DEFAULT 0,
+            denial_reason        TEXT,
+            billing_cycle_start  TEXT    NOT NULL DEFAULT '',
+            response_latency_ms  INTEGER,
+            error_detail         TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_eil_epoch ON external_inference_ledger(epoch_ts);
+        CREATE INDEX IF NOT EXISTS idx_eil_cycle ON external_inference_ledger(billing_cycle_start);
+    """)
+
+
 # ── audit.db migrations ───────────────────────────────────────────────────────
 
 
@@ -142,10 +176,11 @@ def _audit_m004_add_origin_to_tool_executions(conn: sqlite3.Connection) -> None:
 
 _MIGRATIONS: Dict[str, List[tuple[str, MigrationFn]]] = {
     "entity_state": [
-        ("m001_add_interaction_metadata",   _entity_m001_add_interaction_metadata),
-        ("m002_add_entity_meta_table",      _entity_m002_add_entity_meta_table),
-        ("m003_add_autonomy_updated_at",    _entity_m003_add_autonomy_updated_at),
-        ("m004_interaction_log_indexes",    _entity_m004_interaction_log_indexes),
+        ("m001_add_interaction_metadata",          _entity_m001_add_interaction_metadata),
+        ("m002_add_entity_meta_table",             _entity_m002_add_entity_meta_table),
+        ("m003_add_autonomy_updated_at",           _entity_m003_add_autonomy_updated_at),
+        ("m004_interaction_log_indexes",           _entity_m004_interaction_log_indexes),
+        ("m005_add_external_inference_ledger",     _entity_m005_add_external_inference_ledger),
     ],
     "audit": [
         ("m001_add_actor_index",                 _audit_m001_add_actor_index),

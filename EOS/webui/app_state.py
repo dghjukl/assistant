@@ -47,6 +47,11 @@ class AppState:
     bus_seen_signals: set[str] = field(default_factory=set)
     startup_issues: list[dict[str, Any]] = field(default_factory=list)
     startup_guidance: str | None = None
+    # External inference — explicit fields (set by startup_event)
+    ei_policy: Any = None
+    config_path: str | None = None
+    # Pending paid-call approvals: approval_id → {messages, origin_tier, origin_ip, reason, ...}
+    ei_pending_approvals: dict[str, Any] = field(default_factory=dict)
 
 
 app_state = AppState()

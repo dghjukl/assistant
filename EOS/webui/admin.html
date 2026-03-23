@@ -1333,6 +1333,7 @@ if (new URLSearchParams(location.search).get('embed') === '1') {
   <div class="tab-separator"></div>
   <div class="tab" data-panel="computer-use">Computer Use</div>
   <div class="tab" data-panel="access-tiers">Access Tiers</div>
+  <div class="tab" data-panel="ext-inference">Ext. Inference</div>
   <div class="tab-separator"></div>
   <div class="tab" data-panel="integrations">Integrations</div>
   <div class="tab" data-panel="config">Config</div>
@@ -1981,6 +1982,204 @@ if (new URLSearchParams(location.search).get('embed') === '1') {
             <button class="action-btn primary" onclick="atSaveEdit()">Save Changes</button>
             <button class="action-btn" onclick="document.getElementById('at-edit-form').style.display='none'">Cancel</button>
           </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── EXTERNAL INFERENCE PANEL ── -->
+  <div class="panel" id="panel-ext-inference">
+    <div class="panel-body" style="max-width:900px;">
+
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+        <h2 style="font-size:15px;font-weight:600;">External Inference</h2>
+        <button class="action-btn" onclick="eiLoad()" style="padding:4px 10px;font-size:12px;">↻ Refresh</button>
+        <span id="ei-enabled-badge" style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:10px;background:#1e293b;color:var(--muted);">DISABLED</span>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:18px;">
+        Optional Hugging Face inference — <strong style="color:var(--accent);">localhost-only</strong>.
+        Disabled by default. No spend without your explicit configuration.
+        Remote origins (Discord, LAN, web) can never trigger external inference.
+      </p>
+
+      <!-- Budget summary bar -->
+      <div class="ctrl-section" style="margin-bottom:20px;" id="ei-budget-section">
+        <div class="ctrl-section-header">
+          <span class="ctrl-section-title">Budget — Current Cycle</span>
+          <span class="ctrl-section-sub" id="ei-cycle-label">—</span>
+        </div>
+        <div style="margin-top:10px;">
+          <!-- progress bar -->
+          <div style="height:6px;background:var(--border);border-radius:3px;margin-bottom:8px;overflow:hidden;">
+            <div id="ei-budget-bar" style="height:100%;border-radius:3px;background:var(--accent);width:0%;transition:width 0.3s;"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;font-size:12px;">
+            <div class="ov-stat">Budget<strong id="ei-budget-total">—</strong></div>
+            <div class="ov-stat">Spent<strong id="ei-budget-spent">—</strong></div>
+            <div class="ov-stat">Remaining<strong id="ei-budget-remaining">—</strong></div>
+            <div class="ov-stat">Requests (cycle)<strong id="ei-req-count">—</strong></div>
+            <div class="ov-stat">Denied<strong id="ei-denied-count">—</strong></div>
+            <div class="ov-stat">Today<strong id="ei-daily-count">—</strong></div>
+          </div>
+          <div id="ei-warning-bar" style="display:none;margin-top:10px;padding:8px 12px;border-radius:5px;font-size:12px;font-weight:600;"></div>
+        </div>
+      </div>
+
+      <!-- Master enable / escalation mode -->
+      <div class="ctrl-section" style="margin-bottom:20px;">
+        <div class="ctrl-section-header">
+          <span class="ctrl-section-title">Feature Control</span>
+          <span class="ctrl-section-sub">Master enable switch and escalation policy.</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 20px;font-size:13px;margin-top:12px;">
+          <label style="display:flex;align-items:center;gap:8px;">
+            <input type="checkbox" id="ei-f-enabled"> Enable external inference
+          </label>
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            <span style="font-size:12px;color:var(--muted);">Escalation mode</span>
+            <select id="ei-f-escalation" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;font-size:13px;">
+              <option value="disabled">disabled — never escalate</option>
+              <option value="emergency_only">emergency_only</option>
+              <option value="constrained">constrained</option>
+              <option value="balanced">balanced</option>
+              <option value="permissive">permissive</option>
+            </select>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            <span style="font-size:12px;color:var(--muted);">Approval mode</span>
+            <select id="ei-f-approval" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;font-size:13px;">
+              <option value="never">never — always block</option>
+              <option value="ask_for_paid_calls">ask_for_paid_calls</option>
+              <option value="always">always — auto-approve</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:12px;">
+          <button class="action-btn primary" onclick="eiSaveControl()">Save Feature Control</button>
+        </div>
+      </div>
+
+      <!-- Budget settings -->
+      <div class="ctrl-section" style="margin-bottom:20px;">
+        <div class="ctrl-section-header">
+          <span class="ctrl-section-title">Budget Settings</span>
+          <span class="ctrl-section-sub">All limits are enforced locally before any external call.</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px 20px;font-size:13px;margin-top:12px;">
+          <label style="display:flex;flex-direction:column;gap:4px;">
+            <span>Monthly budget (USD)</span>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="color:var(--muted);">$</span>
+              <input type="number" id="ei-f-monthly" min="0" step="0.01" placeholder="0.00"
+                style="width:110px;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;font-size:13px;">
+            </div>
+            <span style="font-size:11px;color:var(--muted);">0 = no spend permitted. Enter any numeric value.</span>
+          </label>
+          <label style="display:flex;flex-direction:column;gap:4px;">
+            <span>Current-cycle override (USD)</span>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="color:var(--muted);">$</span>
+              <input type="number" id="ei-f-override" min="0" step="0.01" placeholder="leave blank to use monthly budget"
+                style="width:160px;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;font-size:13px;">
+            </div>
+            <span style="font-size:11px;color:var(--muted);">Overrides monthly budget for this cycle only.</span>
+          </label>
+          <label style="display:flex;flex-direction:column;gap:4px;">
+            <span>Per-request cap (USD)</span>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="color:var(--muted);">$</span>
+              <input type="number" id="ei-f-per-req" min="0" step="0.001" placeholder="no cap"
+                style="width:110px;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;font-size:13px;">
+            </div>
+          </label>
+          <label style="display:flex;flex-direction:column;gap:4px;">
+            <span>Daily request cap</span>
+            <input type="number" id="ei-f-daily-cap" min="0" step="1" placeholder="no cap"
+              style="width:110px;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;font-size:13px;">
+            <span style="font-size:11px;color:var(--muted);">Max non-denied requests per calendar day.</span>
+          </label>
+          <label style="display:flex;flex-direction:column;gap:4px;">
+            <span>Billing cycle start (YYYY-MM-DD)</span>
+            <input type="text" id="ei-f-cycle-start" placeholder="auto (1st of month)"
+              style="width:160px;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;font-size:13px;">
+          </label>
+        </div>
+        <div style="margin-top:12px;">
+          <button class="action-btn primary" onclick="eiSaveBudget()">Save Budget Settings</button>
+        </div>
+      </div>
+
+      <!-- Model settings -->
+      <div class="ctrl-section" style="margin-bottom:20px;">
+        <div class="ctrl-section-header">
+          <span class="ctrl-section-title">Model Settings</span>
+          <span class="ctrl-section-sub">Hugging Face model and API parameters.</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 20px;font-size:13px;margin-top:12px;">
+          <label style="display:flex;flex-direction:column;gap:4px;">
+            <span>Model ID</span>
+            <input type="text" id="ei-f-model" placeholder="mistralai/Mistral-7B-Instruct-v0.2"
+              style="width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;font-size:13px;">
+            <span style="font-size:11px;color:var(--muted);">Any HF repo that supports the Inference API.</span>
+          </label>
+          <label style="display:flex;flex-direction:column;gap:4px;">
+            <span>Timeout (seconds)</span>
+            <input type="number" id="ei-f-timeout" min="5" max="120" step="1"
+              style="width:90px;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;font-size:13px;">
+          </label>
+        </div>
+        <div style="margin-top:12px;">
+          <button class="action-btn primary" onclick="eiSaveModel()">Save Model Settings</button>
+        </div>
+      </div>
+
+      <!-- API Key management -->
+      <div class="ctrl-section" style="margin-bottom:20px;">
+        <div class="ctrl-section-header">
+          <span class="ctrl-section-title">API Key</span>
+          <span class="ctrl-section-sub">Stored in the system keyring. Never returned by any API after save.</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap;">
+          <span id="ei-key-status" style="font-size:12px;color:var(--muted);">—</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap;">
+          <input type="password" id="ei-f-api-key" placeholder="hf_..."
+            style="width:320px;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:5px 10px;border-radius:4px;font-size:13px;font-family:var(--mono);">
+          <button class="action-btn primary" onclick="eiSaveApiKey()">Save Key</button>
+          <button class="action-btn danger" onclick="eiDeleteApiKey()">Remove Key</button>
+          <button class="action-btn" onclick="eiTestConnection()">Test Connection</button>
+        </div>
+        <div id="ei-test-result" style="margin-top:8px;font-size:12px;display:none;"></div>
+        <p style="font-size:11px;color:var(--muted);margin-top:8px;">
+          The key is stored in the OS keyring (Windows Credential Manager on Windows).
+          It is masked immediately after save and cannot be retrieved through this UI.
+        </p>
+      </div>
+
+      <!-- Usage history -->
+      <div class="ctrl-section" style="margin-bottom:20px;">
+        <div class="ctrl-section-header">
+          <span class="ctrl-section-title">Recent Usage</span>
+          <span class="ctrl-section-sub">Last 50 external inference attempts (allowed and denied).</span>
+        </div>
+        <div style="margin-top:10px;overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;" id="ei-history-table">
+            <thead>
+              <tr style="text-align:left;color:var(--muted);border-bottom:1px solid var(--border);">
+                <th style="padding:4px 8px;">Time</th>
+                <th style="padding:4px 8px;">Result</th>
+                <th style="padding:4px 8px;">Model</th>
+                <th style="padding:4px 8px;">Est. Cost</th>
+                <th style="padding:4px 8px;">Actual</th>
+                <th style="padding:4px 8px;">Latency</th>
+                <th style="padding:4px 8px;">Reason / Denial</th>
+              </tr>
+            </thead>
+            <tbody id="ei-history-body">
+              <tr><td colspan="7" style="padding:12px 8px;color:var(--muted);">No records yet.</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -4367,6 +4566,243 @@ async function atSaveEdit() {
     loadAccessTiers();
   } catch(e) { alert(`Error: ${e.message}`); }
 }
+
+// ═══════════════════════════════════════════════════════════
+//  External Inference Panel
+// ═══════════════════════════════════════════════════════════
+
+let _eiData = null;
+
+async function eiLoad() {
+  try {
+    const d = await api('GET', '/admin/external-inference/status');
+    if (!d.ok) { toast('Failed to load EI status: ' + (d.error || '?'), false); return; }
+    _eiData = d.data;
+    eiRender(d.data);
+  } catch(e) { toast('EI load error: ' + e.message, false); }
+}
+
+function eiRender(data) {
+  if (!data || !data.available) return;
+
+  const cfg    = data.config    || {};
+  const budget = data.budget    || {};
+  const hf     = cfg.huggingface || {};
+
+  // Enabled badge
+  const badge = document.getElementById('ei-enabled-badge');
+  if (cfg.enabled) {
+    badge.textContent = 'ENABLED';
+    badge.style.background = '#14532d';
+    badge.style.color = 'var(--green)';
+  } else {
+    badge.textContent = 'DISABLED';
+    badge.style.background = '#1e293b';
+    badge.style.color = 'var(--muted)';
+  }
+
+  // Feature control fields
+  document.getElementById('ei-f-enabled').checked = !!cfg.enabled;
+  document.getElementById('ei-f-escalation').value = cfg.escalation_mode || 'disabled';
+  document.getElementById('ei-f-approval').value   = cfg.approval_mode   || 'ask_for_paid_calls';
+
+  // Budget fields
+  const monthly = budget.monthly_budget_usd;
+  document.getElementById('ei-f-monthly').value    = monthly != null ? monthly : '';
+  const override = cfg.monthly_budget_override_usd;
+  document.getElementById('ei-f-override').value   = override != null ? override : '';
+  const perReq = budget.per_request_cap_usd;
+  document.getElementById('ei-f-per-req').value    = perReq != null ? perReq : '';
+  const dailyCap = budget.daily_cap;
+  document.getElementById('ei-f-daily-cap').value  = dailyCap != null ? dailyCap : '';
+  document.getElementById('ei-f-cycle-start').value = cfg.current_billing_cycle_start || '';
+
+  // Model fields
+  document.getElementById('ei-f-model').value   = hf.model_id   || '';
+  document.getElementById('ei-f-timeout').value = hf.timeout_sec != null ? hf.timeout_sec : '30';
+
+  // Budget display
+  document.getElementById('ei-cycle-label').textContent =
+    `${budget.cycle_start || '—'} → ${budget.cycle_end || '—'}`;
+  const eff     = budget.effective_budget_usd || 0;
+  const spent   = budget.spent_usd            || 0;
+  const remain  = budget.remaining_usd        || 0;
+  document.getElementById('ei-budget-total').textContent     = eff   > 0 ? `$${eff.toFixed(4)}`    : '$0.00';
+  document.getElementById('ei-budget-spent').textContent     = `$${spent.toFixed(4)}`;
+  document.getElementById('ei-budget-remaining').textContent = `$${remain.toFixed(4)}`;
+  document.getElementById('ei-req-count').textContent        = budget.request_count   ?? '—';
+  document.getElementById('ei-denied-count').textContent     = budget.denied_count    ?? '—';
+  document.getElementById('ei-daily-count').textContent      = budget.daily_count_today ?? '—';
+
+  // Budget progress bar
+  const bar = document.getElementById('ei-budget-bar');
+  const pct = eff > 0 ? Math.min(100, (spent / eff) * 100) : 0;
+  bar.style.width = pct.toFixed(1) + '%';
+  const warnLevel = budget.warning_level;
+  if (warnLevel >= 95) { bar.style.background = 'var(--red)'; }
+  else if (warnLevel >= 80) { bar.style.background = 'var(--yellow)'; }
+  else { bar.style.background = 'var(--accent)'; }
+
+  // Warning banner
+  const warnBar = document.getElementById('ei-warning-bar');
+  if (warnLevel) {
+    warnBar.style.display = 'block';
+    const colours = { 95: ['#3f1515','var(--red)'], 80: ['#3f2d00','var(--yellow)'], 50: ['#1e293b','var(--accent)'] };
+    const [bg, fg] = colours[warnLevel] || colours[50];
+    warnBar.style.background = bg; warnBar.style.color = fg;
+    warnBar.style.border = `1px solid ${fg}`;
+    warnBar.textContent = `⚠ ${warnLevel}% budget threshold reached — ${pct.toFixed(1)}% of $${eff.toFixed(2)} used.`;
+  } else {
+    warnBar.style.display = 'none';
+  }
+
+  // API key status
+  const keyEl = document.getElementById('ei-key-status');
+  if (cfg.api_key_configured) {
+    keyEl.textContent = '✓ API key configured (stored in system keyring)';
+    keyEl.style.color = 'var(--green)';
+  } else {
+    keyEl.textContent = '✗ No API key — enter one below to enable external calls';
+    keyEl.style.color = 'var(--muted)';
+  }
+}
+
+async function eiSaveControl() {
+  const body = {
+    enabled:         document.getElementById('ei-f-enabled').checked,
+    escalation_mode: document.getElementById('ei-f-escalation').value,
+    approval_mode:   document.getElementById('ei-f-approval').value,
+  };
+  try {
+    const d = await api('PATCH', '/admin/external-inference/config', body);
+    if (!d.ok) { toast('Save failed: ' + (d.error || '?'), false); return; }
+    toast('Feature control saved');
+    eiLoad();
+  } catch(e) { toast('Error: ' + e.message, false); }
+}
+
+async function eiSaveBudget() {
+  const body = {};
+  const monthly = parseFloat(document.getElementById('ei-f-monthly').value);
+  if (!isNaN(monthly)) body.monthly_budget_usd = monthly;
+  const override = document.getElementById('ei-f-override').value.trim();
+  body.monthly_budget_override_usd = override ? parseFloat(override) : null;
+  const perReq = document.getElementById('ei-f-per-req').value.trim();
+  body.per_request_cap_usd = perReq ? parseFloat(perReq) : null;
+  const dailyCap = document.getElementById('ei-f-daily-cap').value.trim();
+  body.daily_request_cap = dailyCap ? parseInt(dailyCap, 10) : null;
+  const cycleStart = document.getElementById('ei-f-cycle-start').value.trim();
+  body.current_billing_cycle_start = cycleStart || null;
+
+  try {
+    const d = await api('PATCH', '/admin/external-inference/config', body);
+    if (!d.ok) { toast('Save failed: ' + (d.error || '?'), false); return; }
+    toast('Budget settings saved');
+    eiLoad();
+  } catch(e) { toast('Error: ' + e.message, false); }
+}
+
+async function eiSaveModel() {
+  const body = {
+    model_id:    document.getElementById('ei-f-model').value.trim(),
+    timeout_sec: parseFloat(document.getElementById('ei-f-timeout').value) || 30,
+  };
+  if (!body.model_id) { toast('Model ID cannot be empty', false); return; }
+  try {
+    const d = await api('PATCH', '/admin/external-inference/config', body);
+    if (!d.ok) { toast('Save failed: ' + (d.error || '?'), false); return; }
+    toast('Model settings saved');
+    eiLoad();
+  } catch(e) { toast('Error: ' + e.message, false); }
+}
+
+async function eiSaveApiKey() {
+  const key = document.getElementById('ei-f-api-key').value.trim();
+  if (!key) { toast('Enter an API key first', false); return; }
+  try {
+    const d = await api('POST', '/admin/external-inference/api-key', { api_key: key });
+    if (!d.ok) { toast('Key save failed: ' + (d.error || '?'), false); return; }
+    document.getElementById('ei-f-api-key').value = '';
+    toast('API key stored in system keyring');
+    eiLoad();
+  } catch(e) { toast('Error: ' + e.message, false); }
+}
+
+async function eiDeleteApiKey() {
+  if (!confirm('Remove the HuggingFace API key?')) return;
+  try {
+    const d = await api('DELETE', '/admin/external-inference/api-key');
+    if (!d.ok) { toast('Delete failed: ' + (d.error || '?'), false); return; }
+    toast('API key removed');
+    eiLoad();
+  } catch(e) { toast('Error: ' + e.message, false); }
+}
+
+async function eiTestConnection() {
+  const resEl = document.getElementById('ei-test-result');
+  resEl.style.display = 'block';
+  resEl.style.color   = 'var(--muted)';
+  resEl.textContent   = 'Testing connection…';
+  try {
+    const d = await api('POST', '/admin/external-inference/test');
+    if (d.ok && d.data && d.data.ok) {
+      resEl.style.color = 'var(--green)';
+      resEl.textContent = `✓ Connected — model: ${d.data.model_id} (${d.data.latency_ms}ms)`;
+      toast('Connection OK');
+    } else {
+      const err = (d.data && d.data.error) || d.error || 'Unknown error';
+      resEl.style.color = 'var(--red)';
+      resEl.textContent = `✗ ${err}`;
+      toast('Connection failed', false);
+    }
+  } catch(e) {
+    resEl.style.color = 'var(--red)';
+    resEl.textContent = '✗ Network error: ' + e.message;
+    toast('Error', false);
+  }
+}
+
+async function eiLoadHistory() {
+  try {
+    const d = await api('GET', '/admin/external-inference/usage-history?limit=50');
+    if (!d.ok) return;
+    const rows = (d.data && d.data.records) || [];
+    const tbody = document.getElementById('ei-history-body');
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="padding:12px 8px;color:var(--muted);">No records yet.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(r => {
+      const ts  = r.ts ? new Date(r.ts).toLocaleTimeString() : '—';
+      const res = r.denied ? `<span style="color:var(--red)">DENIED</span>` :
+                  r.succeeded ? `<span style="color:var(--green)">OK</span>` :
+                  `<span style="color:var(--yellow)">FAIL</span>`;
+      const est  = r.estimated_cost_usd != null ? `$${parseFloat(r.estimated_cost_usd).toFixed(4)}` : '—';
+      const act  = r.actual_cost_usd    != null ? `$${parseFloat(r.actual_cost_usd).toFixed(4)}`    : '—';
+      const lat  = r.response_latency_ms != null ? `${r.response_latency_ms}ms` : '—';
+      const note = escHtml(r.denial_reason || r.request_reason || '').slice(0, 40);
+      return `<tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:4px 8px;color:var(--muted);">${escHtml(ts)}</td>
+        <td style="padding:4px 8px;">${res}</td>
+        <td style="padding:4px 8px;font-family:var(--mono);font-size:11px;">${escHtml((r.model_id||'').slice(0,30))}</td>
+        <td style="padding:4px 8px;">${est}</td>
+        <td style="padding:4px 8px;">${act}</td>
+        <td style="padding:4px 8px;">${lat}</td>
+        <td style="padding:4px 8px;color:var(--muted);">${note}</td>
+      </tr>`;
+    }).join('');
+  } catch(e) { /* non-fatal */ }
+}
+
+// Wire panel activation to load data
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    if (tab.dataset.panel === 'ext-inference') {
+      eiLoad();
+      eiLoadHistory();
+    }
+  });
+});
 </script>
 
 </body>
