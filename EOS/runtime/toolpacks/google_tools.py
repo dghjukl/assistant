@@ -4,7 +4,7 @@ Configuration (config.json):
   google:
     enabled: true
     token_path: data/google_token.json
-    client_secret_path: "AI personal files/client_secret_*.json"
+    client_secret_path: "config/google/*.json"
 
 Tools registered
 ----------------
@@ -41,7 +41,7 @@ def _not_configured() -> str:
         "error": "Google Workspace tools not configured",
         "hint": (
             "Set google.enabled=true in config.json and place your "
-            "OAuth client secret in config/google/client_secret_*.json"
+            "OAuth client secret in config/google/*.json"
         ),
     })
 

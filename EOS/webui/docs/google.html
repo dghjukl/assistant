@@ -56,8 +56,8 @@
     <li class="step-card">
       <div class="step-num green">4</div>
       <div class="step-body">
-        <div class="step-title">Place the file in AI personal files</div>
-        <div class="step-desc">Copy the downloaded file into your <span class="file-path">AI personal files\</span> folder. The filename must match the pattern <code>client_secret_*.json</code> — do not rename it to anything else.</div>
+        <div class="step-title">Place the file in config\\google</div>
+        <div class="step-desc">Copy the downloaded file into your <span class="file-path">config\google\</span> folder. Use the default path pattern <code>config/google/*.json</code> or set <code>google.client_secret_path</code> to an explicit JSON file path.</div>
       </div>
     </li>
     <li class="step-card">
@@ -133,7 +133,7 @@
       <tbody>
         <tr>
           <td>No credential file found</td>
-          <td>Check that the file is in <span class="file-path">AI personal files\</span> and the filename matches <code>client_secret_*.json</code>.</td>
+          <td>Check that the file is in <span class="file-path">config\google\</span> (or that <code>google.client_secret_path</code> points to it) and that the filename/path matches your configured JSON credential.</td>
         </tr>
         <tr>
           <td>OAuth browser window not opening</td>

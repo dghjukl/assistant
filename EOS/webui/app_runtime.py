@@ -1037,7 +1037,8 @@ async def startup_event():
             google_oauth_configure(app_state.cfg)
             _emit_log("info", "startup", "Google OAuth manager configured")
         except Exception as exc:
-            logger.warning("Google OAuth configure failed: %s", exc)
+            _emit_log("error", "startup", "Google OAuth configure failed", {"error": str(exc)})
+            logger.error("Google OAuth configure failed: %s", exc)
 
         # 2. Init memory/db
         try:
@@ -4033,16 +4034,22 @@ async def google_status():
             is_authorized,
             get_account_info,
             get_credentials,
-            _client_secret_path,
+            validate_client_secret_path,
             _token_path,
         )
-        oauth_cfg(app_state.cfg)
         gcfg = _google_cfg()
-        authorized = is_authorized()
+        last_auth_error = None
+        try:
+            oauth_cfg(app_state.cfg)
+            validate_client_secret_path()
+            client_secret_exists = True
+        except FileNotFoundError as exc:
+            client_secret_exists = False
+            last_auth_error = str(exc)
+        authorized = is_authorized() if client_secret_exists else False
         account = get_account_info() if authorized else {}
-        client_secret_exists = _client_secret_path() is not None
         token_exists = _token_path().is_file()
-        token_valid = get_credentials() is not None
+        token_valid = get_credentials() is not None if client_secret_exists else False
         services_enabled = {
             "calendar": _google_service_enabled("calendar"),
             "gmail": _google_service_enabled("gmail"),
@@ -4072,7 +4079,7 @@ async def google_status():
                 "services_enabled": services_enabled,
                 "calendar_create_enabled": bool(services_enabled["calendar"]),
                 "drive_download_enabled": bool(services_enabled["drive"]),
-                "last_auth_error": None,
+                "last_auth_error": last_auth_error,
             }
         })
     except Exception as exc:
@@ -4160,6 +4167,8 @@ async def google_revoke():
         if result.get("ok"):
             _emit_log("info", "google_oauth", "Access revoked")
         return JSONResponse({"ok": True, "data": result})
+    except FileNotFoundError as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=503)
     except Exception as exc:
         logger.error("Google revoke error: %s", exc)
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
@@ -4178,6 +4187,8 @@ async def google_account():
                 status_code=401,
             )
         return JSONResponse({"ok": True, "data": {"account": get_account_info()}})
+    except FileNotFoundError as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=503)
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
@@ -4203,6 +4214,8 @@ async def google_calendar_today():
         ).execute()
         events = [_google_calendar_event_dict(event) for event in res.get("items", [])]
         return JSONResponse({"ok": True, "data": {"events": events}})
+    except FileNotFoundError as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=503)
     except PermissionError as exc:
         return JSONResponse({"ok": False, "error": str(exc), "needs_auth": True}, status_code=401)
     except Exception as exc:
@@ -4231,6 +4244,8 @@ async def google_calendar_upcoming(days: int = 7):
         ).execute()
         events = [_google_calendar_event_dict(event) for event in res.get("items", [])]
         return JSONResponse({"ok": True, "data": {"events": events}})
+    except FileNotFoundError as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=503)
     except PermissionError as exc:
         return JSONResponse({"ok": False, "error": str(exc), "needs_auth": True}, status_code=401)
     except Exception as exc:
@@ -4269,6 +4284,8 @@ async def google_gmail_inbox(max_results: int = 10, query: str = ""):
                 "snippet": msg.get("snippet", ""),
             })
         return JSONResponse({"ok": True, "data": {"messages": messages, "query": query}})
+    except FileNotFoundError as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=503)
     except PermissionError as exc:
         return JSONResponse({"ok": False, "error": str(exc), "needs_auth": True}, status_code=401)
     except Exception as exc:
@@ -4292,6 +4309,8 @@ async def google_drive_recent(max_results: int = 10):
         ).execute()
         files = response.get("files", [])
         return JSONResponse({"ok": True, "data": {"files": files}})
+    except FileNotFoundError as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=503)
     except PermissionError as exc:
         return JSONResponse({"ok": False, "error": str(exc), "needs_auth": True}, status_code=401)
     except Exception as exc:
@@ -4318,6 +4337,8 @@ async def google_drive_search(query: str = "", q: str = "", max_results: int = 1
         ).execute()
         files = response.get("files", [])
         return JSONResponse({"ok": True, "data": {"query": query, "files": files}})
+    except FileNotFoundError as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=503)
     except PermissionError as exc:
         return JSONResponse({"ok": False, "error": str(exc), "needs_auth": True}, status_code=401)
     except Exception as exc:

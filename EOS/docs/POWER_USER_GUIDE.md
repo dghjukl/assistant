@@ -164,7 +164,7 @@ Intensity presets control sampling parameters. `temperature`, `top_p`, `top_k` i
 ```json
 "google": {
     "enabled": true,
-    "client_secret_glob": "AI personal files/client_secret_*.json",
+    "client_secret_path": "config/google/*.json",
     "token_path": "data/google_token.json",
     "calendar_enabled": true,
     "gmail_enabled": true,

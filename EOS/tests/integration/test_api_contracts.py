@@ -334,11 +334,11 @@ class TestGoogleWorkspaceRoutes:
             is_authorized=lambda: True,
             get_account_info=lambda: {"email": "tester@example.com"},
             get_credentials=lambda scopes=None: object(),
+            validate_client_secret_path=lambda: client_secret,
             build_authorize_url=lambda redirect_uri: ("https://accounts.example/auth", "state-123"),
             exchange_code=lambda code, state, redirect_uri: {"ok": True, "account": {"email": "tester@example.com"}},
             revoke=lambda: {"ok": True},
             build_service=lambda service_name, version, scopes=None: services[service_name],
-            _client_secret_path=lambda: client_secret,
             _token_path=lambda: token_path,
         )
         monkeypatch.setitem(sys.modules, "core.google_oauth", fake_google)
@@ -375,14 +375,14 @@ class TestGoogleWorkspaceRoutes:
 
     def test_revoke_returns_ok_shape(self, client):
         resp = client.post("/api/google_workspace/revoke")
-        assert resp.status_code == 200
+        assert resp.status_code in (200, 503)
         data = resp.json()
         assert "ok" in data
 
     def test_account_unauthorized_401(self, client):
         resp = client.get("/api/google_workspace/account")
-        # No credentials stored in test env — expect 401
-        assert resp.status_code in (200, 401)
+        # No credentials stored in test env — expect auth or configuration failure
+        assert resp.status_code in (200, 401, 503)
 
     def test_calendar_today_returns_structured_events(self, client, monkeypatch, tmp_path):
         self._install_fake_google(monkeypatch, tmp_path)
@@ -418,11 +418,11 @@ class TestGoogleWorkspaceRoutes:
             is_authorized=lambda: True,
             get_account_info=lambda: {},
             get_credentials=lambda scopes=None: object(),
+            validate_client_secret_path=lambda: tmp_path / "cs.json",
             build_authorize_url=lambda redirect_uri: ("https://accounts.example/auth", "state"),
             exchange_code=lambda code, state, redirect_uri: {"ok": True},
             revoke=lambda: {"ok": True},
             build_service=lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("backend failure")),
-            _client_secret_path=lambda: tmp_path / "cs.json",
             _token_path=lambda: tmp_path / "tok.json",
         )
         monkeypatch.setitem(sys.modules, "core.google_oauth", fake_google)
@@ -445,11 +445,11 @@ class TestGoogleWorkspaceRoutes:
             is_authorized=lambda: True,
             get_account_info=lambda: {},
             get_credentials=lambda scopes=None: object(),
+            validate_client_secret_path=lambda: tmp_path / "cs.json",
             build_authorize_url=lambda redirect_uri: ("https://accounts.example/auth", "state"),
             exchange_code=lambda code, state, redirect_uri: {"ok": True},
             revoke=lambda: {"ok": True},
             build_service=lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("backend failure")),
-            _client_secret_path=lambda: tmp_path / "cs.json",
             _token_path=lambda: tmp_path / "tok.json",
         )
         monkeypatch.setitem(sys.modules, "core.google_oauth", fake_google)

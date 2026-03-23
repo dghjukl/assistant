@@ -174,7 +174,7 @@ EOS can read your Google Calendar, search Gmail, and browse Google Drive files. 
 
 Full credential setup instructions: **[CREDENTIALS.md](CREDENTIALS.md)**
 
-Once the `client_secret_*.json` file is in `AI personal files\` and `"google": { "enabled": true }` is set in `config.json`, restart EOS, then open the Admin Panel → **Integrations** and click **Connect Google Account** to launch the one-time browser authorization flow.
+Once the OAuth client JSON is in `config\google\` (or `google.client_secret_path` points to an explicit JSON file) and `"google": { "enabled": true }` is set in `config.json`, restart EOS, then open the Admin Panel → **Integrations** and click **Connect Google Account** to launch the one-time browser authorization flow.
 
 ### Checking integration status
 
@@ -339,4 +339,4 @@ When optional backends are missing, EOS degrades gracefully rather than failing:
 | STT model | Voice input is unavailable; text chat is unaffected |
 | TTS model | Voice output is unavailable; text chat is unaffected |
 | Discord credential | Discord integration skipped silently |
-| Google credential | Google integration skipped silently |
+| Google credential | Google integration reports explicit configuration error |

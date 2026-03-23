@@ -503,7 +503,7 @@ Write-Host "      Create 'AI personal files\Discord.txt' and paste your bot toke
 Write-Host "      Get a token at: https://discord.com/developers/applications" -ForegroundColor DarkGray
 Write-Host ""
 Write-Host "    Google Workspace (Calendar, Gmail, Drive):" -ForegroundColor Gray
-Write-Host "      Place your OAuth client_secret_*.json in 'AI personal files\'" -ForegroundColor DarkGray
+Write-Host "      Place your OAuth client_secret_*.json in 'config\google\' or set google.client_secret_path" -ForegroundColor DarkGray
 Write-Host "      Create credentials at: https://console.cloud.google.com/" -ForegroundColor DarkGray
 Write-Host $Divider -ForegroundColor DarkGray
 

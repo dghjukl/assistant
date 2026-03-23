@@ -1,6 +1,6 @@
 # EOS — Credentials Setup Guide
 
-Both integrations are **optional**. EOS runs fully without them. If a credential file is missing or the integration is disabled in config, it is skipped silently at startup.
+Both integrations are **optional**. EOS runs fully without them. If a credential file is missing, Google OAuth now fails fast with a clear error log and authorization endpoints return an explicit configuration error. If the integration is disabled in config, it remains disabled.
 
 ---
 
@@ -87,16 +87,20 @@ EOS can read your Google Calendar events, read Gmail messages, and search Google
 Place your downloaded OAuth JSON file in:
 
 ```
-AI personal files\
+config\google\
 ```
 
-The filename must match the pattern `client_secret_*.json`. The file Google gives you is usually already named correctly, for example:
+Use either:
+- the default location `config/google/*.json`, or
+- an explicit `google.client_secret_path` in `config.json` pointing to a specific JSON file under your managed config storage.
+
+The filename can remain the Google-downloaded name, for example:
 
 ```
 client_secret_123456789-abc.apps.googleusercontent.com.json
 ```
 
-Do not rename it — just move it into `AI personal files\`.
+Do not commit this file to git.
 
 ---
 
@@ -145,10 +149,10 @@ Go to **APIs & Services → Credentials**:
 Move the downloaded JSON to:
 
 ```
-AI personal files\
+config\google\
 ```
 
-Leave the filename as-is.
+Leave the filename as-is, or set `google.client_secret_path` to the explicit file location you want EOS to use.
 
 **Step 6 — Authorize on first use**
 
@@ -165,7 +169,7 @@ In `config.json`, confirm:
 ```json
 "google": {
     "enabled": true,
-    "client_secret_glob": "AI personal files/client_secret_*.json",
+    "client_secret_path": "config/google/*.json",
     "token_path": "data/google_token.json",
     "calendar_enabled": true,
     "gmail_enabled": true,
@@ -192,4 +196,4 @@ Gmail sending can also be toggled without restarting. In the admin panel at **ht
 - The Discord token grants full bot-level access to every server it has joined — treat it like a password. If it leaks, reset it immediately in the Discord Developer Portal.
 - The Google OAuth JSON file grants the ability to request access to your Google account — keep it private. If it leaks, delete and recreate the OAuth client ID in Cloud Console.
 - `data\google_token.json` is generated at runtime and contains a live refresh token. It is also excluded from version control. If it leaks, revoke it from your Google Account's security settings at https://myaccount.google.com/permissions
-- Both credential files should live only in `AI personal files\` — never paste tokens directly into `config.json`
+- Store the Google OAuth client JSON only under `config/google/` or another explicitly configured secure path — never paste tokens directly into `config.json`

@@ -274,8 +274,8 @@ for cfg_name in EXPECTED_CONFIGS:
 section("Credential Files (presence only — content not checked)")
 
 discord_file = ROOT / "AI personal files" / "Discord.txt"
-google_glob  = list((ROOT / "AI personal files").glob("client_secret_*.json")) \
-               if (ROOT / "AI personal files").is_dir() else []
+google_glob  = list((ROOT / "config" / "google").glob("*.json")) \
+               if (ROOT / "config" / "google").is_dir() else []
 
 advisory(
     discord_file.is_file(),
@@ -285,8 +285,8 @@ advisory(
 
 advisory(
     len(google_glob) > 0,
-    "Google credential: AI personal files/client_secret_*.json",
-    "See docs/CREDENTIALS.md — required only if Google is enabled in config"
+    "Google credential: config/google/*.json",
+    "See docs/CREDENTIALS.md — required only if Google is enabled in config or google.client_secret_path is set explicitly"
 )
 
 
