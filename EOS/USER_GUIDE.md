@@ -278,6 +278,7 @@ That profile is then injected into every conversation as a compact orientation s
 2. Tell EOS: *"Update the worldview profile"* or *"I've added new materials to worldview/sources — process them."*
 
 3. EOS will read the new documents, read the existing profile (if any), and produce an updated `data\worldview\profile.md` that integrates the new signal without discarding prior understanding.
+4. When EOS needs to inspect the extracted profile directly, it uses `worldview_read` for `data\worldview\profile.md`; this stays separate from workspace-only file tools.
 
 ### Behavioral rules
 

@@ -94,7 +94,7 @@
 <div class="doc-section" id="profile">
   <div class="section-eyebrow">The Output File</div>
   <h2 class="section-title">The Profile File</h2>
-  <p class="doc-p">The extracted profile is stored at <span class="file-path">data\worldview\profile.md</span>. You can read it at any time to see what EOS extracted and how it has characterised your worldview. It is a plain Markdown file — you can edit it directly if you want to correct or remove anything.</p>
+  <p class="doc-p">The extracted profile is stored at <span class="file-path">data\worldview\profile.md</span>. EOS reads that file through the dedicated <code>worldview_read</code> tool rather than through workspace-only file tools. It is a plain Markdown file — you can edit it directly if you want to correct or remove anything.</p>
   <p class="doc-p">EOS tracks which source files have already been processed in <span class="file-path">data\worldview\extraction_log.json</span>. This lets it incorporate only new material on subsequent runs rather than re-reading everything.</p>
 
   <h3 class="sub-title" id="profile-troubleshooting">If the profile seems wrong</h3>
