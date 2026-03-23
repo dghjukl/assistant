@@ -36,3 +36,4 @@ logs/
 dist/
 release/
 *.zip
+EOS_audit_report.md
