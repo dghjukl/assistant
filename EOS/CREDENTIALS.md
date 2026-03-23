@@ -152,11 +152,11 @@ Leave the filename as-is.
 
 **Step 6 — Authorize on first use**
 
-The first time EOS starts with Google enabled, it will open a browser window asking you to sign in and grant access. After you authorize, a token is saved to `data\google_token.json` and you will not be prompted again.
+After EOS starts with Google enabled, open the Admin Panel → **Integrations** and click **Connect Google Account**. EOS opens the browser authorization flow from there, saves the resulting token to `data\google_token.json`, and does not prompt again unless you revoke or replace the token.
 
 If authorization expires or fails:
 - Delete `data\google_token.json`
-- Restart EOS — it will re-authorize
+- Restart EOS, then open the Admin Panel → **Integrations** and click **Re-authorize**
 
 **Step 7 — Verify your config**
 

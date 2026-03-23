@@ -187,7 +187,7 @@ The admin panel at **http://127.0.0.1:7860/admin** provides the runtime safety a
 - **Computer Use** — live mode switching, HALT button, shortcut allowlist, pending confirmations
 - **Cognition** — full turn trace with tool calls, retrieval results, state diffs
 - **Server log tabs** — per-server inference logs with hardware badge (GPU/CPU)
-- **Integrations** — Google Workspace live connection status and data preview
+- **Integrations** — Google Workspace live connection status, Connect/Re-authorize controls, and data preview
 
 ---
 

@@ -74,14 +74,14 @@
       <div class="step-num green">6</div>
       <div class="step-body">
         <div class="step-title">Restart EOS</div>
-        <div class="step-desc">On first run after enabling, EOS will open a browser window to complete OAuth authorization. Keep the browser window accessible.</div>
+        <div class="step-desc">Restart EOS so the WebUI loads the Google integration and detects your client secret file.</div>
       </div>
     </li>
     <li class="step-card">
       <div class="step-num green">7</div>
       <div class="step-body">
-        <div class="step-title">Authorize in your browser</div>
-        <div class="step-desc">Follow the prompts to grant EOS access to your Google account. EOS saves the resulting token to <span class="file-path">data\google_token.json</span> — future starts will not require re-authorization unless the token expires.</div>
+        <div class="step-title">Open the Admin Panel and click Connect Google Account</div>
+        <div class="step-desc">Go to <strong>Admin Panel → Integrations</strong>, click <strong>Connect Google Account</strong>, and complete the browser prompts. EOS saves the resulting token to <span class="file-path">data\google_token.json</span>. Already-authorized users are not interrupted on startup; you only need this flow the first time or when re-authorizing.</div>
       </div>
     </li>
   </ol>
@@ -113,7 +113,7 @@
   <div class="callout tip">
     <div class="callout-icon">💡</div>
     <div class="callout-title">Token expired?</div>
-    <div class="callout-body">Delete <span class="file-path">data\google_token.json</span> and restart EOS. It will open a new browser authorization window and save a fresh token.</div>
+    <div class="callout-body">Delete <span class="file-path">data\google_token.json</span>, restart EOS, then use <strong>Admin Panel → Integrations → Re-authorize</strong> to save a fresh token.</div>
   </div>
 </div>
 
@@ -137,11 +137,11 @@
         </tr>
         <tr>
           <td>OAuth browser window not opening</td>
-          <td>Confirm <code>"enabled": true</code> is set under <code>"google"</code> in <span class="file-path">config.json</span>.</td>
+          <td>Open <strong>Admin Panel → Integrations</strong> and click <strong>Connect Google Account</strong>. If nothing opens, confirm <code>"enabled": true</code> is set under <code>"google"</code> in <span class="file-path">config.json</span> and allow pop-ups for the WebUI.</td>
         </tr>
         <tr>
           <td>Token expired / auth errors</td>
-          <td>Delete <span class="file-path">data\google_token.json</span> and restart EOS to re-authorize.</td>
+          <td>Delete <span class="file-path">data\google_token.json</span>, restart EOS, then use <strong>Admin Panel → Integrations → Re-authorize</strong>.</td>
         </tr>
         <tr>
           <td>Calendar events not showing</td>

@@ -1606,7 +1606,7 @@ if (new URLSearchParams(location.search).get('embed') === '1') {
               ⚙ <strong>Setup required:</strong> Place your Google OAuth desktop client JSON in
               <code>AI personal files/client_secret_*.json</code> (or update
               <code>google.client_secret_path</code> in <code>EOS/config.json</code>), set
-              <code>google.enabled = true</code>, then restart. Full instructions:
+              <code>google.enabled = true</code>, then restart. After restart, open this tab and click <strong>Connect Google Account</strong>. Full instructions:
               <code>EOS/CREDENTIALS.md</code> and <code>EOS/webui/docs/google.html</code>
             </div>
             <div id="gw-hint-disabled" style="display:none" class="integ-hint">
@@ -1626,7 +1626,7 @@ if (new URLSearchParams(location.search).get('embed') === '1') {
             </div>
             <div id="gw-needs-auth" style="display:none">
               <p style="font-size:12px;color:var(--muted);margin:0 0 10px">
-                Google account not yet authorized. Click the button below — a browser window will open for sign-in. Return to this tab when done.
+                Google account not yet authorized. Click <strong>Connect Google Account</strong> to launch the one-time browser sign-in flow, then return to this tab when done.
               </p>
             </div>
             <div id="gw-auth-pending" style="display:none">
@@ -2800,7 +2800,7 @@ async function loadGoogleWorkspace() {
       }).catch(() => {});
     } else if (data.token_exists && !data.token_valid) {
       // Token exists but invalid / expired
-      _gwSetHtml('gw-error-box', 'Token exists but is invalid or expired. Re-authorize to reconnect.');
+      _gwSetHtml('gw-error-box', 'Token exists but is invalid or expired. Click Re-authorize to reconnect from the Admin Panel.');
       _gwShow('gw-error-box');
       _gwShow('gw-reauth-btn');
     } else {

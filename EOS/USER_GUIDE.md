@@ -174,7 +174,7 @@ EOS can read your Google Calendar, search Gmail, and browse Google Drive files. 
 
 Full credential setup instructions: **[CREDENTIALS.md](CREDENTIALS.md)**
 
-Once the `client_secret_*.json` file is in `AI personal files\` and `"google": { "enabled": true }` is set in `config.json`, EOS will prompt you to authorize on first startup by opening a browser window.
+Once the `client_secret_*.json` file is in `AI personal files\` and `"google": { "enabled": true }` is set in `config.json`, restart EOS, then open the Admin Panel → **Integrations** and click **Connect Google Account** to launch the one-time browser authorization flow.
 
 ### Checking integration status
 
