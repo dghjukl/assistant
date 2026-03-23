@@ -543,8 +543,23 @@ def _group_tools_by_category() -> dict[str, list[str]]:
         return {}
 
 
+def _resolve_service_probe(role: str):
+    """Return the live runtime discovery probe for a service role when available."""
+    if app_state.runtime_discovery is None:
+        return None
+    return app_state.runtime_discovery.services.get(role)
+
+
+def _resolve_service_endpoint(role: str, state) -> str:
+    """Resolve a service health endpoint from runtime discovery with state fallback."""
+    probe = _resolve_service_probe(role)
+    if probe is not None and probe.endpoint:
+        return probe.endpoint
+    return state.endpoint
+
+
 async def _server_health_loop() -> None:
-    """Every 30s: check /health on each server; track primary degradation app_state."""
+    """Every 30s: check /health on each server; track primary degradation state."""
     while True:
         try:
             await asyncio.sleep(30)
@@ -553,21 +568,23 @@ async def _server_health_loop() -> None:
 
             for role, state in app_state.topology.servers.items():
                 # Only probe servers that were previously ready or are in error
-                if app_state.is_absent():
+                if state.is_absent():
                     continue
+
+                endpoint = _resolve_service_endpoint(role, state)
 
                 try:
                     async with httpx.AsyncClient(timeout=5) as client:
-                        resp = await client.get(f"{app_state.endpoint}/health")
+                        resp = await client.get(f"{endpoint}/health")
                         if resp.status_code == 200:
                             # Recovery: server is healthy again
-                            was_error = app_state.status.value in ("error", "starting")
-                            app_state.topology.mark_ready(role, app_state.pid)
+                            was_error = state.status.value in ("error", "starting")
+                            app_state.topology.mark_ready(role, state.pid)
                             if was_error:
                                 _emit_log(
                                     "info", "health_monitor",
                                     f"Server '{role}' recovered",
-                                    {"role": role, "port": app_state.port},
+                                    {"role": role, "port": state.port, "endpoint": endpoint},
                                 )
                             # Clear primary degradation flag
                             if role == "primary" and app_state.primary_degraded:
@@ -579,28 +596,29 @@ async def _server_health_loop() -> None:
                             _emit_log(
                                 "warn", "health_monitor",
                                 f"Server '{role}' unhealthy",
-                                {"status": resp.status_code, "role": role},
+                                {"status": resp.status_code, "role": role, "endpoint": endpoint},
                             )
                             if role == "primary" and not app_state.primary_degraded:
                                 app_state.primary_degraded = True
                                 _emit_log(
                                     "error", "health_monitor",
                                     "PRIMARY SERVER DOWN — chat responses gated",
-                                    {"role": role, "port": app_state.port},
+                                    {"role": role, "port": state.port, "endpoint": endpoint},
                                 )
                 except Exception as exc:
-                    if app_state.is_ready():
+                    if state.is_ready():
                         app_state.topology.mark_error(role, str(exc))
                         _emit_log(
                             "error", "health_monitor",
                             f"Server '{role}' unreachable",
-                            {"role": role, "error": str(exc)},
+                            {"role": role, "error": str(exc), "endpoint": endpoint},
                         )
                         if role == "primary" and not app_state.primary_degraded:
                             app_state.primary_degraded = True
                             _emit_log(
                                 "error", "health_monitor",
                                 "PRIMARY SERVER UNREACHABLE — chat responses gated",
+                                {"role": role, "port": state.port, "endpoint": endpoint},
                             )
         except Exception as exc:
             logger.error("Health loop error: %s", exc)
@@ -3119,25 +3137,36 @@ async def admin_memory_maintenance_last():
 async def admin_degradation_status():
     """Report current degradation state of the system."""
     try:
-        servers_up   = []
+        servers_up = []
         servers_down = []
         if app_state.topology:
             for role, state in app_state.topology.servers.items():
-                if app_state.is_absent():
+                if state.is_absent():
                     continue
-                if app_state.is_ready():
-                    servers_up.append(role)
+                probe = _resolve_service_probe(role)
+                endpoint = _resolve_service_endpoint(role, state)
+                service_data = {
+                    "role": role,
+                    "status": state.status.value,
+                    "error": state.error,
+                    "pid": state.pid,
+                    "port": state.port,
+                    "endpoint": endpoint,
+                    "discovery_status": probe.status if probe is not None else None,
+                }
+                if state.is_ready():
+                    servers_up.append(service_data)
                 else:
-                    servers_down.append({"role": role, "status": app_state.status.value, "error": app_state.error})
+                    servers_down.append(service_data)
 
         return JSONResponse({
             "ok": True,
             "data": {
                 "primary_degraded": app_state.primary_degraded,
-                "chat_available":   not app_state.primary_degraded and app_state.topology is not None,
-                "servers_up":       servers_up,
-                "servers_down":     servers_down,
-                "topology_ready":   app_state.topology is not None,
+                "chat_available": not app_state.primary_degraded and app_state.topology is not None,
+                "servers_up": servers_up,
+                "servers_down": servers_down,
+                "topology_ready": app_state.topology is not None,
             }
         })
     except Exception as exc:
@@ -3650,11 +3679,25 @@ async def admin_connectivity():
         results = {}
         async with httpx.AsyncClient(timeout=5) as client:
             for role, state in app_state.topology.servers.items():
+                if state.is_absent():
+                    continue
+                endpoint = _resolve_service_endpoint(role, state)
                 try:
-                    resp = await client.get(f"{app_state.endpoint}/health")
-                    results[role] = {"reachable": resp.status_code == 200, "status": app_state.status.value}
+                    resp = await client.get(f"{endpoint}/health")
+                    results[role] = {
+                        "reachable": resp.status_code == 200,
+                        "status": state.status.value,
+                        "endpoint": endpoint,
+                        "port": state.port,
+                    }
                 except Exception as exc:
-                    results[role] = {"reachable": False, "error": str(exc), "status": app_state.status.value}
+                    results[role] = {
+                        "reachable": False,
+                        "error": str(exc),
+                        "status": state.status.value,
+                        "endpoint": endpoint,
+                        "port": state.port,
+                    }
 
         return JSONResponse({"ok": True, "data": results})
     except Exception as exc:
