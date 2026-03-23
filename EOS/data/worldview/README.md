@@ -11,8 +11,9 @@ partner's worldview, values, reasoning style, and priorities.
 
 ## Directories
 
-  `sources/`     Raw input materials: essays, notes, papers, reflections.
-                 Add files here freely. Run extraction when ready.
+  `sources/`     Raw input materials: UTF-8 plain text and Markdown files.
+                 Binary formats and non-UTF-8 text are not ingested.
+                 Add supported files here freely. Run extraction when ready.
 
   `profile.md`   The extracted worldview profile. Structured, uncertainty-preserving.
                  Updated each time extraction is run.

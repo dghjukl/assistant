@@ -21,7 +21,7 @@ This is not the same problem as memory, task context, or identity. It is a disti
 ### Three Layers
 
 **Layer 1 — Source Documents**
-Raw materials: essays, reflections, frameworks, notes, papers, personal writing. These are deposited by the partner and not actively used as task inputs. They are the input to the extraction process, not the output delivered to the entity.
+Raw materials: UTF-8 plain-text essays, reflections, frameworks, notes, papers, and Markdown files. These are deposited by the partner and not actively used as task inputs. They are the input to the extraction process, not the output delivered to the entity. Binary formats and non-UTF-8 text are outside the ingestion contract.
 
 **Layer 2 — Worldview Profile**
 A structured, extracted, uncertainty-preserving document that compresses the signal from Layer 1 into stable orientation. This is the crucial artifact. It represents what the entity has *understood* from those materials, not a pointer to them. The profile is updated whenever new source documents are added, but it is never overwritten wholesale — it accumulates and refines.
@@ -48,7 +48,7 @@ The behavioral contract:
 ```
 data/worldview/                        ← new top-level subsystem directory
     sources/                           ← Layer 1: raw input documents
-        [any file format]              ← essays, notes, papers, reflections
+        [UTF-8 text / Markdown files]  ← essays, notes, papers, reflections
     profile.md                         ← Layer 2: extracted worldview profile
     extraction_log.json                ← record of what has been processed and when
     README.md                          ← orientation document (written once at init)

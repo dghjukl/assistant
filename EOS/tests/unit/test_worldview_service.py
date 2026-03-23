@@ -30,6 +30,12 @@ def _write_source(service: WorldviewService, name: str, content: str) -> None:
     source_path.write_text(content, encoding="utf-8")
 
 
+def _write_source_bytes(service: WorldviewService, name: str, content: bytes) -> None:
+    source_path = service._root / "sources" / name
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    source_path.write_bytes(content)
+
+
 def test_worldview_extraction_lifecycle_initial_run(tmp_path):
     service = WorldviewService(_make_cfg(tmp_path))
     _write_source(service, "values.md", "I value truth, patience, and careful reasoning.")
@@ -118,6 +124,24 @@ def test_worldview_block_without_sources_preserves_human_triggered_extraction(tm
 
     assert "ask for extraction" in block
     assert "ask your partner" not in block
+
+
+def test_worldview_extraction_rejects_non_utf8_source_documents(tmp_path):
+    service = WorldviewService(_make_cfg(tmp_path))
+    _write_source_bytes(service, "latin1.txt", b"caf\xe9")
+
+    async def _extractor(payload):
+        raise AssertionError("extractor should not be invoked for unsupported source encodings")
+
+    try:
+        asyncio.run(service.refresh_profile_from_sources(_extractor, trigger={"source": "test"}))
+    except ValueError as exc:
+        message = str(exc)
+    else:
+        raise AssertionError("expected refresh_profile_from_sources to reject non-UTF-8 sources")
+
+    assert "UTF-8 plain text or Markdown" in message
+    assert "latin1.txt" in message
 
 
 def test_execute_worldview_extraction_uses_runtime_workflow(monkeypatch):
