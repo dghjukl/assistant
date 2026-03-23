@@ -2,6 +2,7 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
 $Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Definition)
+$ConfigPath = Join-Path $Root "config.json"
 
 # -- Colours ------------------------------------------------------------------
 $cBg        = [System.Drawing.Color]::FromArgb(24,  24,  24 )
@@ -12,143 +13,17 @@ $cDim       = [System.Drawing.Color]::FromArgb(130, 130, 130)
 $cBlue      = [System.Drawing.Color]::FromArgb(0,   120, 212)
 $cGreen     = [System.Drawing.Color]::FromArgb(78,  201, 120)
 $cYellow    = [System.Drawing.Color]::FromArgb(220, 180, 60 )
+$cRed       = [System.Drawing.Color]::FromArgb(255, 110, 110)
 $cConsoleBg = [System.Drawing.Color]::FromArgb(16,  16,  16 )
 
-# -- Server definitions -------------------------------------------------------
-$servers = @(
-    @{ Name="Main";       Port=8080; CPU=$true;  GPU=$true;  Default="GPU" },
-    @{ Name="Tools";      Port=8082; CPU=$true;  GPU=$true;  Default="CPU" },
-    @{ Name="Thinking";   Port=8083; CPU=$true;  GPU=$true;  Default="CPU" },
-    @{ Name="Creativity"; Port=8084; CPU=$true;  GPU=$true;  Default="Off" },
-    @{ Name="Vision";     Port=8081; CPU=$false; GPU=$true;  Default="Off" }
+$roleMeta = @(
+    @{ Key="primary";    Name="Main";       ScriptBase="main";       Port=8080 }
+    @{ Key="tool";       Name="Tools";      ScriptBase="tools";      Port=8082 }
+    @{ Key="thinking";   Name="Thinking";   ScriptBase="thinking";   Port=8083 }
+    @{ Key="creativity"; Name="Creativity"; ScriptBase="creativity"; Port=8084 }
+    @{ Key="vision";     Name="Vision";     ScriptBase="vision";     Port=8081 }
 )
 
-# -- Form ---------------------------------------------------------------------
-$form                 = New-Object System.Windows.Forms.Form
-$form.Text            = "EOS Launcher"
-$form.BackColor       = $cBg
-$form.ForeColor       = $cText
-$form.Font            = New-Object System.Drawing.Font("Segoe UI", 10)
-$form.FormBorderStyle = "FixedSingle"
-$form.MaximizeBox     = $false
-$form.StartPosition   = "CenterScreen"
-
-# Title
-$lblTitle           = New-Object System.Windows.Forms.Label
-$lblTitle.Text      = "EOS  |  Launcher"
-$lblTitle.Font      = New-Object System.Drawing.Font("Segoe UI", 12, [System.Drawing.FontStyle]::Bold)
-$lblTitle.ForeColor = $cText
-$lblTitle.Location  = New-Object System.Drawing.Point(20, 18)
-$lblTitle.AutoSize  = $true
-$form.Controls.Add($lblTitle)
-
-# Product shape hint
-$lblHint           = New-Object System.Windows.Forms.Label
-$lblHint.Text      = "EOS is the platform. The entity runs inside EOS. Default: Standard stack, then bootstrap EOS."
-$lblHint.Font      = New-Object System.Drawing.Font("Segoe UI", 8.5)
-$lblHint.ForeColor = $cDim
-$lblHint.Location  = New-Object System.Drawing.Point(20, 42)
-$lblHint.AutoSize  = $true
-$form.Controls.Add($lblHint)
-
-# Column headers
-$headerY = 72
-foreach ($pair in @( @(162,"CPU"), @(232,"GPU"), @(302,"Off") )) {
-    $h           = New-Object System.Windows.Forms.Label
-    $h.Text      = $pair[1]
-    $h.ForeColor = $cDim
-    $h.Font      = New-Object System.Drawing.Font("Segoe UI", 9)
-    $h.Location  = New-Object System.Drawing.Point($pair[0], $headerY)
-    $h.AutoSize  = $true
-    $form.Controls.Add($h)
-}
-
-# Separator helper
-function Add-Rule($y) {
-    $p           = New-Object System.Windows.Forms.Panel
-    $p.BackColor = $cBorder
-    $p.Location  = New-Object System.Drawing.Point(20, $y)
-    $p.Size      = New-Object System.Drawing.Size(360, 1)
-    $form.Controls.Add($p)
-}
-Add-Rule 90
-
-# -- Server rows --------------------------------------------------------------
-$radioMap = @{}
-$rowY     = 100
-
-foreach ($s in $servers) {
-    $row           = New-Object System.Windows.Forms.Panel
-    $row.BackColor = $cPanel
-    $row.Location  = New-Object System.Drawing.Point(20, $rowY)
-    $row.Size      = New-Object System.Drawing.Size(360, 36)
-    $form.Controls.Add($row)
-
-    $lbl           = New-Object System.Windows.Forms.Label
-    $lbl.Text      = $s.Name
-    $lbl.ForeColor = $cText
-    $lbl.Font      = New-Object System.Drawing.Font("Segoe UI", 10)
-    $lbl.Location  = New-Object System.Drawing.Point(12, 8)
-    $lbl.AutoSize  = $true
-    $row.Controls.Add($lbl)
-
-    $radioMap[$s.Name] = @{}
-
-    $opts = @()
-    if ($s.CPU) { $opts += "CPU" }
-    if ($s.GPU) { $opts += "GPU" }
-    $opts += "Off"
-
-    $xPos = @{ "CPU" = 150; "GPU" = 220; "Off" = 290 }
-
-    foreach ($opt in $opts) {
-        $rb           = New-Object System.Windows.Forms.RadioButton
-        $rb.Text      = ""
-        $rb.BackColor = $cPanel
-        $rb.ForeColor = $cText
-        $rb.Location  = New-Object System.Drawing.Point($xPos[$opt], 8)
-        $rb.Size      = New-Object System.Drawing.Size(20, 20)
-        $rb.Checked   = ($opt -eq $s.Default)
-        $row.Controls.Add($rb)
-        $radioMap[$s.Name][$opt] = $rb
-    }
-
-    $rowY += 38
-}
-
-Add-Rule $rowY
-$rowY += 12
-
-# -- Status console -----------------------------------------------------------
-$console             = New-Object System.Windows.Forms.RichTextBox
-$console.BackColor   = $cConsoleBg
-$console.ForeColor   = $cGreen
-$console.ReadOnly    = $true
-$console.Font        = New-Object System.Drawing.Font("Consolas", 9)
-$console.Location    = New-Object System.Drawing.Point(20, $rowY)
-$console.Size        = New-Object System.Drawing.Size(360, 110)
-$console.BorderStyle = "None"
-$form.Controls.Add($console)
-
-$rowY += 118
-
-# -- Launch button ------------------------------------------------------------
-$btn                               = New-Object System.Windows.Forms.Button
-$btn.Text                          = "Launch EOS"
-$btn.BackColor                     = $cBlue
-$btn.ForeColor                     = [System.Drawing.Color]::White
-$btn.FlatStyle                     = "Flat"
-$btn.FlatAppearance.BorderSize     = 0
-$btn.Font                          = New-Object System.Drawing.Font("Segoe UI", 11, [System.Drawing.FontStyle]::Bold)
-$btn.Location                      = New-Object System.Drawing.Point(20, $rowY)
-$btn.Size                          = New-Object System.Drawing.Size(360, 42)
-$btn.Cursor                        = [System.Windows.Forms.Cursors]::Hand
-$form.Controls.Add($btn)
-
-$rowY += 52
-$form.ClientSize = New-Object System.Drawing.Size(400, $rowY)
-
-# -- Helpers ------------------------------------------------------------------
 function Write-Con {
     param([string]$msg, [System.Drawing.Color]$col)
     if (-not $col) { $col = $cGreen }
@@ -158,6 +33,14 @@ function Write-Con {
     $console.AppendText("$msg`n")
     $console.ScrollToCaret()
     [System.Windows.Forms.Application]::DoEvents()
+}
+
+function Add-Rule($y) {
+    $p           = New-Object System.Windows.Forms.Panel
+    $p.BackColor = $cBorder
+    $p.Location  = New-Object System.Drawing.Point(20, $y)
+    $p.Size      = New-Object System.Drawing.Size(520, 1)
+    $form.Controls.Add($p)
 }
 
 function Wait-Port {
@@ -176,59 +59,416 @@ function Wait-Port {
     return $false
 }
 
-# -- Launch handler -----------------------------------------------------------
+function Get-Assessment {
+    try {
+        $json = & python -m runtime.windows_deployment --json --root $Root --config $ConfigPath 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            throw ($json -join "`n")
+        }
+        return ($json -join "`n" | ConvertFrom-Json)
+    } catch {
+        return [pscustomobject]@{
+            config_path = $ConfigPath
+            hardware = [pscustomobject]@{ has_nvidia_gpu = $false; gpu_name = $null; total_memory_gb = $null; cpu_only_reason = "assessment failed" }
+            roles = @{}
+            profiles = @()
+            recommended_profile = "compatibility"
+            setup_complete = $false
+            summary = @("Automatic launcher assessment failed.")
+            blocking_issues = @("Could not inspect config.json, models, and runtimes. Run 'python verify.py' in the EOS folder.")
+            warnings = @($_.Exception.Message)
+        }
+    }
+}
+
+$assessment = Get-Assessment
+$profilesByKey = @{}
+foreach ($profile in $assessment.profiles) { $profilesByKey[$profile.key] = $profile }
+$rolesByKey = @{}
+foreach ($prop in $assessment.roles.PSObject.Properties) { $rolesByKey[$prop.Name] = $prop.Value }
+
+# -- Form ---------------------------------------------------------------------
+$form                 = New-Object System.Windows.Forms.Form
+$form.Text            = "EOS Launcher"
+$form.BackColor       = $cBg
+$form.ForeColor       = $cText
+$form.Font            = New-Object System.Drawing.Font("Segoe UI", 10)
+$form.FormBorderStyle = "FixedSingle"
+$form.MaximizeBox     = $false
+$form.StartPosition   = "CenterScreen"
+
+$lblTitle           = New-Object System.Windows.Forms.Label
+$lblTitle.Text      = "EOS  |  Launcher"
+$lblTitle.Font      = New-Object System.Drawing.Font("Segoe UI", 12, [System.Drawing.FontStyle]::Bold)
+$lblTitle.ForeColor = $cText
+$lblTitle.Location  = New-Object System.Drawing.Point(20, 18)
+$lblTitle.AutoSize  = $true
+$form.Controls.Add($lblTitle)
+
+$lblHint           = New-Object System.Windows.Forms.Label
+$lblHint.Text      = "Launcher auto-detects the machine tier, then offers only sane launch profiles. Degraded modes are supported modes."
+$lblHint.Font      = New-Object System.Drawing.Font("Segoe UI", 8.5)
+$lblHint.ForeColor = $cDim
+$lblHint.Location  = New-Object System.Drawing.Point(20, 42)
+$lblHint.Size      = New-Object System.Drawing.Size(520, 34)
+$form.Controls.Add($lblHint)
+
+$panelDetect           = New-Object System.Windows.Forms.Panel
+$panelDetect.BackColor = $cPanel
+$panelDetect.Location  = New-Object System.Drawing.Point(20, 82)
+$panelDetect.Size      = New-Object System.Drawing.Size(520, 78)
+$form.Controls.Add($panelDetect)
+
+$lblDetectTitle           = New-Object System.Windows.Forms.Label
+$lblDetectTitle.Text      = "Detected machine tier"
+$lblDetectTitle.Font      = New-Object System.Drawing.Font("Segoe UI", 9.5, [System.Drawing.FontStyle]::Bold)
+$lblDetectTitle.ForeColor = $cText
+$lblDetectTitle.Location  = New-Object System.Drawing.Point(12, 10)
+$lblDetectTitle.AutoSize  = $true
+$panelDetect.Controls.Add($lblDetectTitle)
+
+$lblDetectSummary           = New-Object System.Windows.Forms.Label
+$lblDetectSummary.Text      = ""
+$lblDetectSummary.ForeColor = $cText
+$lblDetectSummary.Location  = New-Object System.Drawing.Point(12, 30)
+$lblDetectSummary.Size      = New-Object System.Drawing.Size(490, 20)
+$panelDetect.Controls.Add($lblDetectSummary)
+
+$lblDetectNotes           = New-Object System.Windows.Forms.Label
+$lblDetectNotes.Text      = ""
+$lblDetectNotes.ForeColor = $cDim
+$lblDetectNotes.Location  = New-Object System.Drawing.Point(12, 50)
+$lblDetectNotes.Size      = New-Object System.Drawing.Size(490, 20)
+$panelDetect.Controls.Add($lblDetectNotes)
+
+Add-Rule 172
+
+$lblProfile           = New-Object System.Windows.Forms.Label
+$lblProfile.Text      = "Launch profile"
+$lblProfile.ForeColor = $cText
+$lblProfile.Location  = New-Object System.Drawing.Point(20, 184)
+$lblProfile.AutoSize  = $true
+$form.Controls.Add($lblProfile)
+
+$cmbProfiles                  = New-Object System.Windows.Forms.ComboBox
+$cmbProfiles.DropDownStyle    = [System.Windows.Forms.ComboBoxStyle]::DropDownList
+$cmbProfiles.Location         = New-Object System.Drawing.Point(120, 180)
+$cmbProfiles.Size             = New-Object System.Drawing.Size(220, 28)
+$form.Controls.Add($cmbProfiles)
+
+$chkManual                 = New-Object System.Windows.Forms.CheckBox
+$chkManual.Text            = "Allow manual override"
+$chkManual.ForeColor       = $cDim
+$chkManual.Location        = New-Object System.Drawing.Point(360, 182)
+$chkManual.Size            = New-Object System.Drawing.Size(180, 24)
+$form.Controls.Add($chkManual)
+
+$lblProfileInfo           = New-Object System.Windows.Forms.Label
+$lblProfileInfo.ForeColor = $cDim
+$lblProfileInfo.Location  = New-Object System.Drawing.Point(20, 212)
+$lblProfileInfo.Size      = New-Object System.Drawing.Size(520, 32)
+$form.Controls.Add($lblProfileInfo)
+
+foreach ($pair in @(@(232, "CPU"), @(302, "GPU"), @(372, "Off"), @(434, "Model"))) {
+    $h           = New-Object System.Windows.Forms.Label
+    $h.Text      = $pair[1]
+    $h.ForeColor = $cDim
+    $h.Font      = New-Object System.Drawing.Font("Segoe UI", 9)
+    $h.Location  = New-Object System.Drawing.Point($pair[0], 248)
+    $h.AutoSize  = $true
+    $form.Controls.Add($h)
+}
+Add-Rule 266
+
+$radioMap = @{}
+$modelLabels = @{}
+$rowY = 276
+
+foreach ($meta in $roleMeta) {
+    $row           = New-Object System.Windows.Forms.Panel
+    $row.BackColor = $cPanel
+    $row.Location  = New-Object System.Drawing.Point(20, $rowY)
+    $row.Size      = New-Object System.Drawing.Size(520, 40)
+    $form.Controls.Add($row)
+
+    $lbl           = New-Object System.Windows.Forms.Label
+    $lbl.Text      = $meta.Name
+    $lbl.ForeColor = $cText
+    $lbl.Location  = New-Object System.Drawing.Point(12, 10)
+    $lbl.Size      = New-Object System.Drawing.Size(120, 20)
+    $row.Controls.Add($lbl)
+
+    $radioMap[$meta.Key] = @{}
+    foreach ($opt in @("cpu", "gpu", "off")) {
+        $rb           = New-Object System.Windows.Forms.RadioButton
+        $rb.Text      = ""
+        $rb.BackColor = $cPanel
+        $rb.ForeColor = $cText
+        $rb.Location  = New-Object System.Drawing.Point(@{cpu=228;gpu=298;off=368}[$opt], 10)
+        $rb.Size      = New-Object System.Drawing.Size(20, 20)
+        $rb.Enabled   = $true
+        $row.Controls.Add($rb)
+        $radioMap[$meta.Key][$opt] = $rb
+        $rb.Add_CheckedChanged({
+            if ($chkManual.Checked) {
+                Update-SelectionSummary
+            }
+        })
+    }
+
+    $modelLabel           = New-Object System.Windows.Forms.Label
+    $modelLabel.ForeColor = $cDim
+    $modelLabel.Location  = New-Object System.Drawing.Point(430, 10)
+    $modelLabel.Size      = New-Object System.Drawing.Size(80, 20)
+    $row.Controls.Add($modelLabel)
+    $modelLabels[$meta.Key] = $modelLabel
+
+    $rowY += 42
+}
+
+Add-Rule $rowY
+$rowY += 10
+
+$lblIssues           = New-Object System.Windows.Forms.Label
+$lblIssues.ForeColor = $cYellow
+$lblIssues.Location  = New-Object System.Drawing.Point(20, $rowY)
+$lblIssues.Size      = New-Object System.Drawing.Size(520, 36)
+$form.Controls.Add($lblIssues)
+$rowY += 44
+
+$console             = New-Object System.Windows.Forms.RichTextBox
+$console.BackColor   = $cConsoleBg
+$console.ForeColor   = $cGreen
+$console.ReadOnly    = $true
+$console.Font        = New-Object System.Drawing.Font("Consolas", 9)
+$console.Location    = New-Object System.Drawing.Point(20, $rowY)
+$console.Size        = New-Object System.Drawing.Size(520, 150)
+$console.BorderStyle = "None"
+$form.Controls.Add($console)
+$rowY += 160
+
+$btn                               = New-Object System.Windows.Forms.Button
+$btn.Text                          = "Launch EOS"
+$btn.BackColor                     = $cBlue
+$btn.ForeColor                     = [System.Drawing.Color]::White
+$btn.FlatStyle                     = "Flat"
+$btn.FlatAppearance.BorderSize     = 0
+$btn.Font                          = New-Object System.Drawing.Font("Segoe UI", 11, [System.Drawing.FontStyle]::Bold)
+$btn.Location                      = New-Object System.Drawing.Point(20, $rowY)
+$btn.Size                          = New-Object System.Drawing.Size(520, 42)
+$btn.Cursor                        = [System.Windows.Forms.Cursors]::Hand
+$form.Controls.Add($btn)
+$rowY += 52
+$form.ClientSize = New-Object System.Drawing.Size(560, $rowY)
+
+function Set-RoleAvailability {
+    param($RoleKey)
+    $role = $rolesByKey[$RoleKey]
+    if (-not $role) {
+        foreach ($opt in @("cpu", "gpu")) { $radioMap[$RoleKey][$opt].Enabled = $false }
+        $radioMap[$RoleKey]["off"].Checked = $true
+        $modelLabels[$RoleKey].Text = "missing"
+        return
+    }
+
+    foreach ($opt in @("cpu", "gpu")) {
+        $radioMap[$RoleKey][$opt].Enabled = ($role.available_accels -contains $opt)
+    }
+    $radioMap[$RoleKey]["off"].Enabled = $true
+
+    if ($role.selected_model) {
+        $name = Split-Path $role.selected_model -Leaf
+        if ($name.Length -gt 22) { $name = $name.Substring(0, 19) + "..." }
+        $modelLabels[$RoleKey].Text = $name
+        $modelLabels[$RoleKey].ForeColor = $cDim
+    } else {
+        $modelLabels[$RoleKey].Text = "missing"
+        $modelLabels[$RoleKey].ForeColor = $cRed
+    }
+}
+
+function Apply-SelectionMap {
+    param($Selections)
+    foreach ($meta in $roleMeta) {
+        $target = if ($Selections.PSObject.Properties.Name -contains $meta.Key) { $Selections.$($meta.Key) } else { "off" }
+        if (-not $radioMap[$meta.Key][$target].Enabled) { $target = "off" }
+        $radioMap[$meta.Key][$target].Checked = $true
+    }
+    Update-SelectionSummary
+}
+
+function Update-SelectionSummary {
+    $issues = New-Object System.Collections.Generic.List[string]
+    $selected = New-Object System.Collections.Generic.List[string]
+    foreach ($meta in $roleMeta) {
+        $role = $rolesByKey[$meta.Key]
+        $choice = "off"
+        foreach ($opt in @("cpu", "gpu", "off")) {
+            if ($radioMap[$meta.Key][$opt].Checked) { $choice = $opt; break }
+        }
+        if ($choice -ne "off") {
+            $selected.Add(("{0} [{1}]" -f $meta.Name, $choice.ToUpper()))
+            if (-not $radioMap[$meta.Key][$choice].Enabled) {
+                $issues.Add(("{0} cannot run on {1}." -f $meta.Name, $choice.ToUpper()))
+            }
+            if ($role -and -not $role.selected_model) {
+                $issues.Add(("{0} model is missing." -f $meta.Name))
+            }
+        }
+    }
+    if (-not $radioMap["primary"]["cpu"].Checked -and -not $radioMap["primary"]["gpu"].Checked) {
+        $issues.Add("Main must be on for EOS to chat.")
+    }
+
+    if ($selected.Count -eq 0) {
+        $lblIssues.ForeColor = $cYellow
+        $lblIssues.Text = "Nothing selected. Pick a supported profile or enable Main manually."
+    } elseif ($issues.Count -gt 0) {
+        $lblIssues.ForeColor = $cRed
+        $lblIssues.Text = ($issues -join " ")
+    } else {
+        $lblIssues.ForeColor = $cGreen
+        $lblIssues.Text = "Ready to launch: " + ($selected -join ", ")
+    }
+
+    $btn.Enabled = ($issues.Count -eq 0 -and $selected.Count -gt 0 -and $assessment.blocking_issues.Count -eq 0)
+}
+
+function Show-AssessmentInConsole {
+    $console.Clear()
+    if ($assessment.hardware.has_nvidia_gpu) {
+        Write-Con ("Detected NVIDIA GPU: " + $assessment.hardware.gpu_name) $cGreen
+    } else {
+        Write-Con "No NVIDIA GPU detected. Compatibility / CPU-first mode is supported on this machine." $cYellow
+    }
+    if ($assessment.hardware.total_memory_gb) {
+        Write-Con (("Detected system RAM: ~{0} GB" -f $assessment.hardware.total_memory_gb)) $cText
+    }
+    Write-Con ("Recommended profile: " + $assessment.recommended_profile) $cText
+    foreach ($line in $assessment.summary) { Write-Con ("- " + $line) $cDim }
+    foreach ($issue in $assessment.blocking_issues) { Write-Con ("BLOCKING: " + $issue) $cRed }
+    foreach ($warning in $assessment.warnings) { Write-Con ("NOTE: " + $warning) $cYellow }
+}
+
+foreach ($meta in $roleMeta) { Set-RoleAvailability -RoleKey $meta.Key }
+
+$hardwareSummary = if ($assessment.hardware.has_nvidia_gpu) {
+    "NVIDIA GPU detected: " + $assessment.hardware.gpu_name
+} else {
+    "No NVIDIA GPU detected — supported CPU/degraded tier"
+}
+$memorySummary = if ($assessment.hardware.total_memory_gb) {
+    "Approx. " + $assessment.hardware.total_memory_gb + " GB RAM"
+} else {
+    "System memory not detected"
+}
+$lblDetectSummary.Text = $hardwareSummary
+$lblDetectNotes.Text = $memorySummary
+
+foreach ($profile in $assessment.profiles) {
+    $label = if ($profile.supported) { $profile.label } else { $profile.label + " (unavailable)" }
+    [void]$cmbProfiles.Items.Add([pscustomobject]@{ Key = $profile.key; Label = $label; Profile = $profile })
+}
+$cmbProfiles.DisplayMember = "Label"
+
+function Select-RecommendedProfile {
+    $targetKey = $assessment.recommended_profile
+    $idx = 0
+    foreach ($item in $cmbProfiles.Items) {
+        if ($item.Key -eq $targetKey) {
+            $cmbProfiles.SelectedIndex = $idx
+            return
+        }
+        $idx += 1
+    }
+    if ($cmbProfiles.Items.Count -gt 0) { $cmbProfiles.SelectedIndex = 0 }
+}
+
+$cmbProfiles.Add_SelectedIndexChanged({
+    if ($cmbProfiles.SelectedItem -eq $null) { return }
+    $profile = $cmbProfiles.SelectedItem.Profile
+    $lblProfileInfo.Text = $profile.description
+    if (-not $chkManual.Checked) {
+        Apply-SelectionMap -Selections $profile.selections
+    }
+    if (-not $profile.supported) {
+        $lblIssues.ForeColor = $cYellow
+        $lblIssues.Text = "Profile is listed for visibility, but this machine is missing something it needs: " + ($profile.issues -join "; ")
+    }
+})
+
+$chkManual.Add_CheckedChanged({
+    if (-not $chkManual.Checked -and $cmbProfiles.SelectedItem -ne $null) {
+        Apply-SelectionMap -Selections $cmbProfiles.SelectedItem.Profile.selections
+    }
+})
+
+Select-RecommendedProfile
+Show-AssessmentInConsole
+Update-SelectionSummary
+if ($assessment.blocking_issues.Count -gt 0) {
+    $btn.Enabled = $false
+}
+
 $btn.Add_Click({
     $btn.Enabled = $false
     $btn.Text    = "Starting..."
-    $console.Clear()
+    Show-AssessmentInConsole
 
-    # Build work list
+    if ($assessment.blocking_issues.Count -gt 0) {
+        Write-Con "Launch blocked until setup issues are fixed. Run 'python verify.py' in the EOS folder." $cRed
+        $btn.Text = "Launch EOS"
+        return
+    }
+
     $toStart = @()
-    foreach ($s in $servers) {
-        $sel = "Off"
-        foreach ($opt in $radioMap[$s.Name].Keys) {
-            if ($radioMap[$s.Name][$opt].Checked) { $sel = $opt; break }
+    foreach ($meta in $roleMeta) {
+        $choice = "off"
+        foreach ($opt in @("cpu", "gpu", "off")) {
+            if ($radioMap[$meta.Key][$opt].Checked) { $choice = $opt; break }
         }
-        if ($sel -ne "Off") {
-            $bat = Join-Path $Root ("start-" + $s.Name.ToLower() + "-" + $sel.ToLower() + ".bat")
-            $toStart += [pscustomobject]@{ Name=$s.Name; Accel=$sel; Port=$s.Port; Bat=$bat }
+        if ($choice -ne "off") {
+            $bat = Join-Path $Root ("launchers\start-" + $meta.ScriptBase + "-" + $choice + ".bat")
+            if (-not (Test-Path $bat)) {
+                Write-Con ("Missing launcher: " + $bat) $cRed
+                $btn.Text = "Launch EOS"
+                $btn.Enabled = $true
+                return
+            }
+            $toStart += [pscustomobject]@{ Name=$meta.Name; Accel=$choice; Port=$meta.Port; Bat=$bat }
         }
     }
 
     if ($toStart.Count -eq 0) {
-        Write-Con "Nothing selected - pick at least one server. Recommended default: Main + Tools + Thinking." $cYellow
-        $btn.Text    = "Launch EOS"
+        Write-Con "Nothing selected. Pick a supported profile or enable Main." $cYellow
+        $btn.Text = "Launch EOS"
         $btn.Enabled = $true
         return
     }
 
-    # Start each server in its own window
+    Write-Con "Starting selected backends..." $cText
     foreach ($t in $toStart) {
-        Write-Con ("  Starting " + $t.Name + " [" + $t.Accel + "]...") $cText
+        Write-Con (("  {0} [{1}]" -f $t.Name, $t.Accel.ToUpper())) $cText
         Start-Process "cmd.exe" -ArgumentList "/k `"$($t.Bat)`"" -WorkingDirectory $Root
         Start-Sleep -Milliseconds 400
     }
 
     Write-Con "" $cText
-    Write-Con "  Waiting for servers to come online..." $cDim
-
-    # Verify ports
+    Write-Con "Waiting for selected ports to come online..." $cDim
     foreach ($t in $toStart) {
-        Write-Con ("    " + $t.Name + " (port " + $t.Port + ")...") $cDim
         $up = Wait-Port -Port $t.Port -TimeoutSec 120
         if ($up) {
-            Write-Con ("    " + $t.Name + " ready.") $cGreen
+            Write-Con (("  {0} ready on port {1}." -f $t.Name, $t.Port)) $cGreen
         } else {
-            Write-Con ("    " + $t.Name + " timed out - continuing anyway.") $cYellow
+            Write-Con (("  {0} did not report healthy on port {1} in time." -f $t.Name, $t.Port)) $cYellow
         }
     }
 
     Write-Con "" $cText
-    Write-Con "  All checks done. Bootstrapping EOS..." $cGreen
+    Write-Con "Bootstrapping EOS WebUI..." $cGreen
     Start-Sleep -Milliseconds 600
-
     Start-Process "cmd.exe" -ArgumentList "/k `"$(Join-Path $Root 'start-eos.bat')`"" -WorkingDirectory $Root
     $form.Close()
 })
 
-$form.ShowDialog() | Out-Null
+[void]$form.ShowDialog()

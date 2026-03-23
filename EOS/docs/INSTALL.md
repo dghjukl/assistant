@@ -9,8 +9,10 @@ For most users, the intended install path is:
 1. Install Python 3.11
 2. Run `setup\Setup-Full.ps1`
 3. Run `python verify.py`
-4. Run `launchers\start-standard.bat`
-5. Run `start-eos.bat`
+4. Run `python verify.py` again if you changed models manually
+5. Run `launchers\Launch EOS.bat` to let the Windows launcher auto-detect the safest profile for this machine
+6. Or run `launchers\start-standard.bat` for a non-interactive hardened default
+7. Run `start-eos.bat` if you launched backends manually
 
 Use a different path only if you need lighter downloads, manual model control, or custom backend behavior.
 
@@ -58,9 +60,12 @@ This checks Python packages, binaries, model files, port availability, and the c
 
 ### Recommended launch path
 
-1. Start the recommended backend bundle:
+1. Start `launchers\Launch EOS.bat`.
+   - It inspects installed models, available runtimes, NVIDIA GPU presence, and supported degraded modes.
+   - It pre-selects a constrained set of sane launch choices instead of expecting you to know which combination is safe.
+2. If you prefer no UI, start the hardened backend bundle:
    - `launchers\start-standard.bat`
-2. Start the runtime bootstrap:
+3. Start the runtime bootstrap only when you launched backends manually:
    - `start-eos.bat`
 
 ### When to deviate from the recommended launch path
@@ -114,7 +119,7 @@ Full instructions for all capabilities: **[USER_GUIDE.md](USER_GUIDE.md)**
 Python is not on your PATH. Re-install Python and enable the PATH option.
 
 **A launcher window closes immediately**  
-Open a command prompt and run the same `.bat` script manually to read the error output.
+Run `python verify.py` first, then use `launchers\Launch EOS.bat` so EOS can explain the missing model, runtime, or unsupported profile before launch.
 
 **A backend is missing from EOS startup summary**  
 Run `status-eos.bat` to see whether it is `active`, `degraded`, or `unavailable`.
