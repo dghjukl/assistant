@@ -1364,6 +1364,13 @@ if (new URLSearchParams(location.search).get('embed') === '1') {
         <div class="spinner"></div> Loading…
       </div>
 
+      <div style="font-size:11px;color:var(--muted);margin:18px 0 8px;letter-spacing:0.5px;text-transform:uppercase;">
+        Overnight Cycle
+      </div>
+      <div class="overview-grid" id="overnight-cards">
+        <div class="info-card" style="color:var(--muted);font-size:12px;">Loading overnight status…</div>
+      </div>
+
     </div>
   </div>
 
@@ -2135,9 +2142,10 @@ setInterval(refreshStatus, 5000);
 
 async function loadOverview() {
   try {
-    const [statusRes, serversRes] = await Promise.all([
+    const [statusRes, serversRes, overnightRes] = await Promise.all([
       api('GET', '/api/status'),
       api('GET', '/admin/servers/status'),
+      api('GET', '/admin/system/overnight'),
     ]);
 
     // Session info
@@ -2186,9 +2194,45 @@ async function loadOverview() {
           ${errorHtml}
         </div>`;
     }).join('');
+
+    const overnightGrid = document.getElementById('overnight-cards');
+    if (!overnightRes.ok || !overnightRes.data) {
+      overnightGrid.innerHTML = '<div class="info-card" style="color:var(--red)">Could not load overnight diagnostics.</div>';
+      return;
+    }
+    const data = overnightRes.data;
+    const win = data.current_window || {};
+    const history = (data.recent_history || []).slice(0, 4);
+    overnightGrid.innerHTML = `
+      <div class="server-card status-${String(data.status || 'unknown').toLowerCase()}">
+        <div class="sc-header">
+          <div class="sc-dot ${String(data.status || 'unknown').toLowerCase()}"></div>
+          <div class="sc-name">Overnight runtime</div>
+          <div class="sc-status-pill ${String(data.status || 'unknown').toLowerCase()}">${escHtml(data.phase || 'DAY_ACTIVE')}</div>
+        </div>
+        <div class="sc-row"><span>Status:</span> <strong>${escHtml(data.status || 'none')}</strong></div>
+        <div class="sc-row"><span>Away start:</span> <strong>${win.away_start_time ? escHtml(new Date(win.away_start_time).toLocaleString()) : '—'}</strong></div>
+        <div class="sc-row"><span>Expected return:</span> <strong>${win.expected_return_time ? escHtml(new Date(win.expected_return_time).toLocaleString()) : '—'}</strong></div>
+        <div class="sc-row"><span>Confidence:</span> <strong>${win.confidence != null ? escHtml(String(win.confidence)) : '—'}</strong></div>
+        <div class="sc-row"><span>Investigations:</span> <strong>${data.posture?.allow_investigations ? 'enabled' : 'held'}</strong></div>
+        <div class="sc-row"><span>Memory maintenance:</span> <strong>${data.posture?.allow_memory_maintenance ? 'enabled' : 'held'}</strong></div>
+      </div>
+      <div class="server-card status-idle">
+        <div class="sc-header">
+          <div class="sc-dot ready"></div>
+          <div class="sc-name">Recent overnight history</div>
+          <div class="sc-status-pill ready">${history.length}</div>
+        </div>
+        ${(history.length ? history.map(item => `
+          <div class="sc-row"><span>${escHtml(item.status || 'unknown')}</span> <strong>${item.expected_return_time ? escHtml(new Date(item.expected_return_time).toLocaleString()) : '—'}</strong></div>
+        `).join('') : '<div class="sc-row"><span>No recent cycles</span><strong>—</strong></div>')}
+      </div>
+    `;
   } catch(e) {
     document.getElementById('server-cards').innerHTML =
       `<p style="color:var(--red)">Error loading overview: ${escHtml(e.message)}</p>`;
+    document.getElementById('overnight-cards').innerHTML =
+      `<p style="color:var(--red)">Error loading overnight diagnostics: ${escHtml(e.message)}</p>`;
   }
 }
 

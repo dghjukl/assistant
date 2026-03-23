@@ -55,6 +55,7 @@ from webui.schemas import (
     SecretSetRequest, ForceToolRequest, ForceRetrievalRequest,
     GoalCreateRequest, GoalNoteRequest, GoalAbandonRequest,
     AccessTierUpdateRequest, LanPairRequest, LanSessionRevokeRequest,
+    OvernightReturnTimeRequest, OvernightCancelRequest,
 )
 from core.audit import init_audit_store, get_audit_store
 from core.secrets import init_secrets, secrets_manager as _secrets_manager_ref
@@ -200,6 +201,11 @@ def _notify_interaction() -> float:
     """Update the shared interaction timestamp for all user-facing turn entry points."""
     interaction_ts = time.monotonic()
     app_state.last_interaction_monotonic = interaction_ts
+    if app_state.overnight_cycle_service is not None and hasattr(app_state.overnight_cycle_service, "note_interaction"):
+        try:
+            app_state.overnight_cycle_service.note_interaction(now=datetime.now(timezone.utc))
+        except Exception as exc:
+            logger.debug("Overnight interaction update failed: %s", exc)
     if app_state.idle_cognition is not None and hasattr(app_state.idle_cognition, "notify_interaction"):
         try:
             app_state.idle_cognition.notify_interaction(at_monotonic=interaction_ts)
@@ -226,6 +232,41 @@ def _build_discord_turn_notifier():
     return _discord_turn_notifier
 
 
+def _get_overnight_status(*, include_history: bool = False) -> dict[str, Any]:
+    if app_state.overnight_cycle_service is None:
+        return {
+            "enabled": False,
+            "phase": "DAY_ACTIVE",
+            "status": "none",
+            "current_window": None,
+            "posture": {
+                "overnight_active": False,
+                "allow_investigations": True,
+                "allow_memory_maintenance": True,
+                "allow_initiative": True,
+                "idle_cognition_style": "day",
+                "prefer_synthesis": False,
+                "suppress_heavy_new_work": False,
+            },
+            "config": {},
+            "recent_history": [] if include_history else None,
+        }
+    try:
+        return app_state.overnight_cycle_service.get_status(include_history=include_history)
+    except Exception as exc:
+        logger.debug("OvernightCycleService status failed: %s", exc)
+        return {
+            "enabled": False,
+            "phase": "DAY_ACTIVE",
+            "status": "none",
+            "current_window": None,
+            "error": str(exc),
+            "posture": {},
+            "config": {},
+            "recent_history": [] if include_history else None,
+        }
+
+
 def _build_entity_snapshot(
     *,
     scope: str,
@@ -236,10 +277,12 @@ def _build_entity_snapshot(
     if app_state.entity_state_service is None:
         return None
     try:
+        enriched_metadata = dict(metadata or {})
+        enriched_metadata.setdefault("overnight", _get_overnight_status())
         return app_state.entity_state_service.build_snapshot(
             scope=scope,
             source=source,
-            metadata=metadata,
+            metadata=enriched_metadata,
         )
     except Exception as exc:
         logger.debug("EntityStateService snapshot failed (%s): %s", source, exc)
@@ -355,6 +398,7 @@ def _build_presence_state(
             recent_interactions=recent_interactions,
             initiative=initiative,
             idle=idle,
+            overnight=_get_overnight_status(),
         )
     except Exception as exc:
         logger.debug("Presence layer build failed: %s", exc)
@@ -363,7 +407,7 @@ def _build_presence_state(
 
 def _build_presence_payload(*, entity_snapshot=None) -> dict[str, Any] | None:
     state = _build_presence_state(entity_snapshot=entity_snapshot)
-    return app_state.to_dict() if state is not None else None
+    return state.to_dict() if state is not None else None
 
 
 def _signal_bus_health_summary() -> dict[str, Any]:
@@ -573,6 +617,16 @@ async def _memory_maintenance_loop() -> None:
             if not app_state.topology:
                 continue
 
+            overnight_status = _get_overnight_status()
+            if overnight_status.get("current_window") and not overnight_status.get("posture", {}).get("allow_memory_maintenance", True):
+                _emit_log(
+                    "info",
+                    "memory_maintenance",
+                    "Maintenance deferred by overnight posture",
+                    {"phase": overnight_status.get("phase"), "status": overnight_status.get("status")},
+                )
+                continue
+
             _emit_log("info", "memory_maintenance", "Starting maintenance run")
             focus_id = None
             try:
@@ -666,6 +720,7 @@ async def _initiative_loop() -> None:
                         **(getattr(snapshot, "attention_summary", None) or {}),
                         "initiative_bias": attention_bias,
                     },
+                    overnight_status=_get_overnight_status(),
                 )
                 if result.get("selected"):
                     _emit_log(
@@ -674,7 +729,12 @@ async def _initiative_loop() -> None:
                         {"selected": result["selected"], "queue_depth": result["queue_depth"]},
                     )
                 dispatched = await app_state.initiative_engine.execute_queued(
-                    app_state.topology, app_state.cfg, tracer=app_state.tracer, bus=app_state.bus, entity_snapshot=snapshot
+                    app_state.topology,
+                    app_state.cfg,
+                    tracer=app_state.tracer,
+                    bus=app_state.bus,
+                    entity_snapshot=snapshot,
+                    overnight_status=_get_overnight_status(),
                 )
                 if dispatched:
                     _emit_log(
@@ -1135,6 +1195,7 @@ async def startup_event():
                     goal_store=app_state.goal_store,
                     workspace_service=app_state.workspace_service,
                     worldview_service=app_state.worldview_service,
+                    overnight_cycle_service=app_state.overnight_cycle_service,
                 )
 
         # 3h. Backup service — state snapshots and restore path
@@ -1211,6 +1272,7 @@ async def startup_event():
                     workspace_service=app_state.workspace_service,
                     worldview_service=app_state.worldview_service,
                     computer_use_service=app_state.computer_use_service,
+                    overnight_cycle_service=app_state.overnight_cycle_service,
                 )
 
         # 4c. Init CapabilityRegistry
@@ -1233,6 +1295,7 @@ async def startup_event():
                     worldview_service=app_state.worldview_service,
                     capability_registry=app_state.capability_registry,
                     computer_use_service=app_state.computer_use_service,
+                    overnight_cycle_service=app_state.overnight_cycle_service,
                 )
 
         # 4d. Init SensorPoller (hardware self-observation)
@@ -1279,6 +1342,32 @@ async def startup_event():
         except Exception as exc:
             logger.warning("IdentityContinuityMonitor init failed: %s", exc)
 
+        # 4f3. Init OvernightCycleService
+        try:
+            from runtime.overnight_store import OvernightCycleStore
+            from runtime.overnight_cycle import OvernightCycleService
+
+            overnight_store = OvernightCycleStore(app_state.cfg.get("db_path", "data/entity_state.db"))
+            app_state.overnight_cycle_service = OvernightCycleService(app_state.cfg, overnight_store)
+            _emit_log("info", "startup", "OvernightCycleService initialized")
+            if app_state.entity_state_service is not None:
+                app_state.entity_state_service.wire(
+                    topology=app_state.topology,
+                    runtime_discovery=app_state.runtime_discovery,
+                    lifecycle_service=app_state.entity_lifecycle,
+                    session_continuity=app_state.session_continuity,
+                    goal_store=app_state.goal_store,
+                    workspace_service=app_state.workspace_service,
+                    worldview_service=app_state.worldview_service,
+                    capability_registry=app_state.capability_registry,
+                    initiative_engine=app_state.initiative_engine,
+                    tool_registry=app_state.tool_registry,
+                    computer_use_service=app_state.computer_use_service,
+                    overnight_cycle_service=app_state.overnight_cycle_service,
+                )
+        except Exception as exc:
+            logger.warning("OvernightCycleService init failed: %s", exc)
+
         # 4g. Init InitiativeEngine
         try:
             from runtime.initiative_engine import InitiativeEngine
@@ -1287,7 +1376,7 @@ async def startup_event():
             if app_state.current_focus_service is not None:
                 app_state.current_focus_service.wire(initiative_engine=app_state.initiative_engine)
             if app_state.entity_state_service is not None:
-                app_state.entity_state_service.wire(initiative_engine=app_state.initiative_engine)
+                app_state.entity_state_service.wire(initiative_engine=app_state.initiative_engine, overnight_cycle_service=app_state.overnight_cycle_service)
         except Exception as exc:
             logger.warning("InitiativeEngine init failed: %s", exc)
 
@@ -1349,6 +1438,7 @@ async def startup_event():
                     initiative_engine=app_state.initiative_engine,
                     tool_registry=app_state.tool_registry,
                     computer_use_service=app_state.computer_use_service,
+                    overnight_cycle_service=app_state.overnight_cycle_service,
                 )
         except Exception as exc:
             logger.warning("Toolpack init failed — falling back to legacy tool states: %s", exc)
@@ -1408,6 +1498,7 @@ async def startup_event():
                     (app_state.idle_cognition,       "idle_cognition"),
                     (app_state.investigation_engine, "investigation_engine"),
                     (app_state.identity_continuity,  "identity_continuity"),
+                    (app_state.overnight_cycle_service, "overnight_cycle"),
                 ]
                 for _obj, _cap_name in _subsystem_caps:
                     if _obj is not None:
@@ -1511,6 +1602,7 @@ async def startup_event():
                     await app_state.idle_cognition.maybe_fire(
                         app_state.topology, app_state.tracer, app_state.bus,
                         entity_snapshot=snapshot,
+                        overnight_status=_get_overnight_status(),
                     )
                     if app_state.current_focus_service is not None:
                         app_state.current_focus_service.set_background_focus(
@@ -1739,6 +1831,7 @@ async def get_status_endpoint():
             "capabilities": app_state.runtime_discovery.capabilities if app_state.runtime_discovery else {},
             "services": app_state.runtime_discovery.to_dict().get("services", {}) if app_state.runtime_discovery else {},
             "current_focus": _get_current_focus_dict(),
+            "overnight": _get_overnight_status(),
             "entity_state": snapshot.to_dict() if snapshot is not None else None,
         })
     except Exception as exc:
@@ -1779,7 +1872,7 @@ async def get_memory_recent(limit: int = 20):
         return JSONResponse({"ok": True, "memories": interactions})
     except Exception as exc:
         logger.error("Memory recent error: %s", exc)
-        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+        return JSONResponse({"ok": True, "memories": [], "error": str(exc)})
 
 
 async def get_presence():
@@ -1798,6 +1891,45 @@ async def get_presence():
         })
     except Exception as exc:
         logger.error("Presence endpoint error: %s", exc)
+        return JSONResponse({"ok": True, "presence": None, "current_focus": {}, "error": str(exc)})
+
+
+async def get_overnight_status():
+    """Return the lightweight user-facing overnight status payload."""
+    try:
+        return JSONResponse({"ok": True, "overnight": _get_overnight_status(include_history=False)})
+    except Exception as exc:
+        logger.error("Overnight status endpoint error: %s", exc)
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+async def post_overnight_cancel(body: OvernightCancelRequest):
+    """Cancel the active overnight cycle."""
+    try:
+        if app_state.overnight_cycle_service is None:
+            return JSONResponse({"ok": False, "error": "OvernightCycleService not initialized"}, status_code=503)
+        cancelled = app_state.overnight_cycle_service.cancel_current()
+        _emit_log("info", "overnight", "Overnight cycle cancelled", {"reason": body.reason, "cancelled": cancelled})
+        return JSONResponse({"ok": True, "overnight": _get_overnight_status(include_history=False), "cancelled": cancelled})
+    except Exception as exc:
+        logger.error("Overnight cancel endpoint error: %s", exc)
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+async def post_overnight_return_time(body: OvernightReturnTimeRequest):
+    """Update the active overnight cycle's expected return timestamp."""
+    try:
+        if app_state.overnight_cycle_service is None:
+            return JSONResponse({"ok": False, "error": "OvernightCycleService not initialized"}, status_code=503)
+        updated = app_state.overnight_cycle_service.update_expected_return_time(
+            expected_return_time=body.expected_return_time
+        )
+        if updated is None:
+            return JSONResponse({"ok": False, "error": "No active overnight cycle"}, status_code=404)
+        _emit_log("info", "overnight", "Overnight return time updated", {"updated": updated})
+        return JSONResponse({"ok": True, "overnight": _get_overnight_status(include_history=False), "updated": updated})
+    except Exception as exc:
+        logger.error("Overnight update endpoint error: %s", exc)
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
 
@@ -1899,6 +2031,7 @@ async def post_chat(body: ChatRequest):
             "turn_count": count_interactions(),
             "current_focus": _get_current_focus_dict(),
             "presence": _build_presence_payload(entity_snapshot=presence_snapshot),
+            "overnight": _get_overnight_status(),
         })
     except Exception as exc:
         logger.error("Chat endpoint error: %s", exc)
@@ -1969,6 +2102,7 @@ async def websocket_chat(websocket: WebSocket):
                     "turn_count": count_interactions(),
                     "current_focus": _get_current_focus_dict(),
                     "presence": _build_presence_payload(entity_snapshot=presence_snapshot),
+                    "overnight": _get_overnight_status(),
                     "ok": True,
                 })
             except Exception as exc:
@@ -2205,6 +2339,7 @@ async def admin_get_status():
                 "services": app_state.runtime_discovery.to_dict().get("services", {}) if app_state.runtime_discovery else {},
                 "signal_bus": _signal_bus_health_summary(),
                 "backup": _backup_health_summary(),
+                "overnight": _get_overnight_status(include_history=True),
                 "tracer": tracer_summary,
             }
         })
@@ -3286,7 +3421,12 @@ async def admin_initiative_execute():
             metadata={"endpoint": "/admin/initiative/execute"},
         )
         dispatched = await app_state.initiative_engine.execute_queued(
-            app_state.topology, app_state.cfg, tracer=app_state.tracer, bus=app_state.bus, entity_snapshot=snapshot
+            app_state.topology,
+            app_state.cfg,
+            tracer=app_state.tracer,
+            bus=app_state.bus,
+            entity_snapshot=snapshot,
+            overnight_status=_get_overnight_status(),
         )
         _emit_log("info", "initiative", f"Admin executed {len(dispatched)} initiatives")
         return JSONResponse({"ok": True, "data": {"dispatched": len(dispatched)}, "current_focus": _get_current_focus_dict()})
@@ -4267,6 +4407,14 @@ async def admin_idle_cognition_status():
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
 
+async def admin_overnight_status():
+    """Return live overnight-cycle diagnostics for the admin panel."""
+    try:
+        return JSONResponse({"ok": True, "data": _get_overnight_status(include_history=True)})
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
 async def admin_identity_continuity():
     """Return cross-session identity stability score, drift history, and revision audit."""
     try:
@@ -4314,7 +4462,8 @@ async def admin_force_idle_cognition():
                 source="maintenance",
             )
         result = await app_state.idle_cognition.force_fire(
-            app_state.topology, app_state.tracer, app_state.bus, entity_snapshot=snapshot
+            app_state.topology, app_state.tracer, app_state.bus, entity_snapshot=snapshot,
+            overnight_status=_get_overnight_status(),
         )
         if app_state.current_focus_service is not None:
             app_state.current_focus_service.set_background_focus(

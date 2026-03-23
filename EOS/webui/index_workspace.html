@@ -418,6 +418,50 @@
     padding: 12px 0;
   }
 
+  .overnight-card {
+    margin-top: 8px;
+    padding: 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .overnight-meta {
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  .overnight-actions {
+    display: flex;
+    gap: 6px;
+  }
+  .overnight-input {
+    width: 100%;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 12px;
+    font-family: var(--font);
+  }
+  .overnight-btn {
+    flex: 1;
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .overnight-btn:hover {
+    color: var(--text);
+    border-color: var(--accent);
+  }
+
   @keyframes pulse {
     0%, 100% { opacity: 1; }
     50%       { opacity: 0.4; }
@@ -671,7 +715,18 @@ if (new URLSearchParams(location.search).get('embed') === '1') {
         <div class="stat-row"><span class="stat-label">Boot time</span><span class="stat-value" id="s-boot">—</span></div>
         <div class="stat-row"><span class="stat-label">Memory items</span><span class="stat-value" id="s-memory">—</span></div>
         <div class="stat-row"><span class="stat-label">Initiative queue</span><span class="stat-value" id="s-initiative">—</span></div>
+        <div class="stat-row"><span class="stat-label">Overnight</span><span class="stat-value" id="s-overnight-status">none</span></div>
+        <div class="stat-row"><span class="stat-label">Overnight phase</span><span class="stat-value" id="s-overnight-phase">DAY_ACTIVE</span></div>
         <div class="stat-row"><span class="stat-label">WebSocket</span><span class="stat-value" id="s-ws">connecting</span></div>
+        <div class="overnight-card">
+          <div class="panel-title" style="border-bottom:none;padding-bottom:0;">Tonight</div>
+          <div class="overnight-meta" id="overnight-meta">No overnight cycle scheduled.</div>
+          <input id="overnight-return-input" class="overnight-input" type="datetime-local" />
+          <div class="overnight-actions">
+            <button class="overnight-btn" onclick="saveOvernightReturnTime()">Save return</button>
+            <button class="overnight-btn" onclick="cancelOvernightCycle()">Cancel</button>
+          </div>
+        </div>
       </div>
 
       <!-- Tools section -->
@@ -796,6 +851,7 @@ function handleWSMessage(msg) {
     appendMessage('eos', safeResponse, msg.tool_used);
     maybeSpeak(safeResponse);
     updateTurnCount(msg.turn_count);
+    if (msg.overnight) renderOvernightStatus(msg.overnight);
     return;
   }
   if (msg.type === 'error') {
@@ -871,6 +927,7 @@ function sendMessage() {
         appendMessage('eos', safeResponse, data.tool_used);
         maybeSpeak(safeResponse);
         updateTurnCount(data.turn_count);
+        if (data.overnight) renderOvernightStatus(data.overnight);
       } else {
         appendSystemMessage('⚠ ' + (data.error || 'Unknown error'));
       }
@@ -983,7 +1040,66 @@ async function loadStatus() {
     const initData = data.initiative;
     const queueCount = initData?.ready ?? initData?.pending ?? '—';
     document.getElementById('s-initiative').textContent = queueCount;
+    renderOvernightStatus(data.overnight || null);
   } catch (e) { /* silent */ }
+}
+
+function renderOvernightStatus(overnight) {
+  const statusEl = document.getElementById('s-overnight-status');
+  const phaseEl = document.getElementById('s-overnight-phase');
+  const metaEl = document.getElementById('overnight-meta');
+  const inputEl = document.getElementById('overnight-return-input');
+  const windowInfo = overnight?.current_window || null;
+  statusEl.textContent = overnight?.status || 'none';
+  phaseEl.textContent = overnight?.phase || 'DAY_ACTIVE';
+  if (!windowInfo) {
+    metaEl.textContent = 'No overnight cycle scheduled.';
+    inputEl.value = '';
+    return;
+  }
+  const away = windowInfo.away_start_time ? new Date(windowInfo.away_start_time).toLocaleString() : '—';
+  const back = windowInfo.expected_return_time ? new Date(windowInfo.expected_return_time).toLocaleString() : '—';
+  metaEl.textContent = `Away ${away} · back ${back} · source ${windowInfo.source || 'conversation'}`;
+  if (windowInfo.expected_return_time) {
+    inputEl.value = new Date(windowInfo.expected_return_time).toISOString().slice(0, 16);
+  }
+}
+
+async function cancelOvernightCycle() {
+  try {
+    const r = await fetch('/api/overnight/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: 'workspace_user_cancel' }),
+    });
+    const data = await r.json();
+    if (!data.ok) throw new Error(data.error || 'Could not cancel overnight cycle');
+    renderOvernightStatus(data.overnight);
+    appendSystemMessage('Overnight cycle cancelled.');
+  } catch (e) {
+    appendSystemMessage('⚠ ' + e.message);
+  }
+}
+
+async function saveOvernightReturnTime() {
+  const inputEl = document.getElementById('overnight-return-input');
+  if (!inputEl.value) {
+    appendSystemMessage('⚠ Choose a return time first.');
+    return;
+  }
+  try {
+    const r = await fetch('/api/overnight/return-time', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expected_return_time: new Date(inputEl.value).toISOString() }),
+    });
+    const data = await r.json();
+    if (!data.ok) throw new Error(data.error || 'Could not update return time');
+    renderOvernightStatus(data.overnight);
+    appendSystemMessage('Updated overnight return time.');
+  } catch (e) {
+    appendSystemMessage('⚠ ' + e.message);
+  }
 }
 
 async function loadTools() {

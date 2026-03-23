@@ -72,6 +72,7 @@ import json
 import logging
 import time
 import uuid as _uuid_mod
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Callable
 
@@ -739,15 +740,32 @@ async def process_turn(
     tool_result:  str | None = None
     final_response = ""
     entity_snapshot = None
+    overnight_turn_state: dict[str, Any] | None = None
 
     try:
         import webui.server as _srv
         _entity_state_svc = getattr(_srv, "_entity_state_service", None)
+        _overnight_cycle_svc = getattr(_srv, "_overnight_cycle_service", None)
+        if _overnight_cycle_svc is not None:
+            overnight_turn_state = _overnight_cycle_svc.handle_user_turn(
+                user_input,
+                now=datetime.now(timezone.utc),
+                topology=topology,
+            )
+            if overnight_turn_state.get("is_declaration"):
+                final_response = (
+                    overnight_turn_state.get("acknowledgment")
+                    or "Understood. I’ll treat this as an overnight cycle."
+                )
         if _entity_state_svc is not None:
             entity_snapshot = _entity_state_svc.build_snapshot(
                 scope="turn",
                 source="orchestrator.process_turn",
-                metadata={"turn_id": turn_id, "user_input_preview": user_input[:120]},
+                metadata={
+                    "turn_id": turn_id,
+                    "user_input_preview": user_input[:120],
+                    "overnight_turn_state": overnight_turn_state,
+                },
             )
     except Exception:
         entity_snapshot = None
@@ -796,7 +814,9 @@ async def process_turn(
             pass
 
     try:
-        if _is_worldview_processing_request(user_input):
+        if final_response:
+            pass
+        elif _is_worldview_processing_request(user_input):
             workflow_result = await execute_worldview_extraction(
                 topology,
                 user_input,

@@ -53,6 +53,7 @@ class PresenceState:
     recent_interactions: list[dict[str, Any]] = field(default_factory=list)
     initiative: dict[str, Any] = field(default_factory=dict)
     idle: dict[str, Any] = field(default_factory=dict)
+    overnight: dict[str, Any] = field(default_factory=dict)
     cues: dict[str, PresenceCue] = field(default_factory=dict)
     proactive_checkin: PresenceCue | None = None
 
@@ -75,6 +76,10 @@ class PresenceState:
             lines.append(f"- Watchpoint: {watching.text}")
         if self.attention.get("compact"):
             lines.append(f"- Durable preferences: {self.attention.get('compact')}")
+        if self.overnight.get("status") not in {None, "none"}:
+            lines.append(
+                f"- Overnight posture: {self.overnight.get('status')} / {self.overnight.get('phase', 'DAY_ACTIVE')}"
+            )
 
         if self.proactive_checkin and self.proactive_checkin.text:
             lines.append(
@@ -110,6 +115,7 @@ class PresenceState:
             "recent_interactions": list(self.recent_interactions),
             "initiative": dict(self.initiative),
             "idle": dict(self.idle),
+            "overnight": dict(self.overnight),
             "ambient": self.ambient_payload(),
         }
 
@@ -125,6 +131,7 @@ def build_presence_state(
     recent_interactions: list[dict[str, Any]] | None = None,
     initiative: dict[str, Any] | None = None,
     idle: dict[str, Any] | None = None,
+    overnight: dict[str, Any] | None = None,
 ) -> PresenceState:
     """Build a PresenceState from raw subsystem summaries."""
     focus = dict(current_focus or {})
@@ -136,6 +143,7 @@ def build_presence_state(
     recent_interactions = list(recent_interactions or [])
     initiative = dict(initiative or {})
     idle = dict(idle or {})
+    overnight = dict(overnight or {})
 
     cues = {
         "what_ive_been_doing": _render_doing_cue(focus, initiative, attention),
@@ -155,6 +163,7 @@ def build_presence_state(
         recent_interactions=recent_interactions,
         initiative=initiative,
         idle=idle,
+        overnight=overnight,
         cues=cues,
         proactive_checkin=proactive,
     )

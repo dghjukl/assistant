@@ -218,7 +218,7 @@
     "drifting_threshold_hours": 6.0,
     "deep_threshold_hours": 24.0,
     "resting_fire_prob": 0.25,
-    "drifting_fire_prob": 0.50,
+    "drifting_fire_prob": 0.5,
     "deep_fire_prob": 0.75,
     "min_gap_hours": 1.5,
     "max_cognitions_per_day": 6,
@@ -340,5 +340,21 @@
   "on_demand": {
     "_comment": "Helper servers (tool, thinking, creativity) start only when the primary model needs them and shut down after idle_ttl_seconds of inactivity.",
     "idle_ttl_seconds": 300
+  },
+  "overnight_cycle": {
+    "enabled": true,
+    "conversation_declare_enabled": true,
+    "early_phase_hours": 2.0,
+    "deep_phase_start_hours": 2.0,
+    "prewake_lead_hours": 1.5,
+    "allow_investigations_overnight": true,
+    "allow_memory_maintenance_overnight": true,
+    "allow_initiative_overnight": true,
+    "use_declared_window_as_bias": true,
+    "cancel_on_live_return": true,
+    "live_override_grace_minutes": 20.0,
+    "default_soon_minutes": 30,
+    "default_morning_return_hour": 8.0,
+    "llm_fallback_enabled": true
   }
 }

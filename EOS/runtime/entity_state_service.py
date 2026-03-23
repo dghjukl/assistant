@@ -248,6 +248,7 @@ class EntityStateSnapshot:
     runtime_status_block: str
     tool_summary: dict[str, Any]
     initiative_summary: dict[str, Any]
+    overnight_summary: dict[str, Any]
     behavior_mode: str
     behavior_summary: dict[str, Any]
     behavior_block: str
@@ -264,6 +265,8 @@ class EntityStateSnapshot:
         if not environment_line:
             environment_line = self.environment_summary.get("headline", "environment unavailable") if isinstance(self.environment_summary, dict) else "environment unavailable"
         tools_line = ", ".join(self.tool_summary.get("enabled_names", [])[:8]) or "none"
+        overnight = self.overnight_summary or {}
+        overnight_line = f"{overnight.get('status', 'none')} / {overnight.get('phase', 'DAY_ACTIVE')}"
         current_focus = self.current_focus_summary or {}
         attention_line = self.attention_summary.get("compact", "no durable attention profile")
         return "\n".join([
@@ -279,6 +282,7 @@ class EntityStateSnapshot:
             f"Workspace: {workspace_line}",
             f"Environment: {environment_line}",
             f"Capabilities: {self.capabilities_summary.get('status_line', 'unavailable')}",
+            f"Overnight cycle: {overnight_line}",
             f"Tools now available: {tools_line}",
         ])
 
@@ -303,6 +307,7 @@ class EntityStateSnapshot:
             "capabilities": self.capabilities_summary,
             "tools": self.tool_summary,
             "initiative": self.initiative_summary,
+            "overnight": self.overnight_summary,
             "behavior_mode": self.behavior_mode,
             "behavior": self.behavior_summary,
             "metadata": self.metadata,
@@ -329,6 +334,7 @@ class EntityStateService:
         self._topology = None
         self._runtime_discovery = None
         self._computer_use_service = None
+        self._overnight_cycle_service = None
 
     def wire(
         self,
@@ -345,6 +351,7 @@ class EntityStateService:
         tool_registry=None,
         initiative_engine=None,
         computer_use_service=None,
+        overnight_cycle_service=None,
     ) -> None:
         self._topology = topology
         self._runtime_discovery = runtime_discovery
@@ -358,6 +365,7 @@ class EntityStateService:
         self._tool_registry = tool_registry
         self._initiative_engine = initiative_engine
         self._computer_use_service = computer_use_service
+        self._overnight_cycle_service = overnight_cycle_service
 
     def build_snapshot(
         self,
@@ -612,6 +620,28 @@ class EntityStateService:
                     "error": str(exc),
                 }
 
+        overnight_summary: dict[str, Any] = {
+            "enabled": False,
+            "phase": "DAY_ACTIVE",
+            "status": "none",
+            "status_line": "overnight unavailable",
+        }
+        if self._overnight_cycle_service is not None:
+            try:
+                overnight_summary = self._overnight_cycle_service.status_summary()
+                overnight_summary["status_line"] = (
+                    f"phase={overnight_summary.get('phase', 'DAY_ACTIVE')}"
+                    f", status={overnight_summary.get('status', 'none')}"
+                )
+            except Exception as exc:
+                overnight_summary = {
+                    "enabled": False,
+                    "phase": "DAY_ACTIVE",
+                    "status": "none",
+                    "status_line": "overnight unavailable",
+                    "error": str(exc),
+                }
+
         behavior_summary = select_behavior_mode(
             current_focus=current_focus_summary,
             session=session_summary,
@@ -669,6 +699,7 @@ class EntityStateService:
             runtime_status_block=runtime_status_block,
             tool_summary=tool_summary,
             initiative_summary=initiative_summary,
+            overnight_summary=overnight_summary,
             behavior_mode=behavior_mode,
             behavior_summary=behavior_summary,
             behavior_block=behavior_block,
