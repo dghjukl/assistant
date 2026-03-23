@@ -365,6 +365,20 @@ def _build_presence_payload(*, entity_snapshot=None) -> dict[str, Any] | None:
     return app_state.to_dict() if state is not None else None
 
 
+def _signal_bus_health_summary() -> dict[str, Any]:
+    """Return compact signal-bus health for admin APIs."""
+    if app_state.bus is None:
+        return {"available": False, "healthy": None}
+    if hasattr(app_state.bus, "health_summary"):
+        try:
+            summary = app_state.bus.health_summary()
+            return {"available": True, **summary}
+        except Exception as exc:
+            logger.warning("Signal bus health summary failed: %s", exc)
+            return {"available": True, "healthy": False, "error": str(exc)}
+    return {"available": True, "healthy": None}
+
+
 def _get_current_focus_dict() -> dict[str, Any]:
     """Return the authoritative current-focus record as a plain dict."""
     if app_state.current_focus_service is None:
@@ -2137,6 +2151,7 @@ async def admin_get_status():
                 "topology": topology_status,
                 "capabilities": app_state.runtime_discovery.capabilities if app_state.runtime_discovery else {},
                 "services": app_state.runtime_discovery.to_dict().get("services", {}) if app_state.runtime_discovery else {},
+                "signal_bus": _signal_bus_health_summary(),
                 "tracer": tracer_summary,
             }
         })
@@ -2719,6 +2734,7 @@ async def admin_export():
                 "topology": topology_summary,
                 "backend_health": probe_snap,
                 "capabilities": app_state.runtime_discovery.capabilities if app_state.runtime_discovery else {},
+                "signal_bus": _signal_bus_health_summary(),
                 "deployment_mode": topology_summary.get("deployment_mode"),
             },
             "tools": {
@@ -2756,6 +2772,7 @@ async def admin_runtime_diagnostics():
             "platform": sys.platform,
             "behavior_mode": getattr(latest_snapshot, "behavior_mode", None),
             "behavior": getattr(latest_snapshot, "behavior_summary", None),
+            "signal_bus": _signal_bus_health_summary(),
         }
         return JSONResponse({"ok": True, "data": diagnostics})
     except Exception as exc:

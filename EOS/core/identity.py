@@ -26,6 +26,7 @@ from core.memory import (
     get_entity_name, set_entity_name, get_relational_model, update_relational,
     get_recent_interactions,
 )
+from runtime.exception_observability import observe_exception
 
 logger = logging.getLogger("eos.identity")
 
@@ -182,8 +183,20 @@ async def run_evaluation_cycle(
                         "drift":      drift,
                         "cycle":      cycle,
                     })
-                except Exception:
-                    pass
+                except Exception as exc:
+                    observe_exception(
+                        logger=logger,
+                        subsystem="identity",
+                        operation="publish_identity_delta_signal",
+                        exc=exc,
+                        level=logging.WARNING,
+                        context={
+                            "domain": domain,
+                            "cycle": cycle,
+                            "drift": drift,
+                            "advisory_signal": True,
+                        },
+                    )
 
         except Exception as exc:
             logger.error("Identity eval error in domain %s: %s", domain, exc)
@@ -208,8 +221,20 @@ async def run_evaluation_cycle(
                         "domains_shifted":   continuity_report.domains_shifted,
                         "name_review_warranted": continuity_report.name_review_warranted,
                     })
-                except Exception:
-                    pass
+                except Exception as exc:
+                    observe_exception(
+                        logger=logger,
+                        subsystem="identity",
+                        operation="publish_identity_continuity_signal",
+                        exc=exc,
+                        level=logging.WARNING,
+                        context={
+                            "cycle": cycle,
+                            "stability_label": continuity_report.stability_label,
+                            "domains_shifted": continuity_report.domains_shifted,
+                            "advisory_signal": True,
+                        },
+                    )
         except Exception as exc:
             logger.warning("Continuity monitor record_cycle failed: %s", exc)
 
