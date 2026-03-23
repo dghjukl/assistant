@@ -33,6 +33,174 @@ from core.memory import (
 UTC = timezone.utc
 
 
+CANONICAL_BEHAVIOR_MODES: tuple[str, ...] = (
+    "resume_prior_work",
+    "advance_current_work",
+    "notice_environment_change",
+    "offer_bounded_check_in",
+    "quiet_standby",
+)
+
+
+def _normalized_text(value: Any) -> str:
+    return str(value or "").strip()
+
+
+def _behavior_prompt_block(mode: str, summary: dict[str, Any]) -> str:
+    label = _normalized_text(summary.get("label") or mode.replace("_", " "))
+    rationale = _normalized_text(summary.get("rationale") or "")
+    instructions = [
+        line.strip()
+        for line in summary.get("instructions", [])
+        if str(line or "").strip()
+    ]
+
+    lines = [
+        "## Active Outward Behavior",
+        f"- Mode: {mode}",
+        f"- Stance: {label}",
+    ]
+    if rationale:
+        lines.append(f"- Why this mode: {rationale}")
+    if instructions:
+        lines.append("- Behavioral rules:")
+        lines.extend(f"  - {line}" for line in instructions[:4])
+    return "\n".join(lines)
+
+
+def select_behavior_mode(
+    *,
+    current_focus: dict[str, Any],
+    session: dict[str, Any],
+    environment: dict[str, Any],
+    capabilities: dict[str, Any],
+    initiative: dict[str, Any],
+    interaction_count: int,
+) -> dict[str, Any]:
+    """Choose one narrow outward behavior mode from the shared snapshot."""
+    focus_source = _normalized_text(current_focus.get("source") or "maintenance")
+    focus_title = _normalized_text(current_focus.get("title") or "the current focus")
+    focus_status = _normalized_text(current_focus.get("status") or "waiting")
+    next_action = _normalized_text(current_focus.get("next_action") or "wait for the next turn")
+
+    env_headline = ""
+    env_summary = environment.get("summary")
+    if isinstance(env_summary, dict):
+        env_headline = _normalized_text(env_summary.get("headline"))
+    env_headline = env_headline or _normalized_text(environment.get("headline"))
+    capability_status = _normalized_text(
+        capabilities.get("status_line") or capabilities.get("summary")
+    )
+
+    queue_depth = int(initiative.get("queue_depth") or 0)
+    idle_seconds = float(initiative.get("idle_seconds") or 0.0)
+    has_prior_session = bool(session.get("has_prior_session"))
+    prior_turns = int(session.get("turn_count") or 0)
+    session_ended = _normalized_text(session.get("session_ended_at"))[:10]
+
+    if (
+        has_prior_session
+        and interaction_count <= 2
+        and focus_source in {"user_goal", "investigation", "initiative"}
+    ):
+        return {
+            "mode": "resume_prior_work",
+            "label": "Resume prior work",
+            "rationale": (
+                f"There is prior-session continuity and the live focus is still '{focus_title}'."
+            ),
+            "instructions": [
+                "Pick up naturally from the last known thread instead of sounding reset.",
+                "Briefly orient around the in-flight work before adding anything new.",
+                f"Stay anchored to the next concrete step: {next_action}.",
+            ],
+            "signals": {
+                "focus_source": focus_source,
+                "has_prior_session": has_prior_session,
+                "session_ended_at": session_ended,
+                "prior_turn_count": prior_turns,
+            },
+        }
+
+    if any(
+        token in f"{env_headline} {capability_status}".lower()
+        for token in ("degraded", "offline", "limited", "unavailable", "error", "warn")
+    ):
+        return {
+            "mode": "notice_environment_change",
+            "label": "Notice an environmental change",
+            "rationale": (
+                f"The environment/capability state contains a meaningful change: "
+                f"{env_headline or capability_status or 'runtime status changed'}."
+            ),
+            "instructions": [
+                "Acknowledge relevant changes plainly and only when they matter to the turn.",
+                "Keep the notice brief; do not spiral into telemetry.",
+                "Adapt the reply to the current capability limits or changes.",
+            ],
+            "signals": {
+                "environment_headline": env_headline,
+                "capability_status": capability_status,
+            },
+        }
+
+    if (
+        focus_source in {"initiative", "maintenance"}
+        and focus_status in {"waiting", "active"}
+        and queue_depth > 0
+        and interaction_count > 0
+    ):
+        return {
+            "mode": "offer_bounded_check_in",
+            "label": "Offer a bounded check-in",
+            "rationale": (
+                f"There are {queue_depth} queued proactive item(s) and no higher-priority user goal is active."
+            ),
+            "instructions": [
+                "If a check-in is appropriate, keep it optional, brief, and tightly scoped.",
+                "Do not introduce multiple new directions.",
+                "Stay close to the present focus instead of broad proactive exploration.",
+            ],
+            "signals": {
+                "focus_source": focus_source,
+                "queue_depth": queue_depth,
+                "idle_seconds": idle_seconds,
+            },
+        }
+
+    if focus_source in {"user_goal", "investigation", "initiative"}:
+        return {
+            "mode": "advance_current_work",
+            "label": "Advance current work",
+            "rationale": f"The active focus is '{focus_title}' from {focus_source}.",
+            "instructions": [
+                "Stay task-forward and help move the active work ahead.",
+                "Prefer the next concrete step over broad reframing.",
+                f"Use this near-term action as the anchor: {next_action}.",
+            ],
+            "signals": {
+                "focus_source": focus_source,
+                "focus_status": focus_status,
+                "focus_title": focus_title,
+            },
+        }
+
+    return {
+        "mode": "quiet_standby",
+        "label": "Quietly stand by",
+        "rationale": "No strong continuity, change, or proactive condition currently outweighs a calm waiting stance.",
+        "instructions": [
+            "Answer directly without manufacturing momentum.",
+            "Sound present and available, but not pushy.",
+            "Do not create new threads unless the user asks for them.",
+        ],
+        "signals": {
+            "focus_source": focus_source,
+            "focus_status": focus_status,
+        },
+    }
+
+
 def _now_iso() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
@@ -73,6 +241,10 @@ class EntityStateSnapshot:
     capabilities_summary: dict[str, Any]
     runtime_status_block: str
     tool_summary: dict[str, Any]
+    initiative_summary: dict[str, Any]
+    behavior_mode: str
+    behavior_summary: dict[str, Any]
+    behavior_block: str
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def background_context_block(self) -> str:
@@ -121,6 +293,9 @@ class EntityStateSnapshot:
             "environment": self.environment_summary,
             "capabilities": self.capabilities_summary,
             "tools": self.tool_summary,
+            "initiative": self.initiative_summary,
+            "behavior_mode": self.behavior_mode,
+            "behavior": self.behavior_summary,
             "metadata": self.metadata,
         }
 
@@ -141,6 +316,7 @@ class EntityStateService:
         self._worldview_service = None
         self._capability_registry = None
         self._tool_registry = None
+        self._initiative_engine = None
         self._topology = None
         self._runtime_discovery = None
         self._computer_use_service = None
@@ -158,6 +334,7 @@ class EntityStateService:
         worldview_service=None,
         capability_registry=None,
         tool_registry=None,
+        initiative_engine=None,
         computer_use_service=None,
     ) -> None:
         self._topology = topology
@@ -170,6 +347,7 @@ class EntityStateService:
         self._worldview_service = worldview_service
         self._capability_registry = capability_registry
         self._tool_registry = tool_registry
+        self._initiative_engine = initiative_engine
         self._computer_use_service = computer_use_service
 
     def build_snapshot(
@@ -400,6 +578,46 @@ class EntityStateService:
                 "account_count": 0,
             }
 
+        initiative_summary: dict[str, Any] = {
+            "enabled": False,
+            "queue_depth": 0,
+            "queue": [],
+            "status_line": "initiative unavailable",
+        }
+        if self._initiative_engine is not None:
+            try:
+                initiative_summary = self._initiative_engine.get_status()
+                initiative_summary["status_line"] = (
+                    f"queue_depth={initiative_summary.get('queue_depth', 0)}"
+                    f", idle_seconds={initiative_summary.get('idle_seconds', 0)}"
+                )
+            except Exception as exc:
+                initiative_summary = {
+                    "enabled": False,
+                    "queue_depth": 0,
+                    "queue": [],
+                    "status_line": "initiative unavailable",
+                    "error": str(exc),
+                }
+
+        behavior_summary = select_behavior_mode(
+            current_focus=current_focus_summary,
+            session=session_summary,
+            environment=environment_summary,
+            capabilities=capabilities_summary,
+            initiative=initiative_summary,
+            interaction_count=interaction_count,
+        )
+        behavior_mode = str(behavior_summary.get("mode") or "quiet_standby")
+        if behavior_mode not in CANONICAL_BEHAVIOR_MODES:
+            behavior_mode = "quiet_standby"
+            behavior_summary = {
+                **behavior_summary,
+                "mode": behavior_mode,
+                "label": "Quietly stand by",
+            }
+        behavior_block = _behavior_prompt_block(behavior_mode, behavior_summary)
+
         runtime_status_block = self._build_runtime_status_block(
             environment_summary=environment_summary,
             capabilities_summary=capabilities_summary,
@@ -436,6 +654,10 @@ class EntityStateService:
             capabilities_summary=capabilities_summary,
             runtime_status_block=runtime_status_block,
             tool_summary=tool_summary,
+            initiative_summary=initiative_summary,
+            behavior_mode=behavior_mode,
+            behavior_summary=behavior_summary,
+            behavior_block=behavior_block,
             metadata=metadata or {},
         )
 
@@ -460,6 +682,8 @@ class EntityStateService:
             "latest": latest.to_dict() if latest else None,
             "history": self.history(limit=5),
             "environment": latest.environment_summary if latest else None,
+            "behavior_mode": latest.behavior_mode if latest else None,
+            "behavior": latest.behavior_summary if latest else None,
         }
 
     def _build_runtime_status_block(
