@@ -10,6 +10,8 @@ The canonical launch hierarchy is:
 4. **Fallback diagnostics:** `status-eos.bat`
 5. **Advanced control:** per-server launchers or direct `python eos.py`
 
+The authoritative launch-role metadata, bundle composition, and legacy-surface status now live in `runtime/launch_catalog.py`. Batch files and the launcher UI should reflect that catalog rather than redefining launch policy independently.
+
 Missing backends degrade gracefully — they do not prevent startup.
 
 For capability governance (autonomy, computer use, workspace permissions, etc.) see the admin panel at **http://127.0.0.1:7860/admin → Control & Permissions → Capabilities**, or see [USER_GUIDE.md](USER_GUIDE.md). These controls are runtime supervision and safety backstops, not the primary product definition.
@@ -76,3 +78,10 @@ Vision is additive: start `launchers\start-vision-gpu.bat` alongside whichever b
 | Vision | vision unavailable |
 | STT | voice degraded/unavailable |
 | TTS | voice degraded/unavailable |
+
+
+---
+
+## Legacy note
+
+Older launcher names still exist for compatibility, but they are deprecated wrappers around the launchers above. Treat `launchers\legacy\` as advanced/compatibility-only surface area, not as a second profile system.

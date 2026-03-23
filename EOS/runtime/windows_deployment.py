@@ -14,6 +14,7 @@ if __package__ in {None, ""}:
 from typing import Any, Callable
 
 from runtime.boot import _resolve_mmproj_path, _resolve_model_path, load_config
+from runtime.launch_catalog import LAUNCH_ROLES, ROLE_BY_KEY, bundle_for
 
 
 @dataclass
@@ -57,6 +58,7 @@ class DeploymentAssessment:
     profiles: list[LaunchProfile]
     recommended_profile: str
     setup_complete: bool
+    role_catalog: list[dict[str, Any]] = field(default_factory=list)
     summary: list[str] = field(default_factory=list)
     blocking_issues: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
@@ -69,21 +71,14 @@ class DeploymentAssessment:
             "profiles": [asdict(profile) for profile in self.profiles],
             "recommended_profile": self.recommended_profile,
             "setup_complete": self.setup_complete,
+            "role_catalog": list(self.role_catalog),
             "summary": list(self.summary),
             "blocking_issues": list(self.blocking_issues),
             "warnings": list(self.warnings),
         }
 
 
-ROLE_LABELS = {
-    "primary": "Main",
-    "tool": "Tools",
-    "thinking": "Thinking",
-    "creativity": "Creativity",
-    "vision": "Vision",
-}
-
-ROLE_ORDER = ["primary", "tool", "thinking", "creativity", "vision"]
+ROLE_ORDER = [role.key for role in LAUNCH_ROLES]
 
 
 def detect_nvidia_gpu(run: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run) -> tuple[bool, str | None, str | None]:
@@ -152,7 +147,7 @@ def _role_binary_path(root: Path, srv_cfg: dict[str, Any], accel: str) -> Path |
 
 
 def _assess_role(role: str, srv_cfg: dict[str, Any], root: Path, hardware: HardwareAssessment) -> RoleAssessment:
-    label = ROLE_LABELS.get(role, role.title())
+    label = ROLE_BY_KEY.get(role).label if role in ROLE_BY_KEY else role.title()
     enabled = bool(srv_cfg.get("enabled", False))
     port = int(srv_cfg.get("port", 0))
     assessment = RoleAssessment(
@@ -307,7 +302,7 @@ def assess_windows_deployment(root: Path | str, config_path: Path | str = "confi
             roles,
         ),
         _profile(
-            "Full installed stack",
+            bundle_for("full").label + " installed stack",
             "full",
             "Starts every installed helper your machine appears able to support.",
             "tier-3",
@@ -315,6 +310,7 @@ def assess_windows_deployment(root: Path | str, config_path: Path | str = "confi
             roles,
         ),
     ]
+
 
     if blocking:
         recommended_profile = "compatibility"
@@ -337,6 +333,17 @@ def assess_windows_deployment(root: Path | str, config_path: Path | str = "confi
         profiles=profiles,
         recommended_profile=recommended_profile,
         setup_complete=len(blocking) == 0,
+        role_catalog=[
+            {
+                "key": role.key,
+                "label": role.label,
+                "script_base": role.script_base,
+                "port": role.port,
+                "optional": role.optional,
+                "aliases": list(role.aliases),
+            }
+            for role in LAUNCH_ROLES
+        ],
         summary=summary,
         blocking_issues=blocking,
         warnings=warnings,

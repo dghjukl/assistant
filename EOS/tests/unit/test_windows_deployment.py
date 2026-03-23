@@ -151,3 +151,23 @@ def test_build_launch_plan_rejects_incomplete_setup(monkeypatch, deployment_root
 
     with pytest.raises(LaunchPlanError, match="Setup is incomplete"):
         build_launch_plan("minimal", assessment, root=deployment_root)
+
+
+def test_assessment_exposes_canonical_role_catalog(monkeypatch, deployment_root: Path):
+    monkeypatch.setattr(
+        "runtime.windows_deployment.detect_nvidia_gpu",
+        lambda: (True, "RTX 4070", None),
+    )
+    monkeypatch.setattr("runtime.windows_deployment.detect_total_memory_gb", lambda: 32.0)
+
+    assessment = assess_windows_deployment(deployment_root, deployment_root / "config.json")
+
+    assert [entry["key"] for entry in assessment.role_catalog] == [
+        "primary",
+        "tool",
+        "thinking",
+        "creativity",
+        "vision",
+    ]
+    assert assessment.role_catalog[0]["script_base"] == "main"
+    assert assessment.to_dict()["role_catalog"][1]["port"] == 8082

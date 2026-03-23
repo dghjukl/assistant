@@ -16,13 +16,20 @@ $cYellow    = [System.Drawing.Color]::FromArgb(220, 180, 60 )
 $cRed       = [System.Drawing.Color]::FromArgb(255, 110, 110)
 $cConsoleBg = [System.Drawing.Color]::FromArgb(16,  16,  16 )
 
-$roleMeta = @(
-    @{ Key="primary";    Name="Main";       ScriptBase="main";       Port=8080 }
-    @{ Key="tool";       Name="Tools";      ScriptBase="tools";      Port=8082 }
-    @{ Key="thinking";   Name="Thinking";   ScriptBase="thinking";   Port=8083 }
-    @{ Key="creativity"; Name="Creativity"; ScriptBase="creativity"; Port=8084 }
-    @{ Key="vision";     Name="Vision";     ScriptBase="vision";     Port=8081 }
-)
+function Get-RoleCatalog {
+    param($Assessment)
+    if ($Assessment -and $Assessment.role_catalog) {
+        return @($Assessment.role_catalog)
+    }
+
+    return @(
+        @{ key="primary";    label="Main";       script_base="main";       port=8080; optional=$false }
+        @{ key="tool";       label="Tools";      script_base="tools";      port=8082; optional=$true }
+        @{ key="thinking";   label="Thinking";   script_base="thinking";   port=8083; optional=$true }
+        @{ key="creativity"; label="Creativity"; script_base="creativity"; port=8084; optional=$true }
+        @{ key="vision";     label="Vision";     script_base="vision";     port=8081; optional=$true }
+    )
+}
 
 function Write-Con {
     param([string]$msg, [System.Drawing.Color]$col)
@@ -82,6 +89,7 @@ function Get-Assessment {
 }
 
 $assessment = Get-Assessment
+$roleMeta = Get-RoleCatalog -Assessment $assessment
 $profilesByKey = @{}
 foreach ($profile in $assessment.profiles) { $profilesByKey[$profile.key] = $profile }
 $rolesByKey = @{}
@@ -192,13 +200,13 @@ foreach ($meta in $roleMeta) {
     $form.Controls.Add($row)
 
     $lbl           = New-Object System.Windows.Forms.Label
-    $lbl.Text      = $meta.Name
+    $lbl.Text      = $meta.label
     $lbl.ForeColor = $cText
     $lbl.Location  = New-Object System.Drawing.Point(12, 10)
     $lbl.Size      = New-Object System.Drawing.Size(120, 20)
     $row.Controls.Add($lbl)
 
-    $radioMap[$meta.Key] = @{}
+    $radioMap[$meta.key] = @{}
     foreach ($opt in @("cpu", "gpu", "off")) {
         $rb           = New-Object System.Windows.Forms.RadioButton
         $rb.Text      = ""
@@ -208,7 +216,7 @@ foreach ($meta in $roleMeta) {
         $rb.Size      = New-Object System.Drawing.Size(20, 20)
         $rb.Enabled   = $true
         $row.Controls.Add($rb)
-        $radioMap[$meta.Key][$opt] = $rb
+        $radioMap[$meta.key][$opt] = $rb
         $rb.Add_CheckedChanged({
             if ($chkManual.Checked) {
                 Update-SelectionSummary
@@ -221,7 +229,7 @@ foreach ($meta in $roleMeta) {
     $modelLabel.Location  = New-Object System.Drawing.Point(430, 10)
     $modelLabel.Size      = New-Object System.Drawing.Size(80, 20)
     $row.Controls.Add($modelLabel)
-    $modelLabels[$meta.Key] = $modelLabel
+    $modelLabels[$meta.key] = $modelLabel
 
     $rowY += 42
 }
@@ -290,9 +298,9 @@ function Set-RoleAvailability {
 function Apply-SelectionMap {
     param($Selections)
     foreach ($meta in $roleMeta) {
-        $target = if ($Selections.PSObject.Properties.Name -contains $meta.Key) { $Selections.$($meta.Key) } else { "off" }
-        if (-not $radioMap[$meta.Key][$target].Enabled) { $target = "off" }
-        $radioMap[$meta.Key][$target].Checked = $true
+        $target = if ($Selections.PSObject.Properties.Name -contains $meta.key) { $Selections.$($meta.key) } else { "off" }
+        if (-not $radioMap[$meta.key][$target].Enabled) { $target = "off" }
+        $radioMap[$meta.key][$target].Checked = $true
     }
     Update-SelectionSummary
 }
@@ -301,18 +309,18 @@ function Update-SelectionSummary {
     $issues = New-Object System.Collections.Generic.List[string]
     $selected = New-Object System.Collections.Generic.List[string]
     foreach ($meta in $roleMeta) {
-        $role = $rolesByKey[$meta.Key]
+        $role = $rolesByKey[$meta.key]
         $choice = "off"
         foreach ($opt in @("cpu", "gpu", "off")) {
-            if ($radioMap[$meta.Key][$opt].Checked) { $choice = $opt; break }
+            if ($radioMap[$meta.key][$opt].Checked) { $choice = $opt; break }
         }
         if ($choice -ne "off") {
-            $selected.Add(("{0} [{1}]" -f $meta.Name, $choice.ToUpper()))
-            if (-not $radioMap[$meta.Key][$choice].Enabled) {
-                $issues.Add(("{0} cannot run on {1}." -f $meta.Name, $choice.ToUpper()))
+            $selected.Add(("{0} [{1}]" -f $meta.label, $choice.ToUpper()))
+            if (-not $radioMap[$meta.key][$choice].Enabled) {
+                $issues.Add(("{0} cannot run on {1}." -f $meta.label, $choice.ToUpper()))
             }
             if ($role -and -not $role.selected_model) {
-                $issues.Add(("{0} model is missing." -f $meta.Name))
+                $issues.Add(("{0} model is missing." -f $meta.label))
             }
         }
     }
@@ -350,7 +358,7 @@ function Show-AssessmentInConsole {
     foreach ($warning in $assessment.warnings) { Write-Con ("NOTE: " + $warning) $cYellow }
 }
 
-foreach ($meta in $roleMeta) { Set-RoleAvailability -RoleKey $meta.Key }
+foreach ($meta in $roleMeta) { Set-RoleAvailability -RoleKey $meta.key }
 
 $hardwareSummary = if ($assessment.hardware.has_nvidia_gpu) {
     "NVIDIA GPU detected: " + $assessment.hardware.gpu_name
@@ -425,17 +433,17 @@ $btn.Add_Click({
     foreach ($meta in $roleMeta) {
         $choice = "off"
         foreach ($opt in @("cpu", "gpu", "off")) {
-            if ($radioMap[$meta.Key][$opt].Checked) { $choice = $opt; break }
+            if ($radioMap[$meta.key][$opt].Checked) { $choice = $opt; break }
         }
         if ($choice -ne "off") {
-            $bat = Join-Path $Root ("launchers\start-" + $meta.ScriptBase + "-" + $choice + ".bat")
+            $bat = Join-Path $Root ("launchers\start-" + $meta.script_base + "-" + $choice + ".bat")
             if (-not (Test-Path $bat)) {
                 Write-Con ("Missing launcher: " + $bat) $cRed
                 $btn.Text = "Launch EOS"
                 $btn.Enabled = $true
                 return
             }
-            $toStart += [pscustomobject]@{ Name=$meta.Name; Accel=$choice; Port=$meta.Port; Bat=$bat }
+            $toStart += [pscustomobject]@{ Name=$meta.label; Accel=$choice; Port=$meta.port; Bat=$bat }
         }
     }
 

@@ -10,24 +10,10 @@ from pathlib import Path
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from runtime.launch_catalog import BUNDLE_KEYS, bundle_for, role_for
 from runtime.windows_deployment import DeploymentAssessment, assess_windows_deployment
 
 ROOT = Path(__file__).resolve().parent.parent
-
-ROLE_TO_SCRIPT = {
-    "primary": "main",
-    "tool": "tools",
-    "thinking": "thinking",
-    "creativity": "creativity",
-    "vision": "vision",
-}
-
-PROFILE_ROLE_ORDER = {
-    "minimal": ["primary"],
-    "standard": ["primary", "tool", "thinking"],
-    "full": ["primary", "tool", "thinking", "creativity"],
-    "vision": ["vision"],
-}
 
 
 @dataclass
@@ -57,15 +43,16 @@ def build_launch_plan(profile: str, assessment: DeploymentAssessment, root: Path
     profile = profile.lower()
     if assessment.blocking_issues and profile != "vision":
         raise LaunchPlanError("Setup is incomplete. Run 'python verify.py' and fix the blocking issues first.")
-    if profile not in PROFILE_ROLE_ORDER:
-        raise LaunchPlanError(f"Unknown profile: {profile}")
+    try:
+        bundle = bundle_for(profile)
+    except KeyError as exc:
+        raise LaunchPlanError(f"Unknown profile: {profile}") from exc
 
     cpu_preferred = assessment.recommended_profile == "compatibility"
     plan: list[LaunchItem] = []
-    for role_key in PROFILE_ROLE_ORDER[profile]:
+    for role_key in bundle.roles:
         accel = _choose_accel(role_key, assessment, cpu_preferred=cpu_preferred)
-        script_base = ROLE_TO_SCRIPT[role_key]
-        script_path = root / "launchers" / f"start-{script_base}-{accel}.bat"
+        script_path = role_for(role_key).launcher_path(root, accel=accel)
         if not script_path.is_file():
             raise LaunchPlanError(f"Launcher not found: {script_path}")
         plan.append(LaunchItem(role=role_key, accel=accel, script_path=script_path))
@@ -86,7 +73,7 @@ def launch_plan(plan: list[LaunchItem], root: Path | None = None) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Start a hardened EOS launch profile.")
-    parser.add_argument("profile", choices=tuple(PROFILE_ROLE_ORDER), help="Profile to start")
+    parser.add_argument("profile", choices=BUNDLE_KEYS, help="Profile to start")
     parser.add_argument("--root", default=str(ROOT), help="EOS root directory")
     parser.add_argument("--config", default="config.json", help="Config file to inspect")
     args = parser.parse_args()
