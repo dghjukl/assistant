@@ -45,6 +45,7 @@ class PresenceCue:
 class PresenceState:
     created_at: str
     focus: dict[str, Any]
+    attention: dict[str, Any]
     continuity: dict[str, Any]
     environment: dict[str, Any]
     capabilities: dict[str, Any]
@@ -72,6 +73,8 @@ class PresenceState:
             lines.append(f"- Fresh change: {changed.text}")
         if watching and watching.text:
             lines.append(f"- Watchpoint: {watching.text}")
+        if self.attention.get("compact"):
+            lines.append(f"- Durable preferences: {self.attention.get('compact')}")
 
         if self.proactive_checkin and self.proactive_checkin.text:
             lines.append(
@@ -99,6 +102,7 @@ class PresenceState:
         return {
             "created_at": self.created_at,
             "focus": self.focus,
+            "attention": self.attention,
             "continuity": self.continuity,
             "environment": self.environment,
             "capabilities": self.capabilities,
@@ -113,6 +117,7 @@ class PresenceState:
 def build_presence_state(
     *,
     current_focus: dict[str, Any] | None = None,
+    attention_summary: dict[str, Any] | None = None,
     continuity: dict[str, Any] | None = None,
     environment: dict[str, Any] | None = None,
     capabilities: dict[str, Any] | None = None,
@@ -123,6 +128,7 @@ def build_presence_state(
 ) -> PresenceState:
     """Build a PresenceState from raw subsystem summaries."""
     focus = dict(current_focus or {})
+    attention = dict(attention_summary or {})
     continuity = dict(continuity or {})
     environment = dict(environment or {})
     capabilities = dict(capabilities or {})
@@ -132,15 +138,16 @@ def build_presence_state(
     idle = dict(idle or {})
 
     cues = {
-        "what_ive_been_doing": _render_doing_cue(focus, initiative),
+        "what_ive_been_doing": _render_doing_cue(focus, initiative, attention),
         "what_changed_since_last_time": _render_change_cue(recent_events, continuity, recent_interactions),
-        "what_im_keeping_an_eye_on": _render_watch_cue(focus, environment, capabilities, recent_events, initiative),
+        "what_im_keeping_an_eye_on": _render_watch_cue(focus, attention, environment, capabilities, recent_events, initiative),
     }
-    proactive = _render_checkin_cue(focus, initiative, idle, recent_events)
+    proactive = _render_checkin_cue(focus, attention, initiative, idle, recent_events)
 
     return PresenceState(
         created_at=_now_iso(),
         focus=focus,
+        attention=attention,
         continuity=continuity,
         environment=environment,
         capabilities=capabilities,
@@ -153,18 +160,46 @@ def build_presence_state(
     )
 
 
-def _render_doing_cue(focus: dict[str, Any], initiative: dict[str, Any]) -> PresenceCue:
+def _attention_topics(attention: dict[str, Any], key: str, limit: int = 2) -> list[str]:
+    items = attention.get(key, [])
+    if not isinstance(items, list):
+        return []
+    topics: list[str] = []
+    for item in items[:limit]:
+        topic = str((item or {}).get("topic") or "").strip()
+        if topic:
+            topics.append(topic)
+    return topics
+
+
+def _render_doing_cue(
+    focus: dict[str, Any],
+    initiative: dict[str, Any],
+    attention: dict[str, Any],
+) -> PresenceCue:
     title = _truncate(focus.get("title") or "Standing by for the next meaningful task", 120)
     next_action = _truncate(focus.get("next_action") or "wait for the next turn", 120)
     source = str(focus.get("source") or "maintenance")
     queue_depth = int(initiative.get("queue_depth") or 0)
+    preferred_projects = _attention_topics(attention, "preferred_projects")
 
     if source == "user_goal":
-        text = f"I'm working around the active goal '{title}', with next attention on {next_action.lower()}."
+        if preferred_projects and title not in preferred_projects:
+            text = (
+                f"I'm working around the active goal '{title}', while keeping continuity with "
+                f"preferred project threads like '{preferred_projects[0]}'; next attention is on {next_action.lower()}."
+            )
+        else:
+            text = f"I'm working around the active goal '{title}', with next attention on {next_action.lower()}."
     elif source == "initiative" and queue_depth > 0:
         text = f"I've been handling a queued initiative around '{title}', and next up is {next_action.lower()}."
     elif source == "investigation":
         text = f"I've been tracking the investigation '{title}', with the next step being {next_action.lower()}."
+    elif preferred_projects:
+        text = (
+            f"I've been keeping steady continuity around preferred projects like '{preferred_projects[0]}', "
+            f"and right now I’m oriented around '{title}' with next attention on {next_action.lower()}."
+        )
     else:
         text = f"I've been oriented around '{title}', and next I’m set to {next_action.lower()}."
 
@@ -217,6 +252,7 @@ def _render_change_cue(
 
 def _render_watch_cue(
     focus: dict[str, Any],
+    attention: dict[str, Any],
     environment: dict[str, Any],
     capabilities: dict[str, Any],
     recent_events: list[dict[str, Any]],
@@ -231,6 +267,8 @@ def _render_watch_cue(
     status_line = str(capabilities.get("status_line") or capabilities.get("summary") or "").strip()
     queue_depth = int(initiative.get("queue_depth") or 0)
     warned = next((e for e in recent_events if e.get("level") in {"warn", "error"}), None)
+    watch_topics = _attention_topics(attention, "monitored_topics", limit=3)
+    concern_topics = _attention_topics(attention, "recurring_concerns", limit=2)
 
     if warned:
         return PresenceCue(
@@ -252,6 +290,20 @@ def _render_watch_cue(
             text=f"I’m tracking the environment state: {env_headline}.",
             source="environment",
         )
+    if watch_topics:
+        topic = watch_topics[0]
+        tail = f" and recurring concern '{concern_topics[0]}'" if concern_topics else ""
+        return PresenceCue(
+            kind="watching",
+            text=f"I’m keeping durable watch on '{topic}'{tail} across sessions.",
+            source="attention_profile",
+        )
+    if concern_topics:
+        return PresenceCue(
+            kind="watching",
+            text=f"I’m keeping an eye on recurring concern '{concern_topics[0]}' so it stays salient over time.",
+            source="attention_profile",
+        )
     if queue_depth > 0:
         return PresenceCue(
             kind="watching",
@@ -269,6 +321,7 @@ def _render_watch_cue(
 
 def _render_checkin_cue(
     focus: dict[str, Any],
+    attention: dict[str, Any],
     initiative: dict[str, Any],
     idle: dict[str, Any],
     recent_events: list[dict[str, Any]],
@@ -278,6 +331,8 @@ def _render_checkin_cue(
     queue_depth = int(initiative.get("queue_depth") or 0)
     watch_event = next((e for e in recent_events if e.get("level") in {"warn", "error"}), None)
     title = _truncate(focus.get("title") or "what’s been happening", 100)
+    watch_topics = _attention_topics(attention, "monitored_topics", limit=2)
+    preferred_projects = _attention_topics(attention, "preferred_projects", limit=2)
 
     if watch_event:
         msg = _truncate(watch_event.get("message") or "a recent runtime warning", 120)
@@ -289,6 +344,12 @@ def _render_checkin_cue(
         )
 
     if initiative_enabled and queue_depth > 0:
+        if watch_topics:
+            return PresenceCue(
+                kind="checkin",
+                text=f"If you want, I can give a short watchlist update on '{watch_topics[0]}' while I handle the queued proactive work.",
+                source="attention_profile",
+            )
         return PresenceCue(
             kind="checkin",
             text=f"If you want, I can give a short update on the proactive work around '{title}'.",
@@ -296,6 +357,12 @@ def _render_checkin_cue(
         )
 
     if initiative_enabled and idle_tier in {"resting", "drifting", "deep"}:
+        if preferred_projects:
+            return PresenceCue(
+                kind="checkin",
+                text=f"If you'd like, I can give a brief continuity check-in on '{preferred_projects[0]}' and anything that shifted while things were quiet.",
+                source="attention_profile",
+            )
         return PresenceCue(
             kind="checkin",
             text=f"If you'd like, I can give a brief resident check-in on '{title}' and anything that shifted while things were quiet.",

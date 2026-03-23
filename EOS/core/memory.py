@@ -105,6 +105,19 @@ def init_db() -> None:
                 key         TEXT PRIMARY KEY,
                 value       TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS attention_preferences (
+                category      TEXT NOT NULL,
+                topic         TEXT NOT NULL,
+                score         REAL NOT NULL DEFAULT 0.0,
+                note          TEXT NOT NULL DEFAULT '',
+                origin        TEXT NOT NULL DEFAULT '',
+                first_seen_at REAL NOT NULL,
+                last_seen_at  REAL NOT NULL,
+                updated_at    REAL NOT NULL,
+                metadata      TEXT,
+                PRIMARY KEY (category, topic)
+            );
         """)
 
         # Seed identity domains

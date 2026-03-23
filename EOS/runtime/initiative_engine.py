@@ -128,14 +128,19 @@ class InitiativeEngine:
 
     # ── Public API ────────────────────────────────────────────────────────────
 
-    def evaluate(self, *, memory_retrieved_count: int = 0) -> dict[str, Any]:
+    def evaluate(
+        self,
+        *,
+        memory_retrieved_count: int = 0,
+        attention_summary: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Collect signals, select top candidate, queue it if eligible.
 
         Returns the evaluation result dict.  Does NOT execute anything.
         Caller is responsible for checking the autonomy gate before calling.
         """
         signals = self._collect_signals(memory_retrieved_count=memory_retrieved_count)
-        selected = self._select_signal(signals)
+        selected = self._select_signal(signals, attention_summary=attention_summary)
         now = _iso_now()
         self._last_eval_at = time.time()
         self._eval_count  += 1
@@ -181,6 +186,7 @@ class InitiativeEngine:
             "eval_count":       self._eval_count,
             "signal_count":     len(signals),
             "signals":          [s.as_dict() for s in signals],
+            "attention_bias":   dict((attention_summary or {}).get("initiative_bias") or {}),
             "selected":         enacted,
             "suppression_reason": suppression_reason,
             "queue_depth":      len(self._queue),
@@ -473,13 +479,20 @@ class InitiativeEngine:
         return signals
 
     def _select_signal(
-        self, signals: list[InitiativeSignal]
+        self,
+        signals: list[InitiativeSignal],
+        *,
+        attention_summary: dict[str, Any] | None = None,
     ) -> InitiativeSignal | None:
         if not signals:
             return None
+        initiative_bias = dict((attention_summary or {}).get("initiative_bias") or {})
         return sorted(
             signals,
-            key=lambda s: (_PRIORITY_RANK.get(s.priority, 99), s.initiative_type),
+            key=lambda s: (
+                _PRIORITY_RANK.get(s.priority, 99) - (float(initiative_bias.get(s.initiative_type, 0.0) or 0.0) * 2.0),
+                s.initiative_type,
+            ),
         )[0]
 
     def _is_cooldown_active(self, initiative_type: str) -> bool:

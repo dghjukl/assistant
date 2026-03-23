@@ -77,6 +77,7 @@ from typing import Any, Callable
 
 import httpx
 
+from core.attention_preferences import record_turn_attention
 from core.entity  import build_system_prompt, should_think, should_use_tool, should_run_identity_eval
 from core.memory  import init_db, log_interaction, get_recent_interactions, search_memory, store_memory
 from core.identity import run_evaluation_cycle, request_self_name
@@ -335,6 +336,76 @@ def remember(text: str, source: str = "interaction") -> None:
         store_memory(text, source=source)
     except Exception:
         pass
+
+
+def get_initiative_attention_bias(entity_snapshot: Any | None = None) -> dict[str, float]:
+    """Expose initiative preference weights from the durable attention layer."""
+    summary = getattr(entity_snapshot, "attention_summary", None) if entity_snapshot is not None else None
+    bias = dict((summary or {}).get("initiative_bias") or {})
+    return {str(k): float(v or 0.0) for k, v in bias.items()}
+
+
+def _build_attention_biased_closing(
+    *,
+    interaction_mode: InteractionMode,
+    entity_snapshot: Any | None = None,
+) -> str | None:
+    if interaction_mode != InteractionMode.ASSIST_MODE or entity_snapshot is None:
+        return None
+
+    attention_summary = getattr(entity_snapshot, "attention_summary", {}) or {}
+    style_items = attention_summary.get("favored_interaction_style", [])
+    style_topics = {
+        str((item or {}).get("topic") or "").strip()
+        for item in style_items
+        if isinstance(item, dict)
+    }
+    watch_topics = list(attention_summary.get("watch_topics") or [])
+    preferred_projects = [
+        str((item or {}).get("topic") or "").strip()
+        for item in attention_summary.get("preferred_projects", [])[:2]
+        if isinstance(item, dict) and str((item or {}).get("topic") or "").strip()
+    ]
+
+    if "concise" in style_topics and not watch_topics:
+        return None
+
+    try:
+        from runtime.presence_layer import build_presence_state
+
+        presence_state = build_presence_state(
+            current_focus=getattr(entity_snapshot, "current_focus_summary", None),
+            attention_summary=attention_summary,
+            continuity=getattr(entity_snapshot, "session_summary", None),
+            environment=getattr(entity_snapshot, "environment_summary", None),
+            capabilities=getattr(entity_snapshot, "capabilities_summary", None),
+            initiative=getattr(entity_snapshot, "initiative_summary", None),
+            idle={"tier": "active"},
+        )
+        if (
+            presence_state.proactive_checkin is not None
+            and presence_state.proactive_checkin.text
+            and "concise" not in style_topics
+        ):
+            return presence_state.proactive_checkin.text
+    except Exception:
+        pass
+
+    if watch_topics:
+        return f"If useful, I can keep an eye on '{watch_topics[0]}' across sessions."
+    if preferred_projects and "direct" not in style_topics:
+        return f"If you'd like, I can keep '{preferred_projects[0]}' moving with a short follow-up next time."
+    return None
+
+
+def _append_optional_closing(response: str, closing: str | None) -> str:
+    response = str(response or "").rstrip()
+    closing = str(closing or "").strip()
+    if not closing:
+        return response
+    if closing in response:
+        return response
+    return f"{response}\n\n{closing}"
 
 
 # ── QWEN public thinking interface (for background subsystems) ─────────────────
@@ -756,9 +827,25 @@ async def process_turn(
                     topology, user_input, cfg, use_think=False, entity_snapshot=entity_snapshot
                 )
 
+        final_response = _append_optional_closing(
+            final_response,
+            _build_attention_biased_closing(
+                interaction_mode=interaction_mode,
+                entity_snapshot=entity_snapshot,
+            ),
+        )
+
         # ── Persist to interaction log + vector memory ────────────────────────
         log_interaction("user",      user_input)
         log_interaction("assistant", final_response)
+        try:
+            record_turn_attention(
+                user_text=user_input,
+                assistant_text=final_response,
+                current_focus=getattr(entity_snapshot, "current_focus_summary", None),
+            )
+        except Exception:
+            pass
         remember(user_input,     source="interaction")
         remember(final_response, source="interaction")
 
