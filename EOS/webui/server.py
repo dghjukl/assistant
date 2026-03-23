@@ -27,6 +27,9 @@ def create_app(*, config_path: str | Path | None = None) -> FastAPI:
     app = FastAPI(title='EOS WebUI', version='1.0', docs_url=None, redoc_url=None)
     app.state.eos = app_state
     app.state.config_path = str(config_path) if config_path is not None else None
+    # Starlette runs middleware in reverse registration order, so add
+    # AccessControlMiddleware last to classify origin first, then enforce
+    # admin token auth with the resolved origin tier.
     app.add_middleware(AdminAuthMiddleware)
     app.add_middleware(AccessControlMiddleware)
 

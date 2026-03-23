@@ -95,6 +95,29 @@ def get_token_file_path() -> Path:
     return _token_file
 
 
+def _admin_origin_allowed(request: Request) -> bool:
+    """Return True when the request origin tier is allowed to use /admin routes."""
+    try:
+        from core.access_control import (
+            TIER_LOCALHOST,
+            classify_origin,
+            extract_client_ip,
+            get_access_controller,
+        )
+
+        tier = getattr(request.state, "origin_tier", None) or classify_origin(extract_client_ip(request))
+        if tier == TIER_LOCALHOST:
+            return True
+
+        ctrl = get_access_controller()
+        if ctrl is None:
+            return True
+        return bool(ctrl.policies.get(tier).admin_enabled)
+    except Exception as exc:
+        logger.debug("[auth] Admin origin-tier check fallback due to error: %s", exc)
+        return True
+
+
 # ── FastAPI dependency ──────────────────────────────────────────────────────
 
 def require_admin(
@@ -147,13 +170,12 @@ class AdminAuthMiddleware(BaseHTTPMiddleware):
         # WebSocket upgrade: check ?token= query param
         if request.headers.get("upgrade", "").lower() == "websocket":
             token = request.query_params.get("token", "")
+            from starlette.responses import Response
+
             if not token or token != _admin_token:
-                # Can't return a normal JSON response for WS — close with 403
-                from starlette.responses import Response
-                return Response(
-                    "Admin token required",
-                    status_code=403,
-                )
+                return Response("Admin token required", status_code=403)
+            if not _admin_origin_allowed(request):
+                return Response("Admin access from this origin is disabled", status_code=403)
             return await call_next(request)
 
         # HTTP: check X-Admin-Token or Authorization: Bearer
@@ -168,6 +190,12 @@ class AdminAuthMiddleware(BaseHTTPMiddleware):
                 {"ok": False, "error": "Admin authentication required"},
                 status_code=401,
                 headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        if not _admin_origin_allowed(request):
+            return JSONResponse(
+                {"ok": False, "error": "Admin access from this origin is disabled"},
+                status_code=403,
             )
 
         return await call_next(request)

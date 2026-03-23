@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import tempfile
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -19,12 +21,21 @@ class _FakeTopology:
 
 def _patch_turn_side_effects(monkeypatch):
     import runtime.orchestrator as orch
+    from core.memory import configure, init_db
+
+    tmp_root = Path(tempfile.mkdtemp(prefix="orch-test-"))
+    configure({
+        "db_path": str(tmp_root / "entity_state.db"),
+        "retrieval": {"chroma_path": str(tmp_root / "chroma")},
+    })
+    init_db()
 
     monkeypatch.setattr(orch, "search_memory", lambda query, top_k=3: [])
     monkeypatch.setattr(orch, "log_interaction", lambda role, text: None)
     monkeypatch.setattr(orch, "remember", lambda text, source="interaction": None)
     monkeypatch.setattr(orch, "record_turn_attention", lambda **kwargs: None)
     monkeypatch.setattr(orch, "should_run_identity_eval", lambda cfg: False)
+    monkeypatch.setattr(orch, "should_run_relational_eval", lambda cfg: False)
     return orch
 
 

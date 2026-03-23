@@ -102,6 +102,11 @@ logger = logging.getLogger("eos.orchestrator")
 _tool_executor = None  # ToolExecutor | None
 
 
+def get_tool_executor():
+    """Return the live ToolExecutor instance, if one has been wired."""
+    return _tool_executor
+
+
 def wire_executor(registry: Any, audit_store: Any = None) -> None:
     """Wire the ToolExecutor with the live registry and audit store.
 

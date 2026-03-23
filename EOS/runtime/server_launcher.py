@@ -6,12 +6,8 @@ import signal
 import sys
 from pathlib import Path
 
-from runtime.boot import (
-    BootError,
-    _launch_server,
-    _wait_for_health_with_retry,
-    load_config,
-)
+from runtime.boot import BootError, load_config
+from runtime.server_runtime import launch_server, wait_for_health_with_retry
 from runtime.launch_catalog import normalize_role_name
 
 logging.basicConfig(
@@ -76,7 +72,7 @@ def launch_role(config_path: Path, role: str, accel: str, root: Path | None = No
     endpoint = f"http://{host}:{port}"
 
     logger.info("[%s] Starting %s server on %s", role, accel.upper(), endpoint)
-    proc = _launch_server(role, launch_cfg, root)
+    proc = launch_server(role, launch_cfg, root)
 
     def _terminate(*_args):
         logger.info("[%s] Stopping server (PID %d)", role, proc.pid)
@@ -87,7 +83,7 @@ def launch_role(config_path: Path, role: str, accel: str, root: Path | None = No
     signal.signal(signal.SIGTERM, _terminate)
 
     timeout = float(launch_cfg.get("health_timeout", 120.0))
-    if not _wait_for_health_with_retry(role, endpoint, timeout=timeout, poll_interval=2.0, proc=proc):
+    if not wait_for_health_with_retry(role, endpoint, timeout=timeout, poll_interval=2.0, proc=proc):
         _stop_process(proc)
         raise BootError(f"[{role}] failed to pass health checks at {endpoint}/health")
 
