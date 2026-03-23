@@ -240,8 +240,10 @@ class WorldviewService:
         n_sources     = self._count_sources()
         n_unprocessed = self._count_unprocessed()
 
-        if self._log_cache is None or not self._log_cache.get("processed_files"):
-            # No extraction has been run yet
+        has_profile = bool((self._profile_cache or "").strip())
+        has_processed_files = bool(self._log_cache and self._log_cache.get("processed_files"))
+
+        if not has_profile:
             if n_sources == 0:
                 return (
                     "## Partner Orientation\n"
@@ -249,15 +251,22 @@ class WorldviewService:
                     "reflections) in data/worldview/sources/ and ask for extraction "
                     "to build an orientation profile."
                 )
-            else:
-                pending = f"{n_sources} source document{'s' if n_sources != 1 else ''} pending extraction"
+
+            pending = f"{n_sources} source document{'s' if n_sources != 1 else ''} pending extraction"
+            if not has_processed_files:
                 return (
                     "## Partner Orientation\n"
                     f"{pending}. Source documents are passive context and should not trigger "
                     "unprompted acknowledgment. Extraction remains human-triggered; only mention "
-                    "pending material if explicitly asked.\n"
-                    "Read full profile with worldview_read: data/worldview/profile.md"
+                    "pending material if explicitly asked."
                 )
+
+            return (
+                "## Partner Orientation\n"
+                "Worldview source documents are on file, but no extracted profile is currently "
+                "available. Source documents remain passive context; only mention worldview "
+                "material if explicitly asked."
+            )
 
         # Extraction has been run — profile exists
         n_processed   = len(self._log_cache.get("processed_files", []))
