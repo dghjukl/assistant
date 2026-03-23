@@ -263,17 +263,17 @@ EOS is intended to have a meaningful working environment in its workspace. If yo
 
 ### What it does
 
-The worldview subsystem lets you give EOS a curated understanding of who you are — your values, reasoning style, priorities, and worldview — without waiting for it to infer all of that from conversation over time. You deposit source documents (essays, notes, reflections, anything you've written) and ask EOS to extract a structured profile from them.
+The worldview subsystem lets you give EOS a curated understanding of who you are — your values, reasoning style, priorities, and worldview — without waiting for it to infer all of that from conversation over time. You deposit UTF-8 plain-text source documents such as essays, notes, reflections, or Markdown files, and ask EOS to extract a structured profile from them.
 
 That profile is then injected into every conversation as a compact orientation signal. EOS uses it for interpretive calibration — it shapes how EOS reads your intent, not what it says back to you.
 
 ### How to use it
 
-1. Place any documents you want EOS to understand you through into:
+1. Place any UTF-8 plain-text or Markdown documents you want EOS to understand you through into:
    ```
    data\worldview\sources\
    ```
-   Any file format works — plain text and markdown work best.
+   Worldview extraction supports UTF-8 plain text and Markdown only. Binary formats and non-UTF-8 text are not ingested.
 
 2. Tell EOS: *"Update the worldview profile"* or *"I've added new materials to worldview/sources — process them."*
 

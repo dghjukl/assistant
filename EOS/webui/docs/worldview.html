@@ -7,7 +7,7 @@
 <div class="doc-section" id="what">
   <div class="section-eyebrow">Overview</div>
   <h2 class="section-title">What it Does</h2>
-  <p class="doc-p">You deposit source documents — essays, notes, reflections, anything you've written — and ask EOS to extract a structured profile from them. That profile is injected into every conversation as a compact orientation signal.</p>
+  <p class="doc-p">You deposit source documents — UTF-8 plain-text essays, notes, reflections, or Markdown files — and ask EOS to extract a structured profile from them. That profile is injected into every conversation as a compact orientation signal.</p>
   <p class="doc-p">EOS uses the profile for interpretive calibration: it shapes how EOS reads your intent, not what it says back to you. The profile does not change EOS's outputs directly — it changes how EOS understands the inputs you give it.</p>
 
   <div class="callout important">
@@ -27,7 +27,7 @@
       <div class="step-num purple">1</div>
       <div class="step-body">
         <div class="step-title">Add source documents</div>
-        <div class="step-desc">Place your source documents in <span class="file-path">data\worldview\sources\</span>. Plain text and Markdown work best, but any readable format is accepted. These can be essays, journal entries, notes on your values, descriptions of how you think — anything that gives EOS signal about who you are.</div>
+        <div class="step-desc">Place your source documents in <span class="file-path">data\worldview\sources\</span>. Worldview extraction supports UTF-8 plain text and Markdown only; binary formats and non-UTF-8 text are not ingested. These can be essays, journal entries, notes on your values, descriptions of how you think — anything that gives EOS signal about who you are.</div>
       </div>
     </li>
     <li class="step-card">
