@@ -1132,10 +1132,21 @@ async def startup_event(app=None, config_path: str | Path | None = None):
         # 3a. On-demand server manager (tool / thinking / creativity start only when needed)
         try:
             from runtime.on_demand import init_on_demand_manager
-            _on_demand_manager = init_on_demand_manager(app_state.cfg, config_path.parent, app_state.topology)
-            idle_task = _on_demand_manager.start_idle_loop()
+
+            def _interaction_age_provider():
+                if not app_state.last_interaction_monotonic:
+                    return None
+                return max(0.0, time.monotonic() - app_state.last_interaction_monotonic)
+
+            app_state.server_activation_manager = init_on_demand_manager(
+                app_state.cfg,
+                config_path.parent,
+                app_state.topology,
+                interaction_age_provider=_interaction_age_provider,
+            )
+            idle_task = app_state.server_activation_manager.start_idle_loop()
             _track_background_task("on_demand_idle_loop", idle_task)
-            _emit_log("info", "startup", "OnDemandServerManager initialised")
+            _emit_log("info", "startup", "Elastic auxiliary server manager initialised")
         except Exception as exc:
             logger.warning("OnDemandServerManager init failed: %s", exc)
 
@@ -1466,6 +1477,16 @@ async def startup_event(app=None, config_path: str | Path | None = None):
                 )
         except Exception as exc:
             logger.warning("OvernightCycleService init failed: %s", exc)
+
+        if app_state.server_activation_manager is not None:
+            try:
+                app_state.server_activation_manager.bind_runtime_providers(
+                    sensor_provider=(lambda: app_state.sensor_poller.snapshot() if app_state.sensor_poller is not None else None),
+                    posture_provider=(lambda: _get_overnight_status(include_history=False)),
+                )
+                _emit_log("info", "startup", "Elastic auxiliary policy providers bound")
+            except Exception as exc:
+                logger.warning("Elastic auxiliary provider binding failed: %s", exc)
 
         # 4g. Init InitiativeEngine
         try:
@@ -1917,6 +1938,7 @@ async def get_status_endpoint():
             "services": app_state.runtime_discovery.to_dict().get("services", {}) if app_state.runtime_discovery else {},
             "startup_guidance": app_state.startup_guidance,
             "startup_issues": list(app_state.startup_issues),
+            "activation_policy": app_state.server_activation_manager.status() if app_state.server_activation_manager else None,
             "current_focus": _get_current_focus_dict(),
             "overnight": _get_overnight_status(),
             "entity_state": snapshot.to_dict() if snapshot is not None else None,
@@ -2437,6 +2459,7 @@ async def admin_get_status():
                 "backup": _backup_health_summary(),
                 "overnight": _get_overnight_status(include_history=True),
                 "tracer": tracer_summary,
+                "activation_policy": app_state.server_activation_manager.status() if app_state.server_activation_manager else None,
             }
         })
     except Exception as exc:
@@ -3020,6 +3043,7 @@ async def admin_export():
                 "capabilities": app_state.runtime_discovery.capabilities if app_state.runtime_discovery else {},
                 "signal_bus": _signal_bus_health_summary(),
                 "deployment_mode": topology_summary.get("deployment_mode"),
+                "activation_policy": app_state.server_activation_manager.status() if app_state.server_activation_manager else None,
             },
             "tools": {
                 "total": len(app_state.tool_states),
@@ -3060,6 +3084,7 @@ async def admin_runtime_diagnostics():
             "behavior": getattr(latest_snapshot, "behavior_summary", None),
             "signal_bus": _signal_bus_health_summary(),
             "backup": _backup_health_summary(),
+            "activation_policy": app_state.server_activation_manager.status() if app_state.server_activation_manager else None,
         }
         return JSONResponse({"ok": True, "data": diagnostics})
     except Exception as exc:

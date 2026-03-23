@@ -2,8 +2,14 @@ from __future__ import annotations
 
 from typing import Any
 
-MODEL_BACKEND_ROLES = ("primary", "tool", "thinking", "creativity", "vision")
-START_BACKENDS_MESSAGE = "Start backend services before using UI"
+START_BACKENDS_MESSAGE = "Start baseline backend services before using UI"
+
+
+def _baseline_backend_roles(runtime_discovery: Any) -> tuple[str, ...]:
+    cfg = getattr(runtime_discovery, "config", {}) or {}
+    activation = cfg.get("server_activation", {}) or {}
+    baseline = activation.get("baseline_roles") or ["primary", "tool", "vision"]
+    return tuple(str(role) for role in baseline)
 
 
 def google_unavailable_payload(*, reason: str = "not_configured") -> dict[str, str]:
@@ -18,7 +24,7 @@ def detect_startup_guidance(runtime_discovery: Any) -> str | None:
         return None
 
     services = getattr(runtime_discovery, "services", {}) or {}
-    model_probes = [services.get(role) for role in MODEL_BACKEND_ROLES if services.get(role) is not None]
+    model_probes = [services.get(role) for role in _baseline_backend_roles(runtime_discovery) if services.get(role) is not None]
     if not model_probes:
         return START_BACKENDS_MESSAGE
 

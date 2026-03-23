@@ -251,7 +251,7 @@ async def test_startup_event_sets_user_guidance_when_no_backends_are_running(mon
 
     await app_runtime.startup_event(config_path=config_path)
 
-    assert app_state.startup_guidance == "Start backend services before using UI"
+    assert app_state.startup_guidance == "Start baseline backend services before using UI"
 
 
 
@@ -276,10 +276,10 @@ def test_runtime_discovery_degrades_vision_and_optional_tool_helpers(tmp_path, b
 
     assert discovery.services["tool"].status == "unavailable"
     assert discovery.services["tool"].fallback == "fallback to main"
-    assert discovery.services["thinking"].status == "unavailable"
+    assert discovery.services["thinking"].status == "degraded"
     assert discovery.services["vision"].status == "unavailable"
     assert discovery.capabilities["tools"] == "degraded"
-    assert discovery.capabilities["reasoning"] == "degraded"
+    assert discovery.capabilities["reasoning"] == "available"
     assert discovery.capabilities["vision"] == "unavailable"
 
 @pytest.mark.asyncio

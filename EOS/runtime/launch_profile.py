@@ -51,9 +51,17 @@ def build_launch_plan(profile: str, assessment: DeploymentAssessment, root: Path
     cpu_preferred = assessment.recommended_profile == "compatibility"
     plan: list[LaunchItem] = []
     for role_key in bundle.roles:
-        accel = _choose_accel(role_key, assessment, cpu_preferred=cpu_preferred)
-        script_path = role_for(role_key).launcher_path(root, accel=accel)
+        role_meta = role_for(role_key)
+        try:
+            accel = _choose_accel(role_key, assessment, cpu_preferred=cpu_preferred)
+        except LaunchPlanError:
+            if role_meta.optional:
+                continue
+            raise
+        script_path = role_meta.launcher_path(root, accel=accel)
         if not script_path.is_file():
+            if role_meta.optional:
+                continue
             raise LaunchPlanError(f"Launcher not found: {script_path}")
         plan.append(LaunchItem(role=role_key, accel=accel, script_path=script_path))
     return plan

@@ -12,7 +12,9 @@
       "port": 8080,
       "n_gpu_layers": 99,
       "context_size": 8192,
-      "required": true
+      "required": true,
+      "residency": "resident",
+      "activation_mode": "persistent"
     },
     "vision": {
       "_role": "Perception only. Not active in this profile.",
@@ -24,7 +26,9 @@
       "port": 8081,
       "n_gpu_layers": 99,
       "context_size": 4096,
-      "required": false
+      "required": false,
+      "residency": "resident",
+      "activation_mode": "persistent"
     },
     "tool": {
       "_role": "Extracts structured function calls from Qwen3 output. Does not generate responses.",
@@ -35,7 +39,9 @@
       "port": 8082,
       "n_gpu_layers": 0,
       "context_size": 4096,
-      "required": false
+      "required": false,
+      "residency": "resident",
+      "activation_mode": "persistent"
     },
     "thinking": {
       "_role": "Background thinking worker. Not active in this profile.",
@@ -46,7 +52,12 @@
       "port": 8083,
       "n_gpu_layers": 0,
       "context_size": 4096,
-      "required": false
+      "required": false,
+      "residency": "auxiliary",
+      "activation_mode": "on_demand",
+      "idle_timeout_seconds": 420,
+      "cooldown_seconds": 120,
+      "min_uptime_seconds": 90
     },
     "creativity": {
       "_role": "Controlled divergence subsystem. Advisory only \u2014 proposes alternate interpretations, reframes, analogies, non-obvious solution paths, and ideation. Does not decide, authorize, or override. Optional at runtime; system degrades gracefully if absent.",
@@ -57,7 +68,12 @@
       "port": 8084,
       "n_gpu_layers": 0,
       "context_size": 4096,
-      "required": false
+      "required": false,
+      "residency": "auxiliary",
+      "activation_mode": "on_demand",
+      "idle_timeout_seconds": 420,
+      "cooldown_seconds": 120,
+      "min_uptime_seconds": 90
     }
   },
   "creativity": {
@@ -289,5 +305,70 @@
     "default_soon_minutes": 30,
     "default_morning_return_hour": 8.0,
     "llm_fallback_enabled": true
+  },
+  "server_activation": {
+    "_comment": "Centralized activation policy for elastic auxiliary servers. The executive keeps baseline services resident and may start auxiliary cognition on demand when posture + resources allow.",
+    "startup_baseline_only": true,
+    "baseline_roles": [
+      "primary",
+      "tool",
+      "vision"
+    ],
+    "auxiliary_roles": [
+      "thinking",
+      "creativity"
+    ],
+    "active_interaction_grace_seconds": 900,
+    "active_mode_threshold": 0.82,
+    "idle_mode_threshold": 0.45,
+    "resource_thresholds": {
+      "min_free_ram_mb": 2048,
+      "min_free_vram_mb": 1024,
+      "max_cpu_percent": 85,
+      "max_gpu_percent": 90,
+      "allow_when_metrics_unavailable": true
+    },
+    "roles": {
+      "primary": {
+        "residency": "resident",
+        "activation_mode": "persistent",
+        "idle_timeout_seconds": 300,
+        "cooldown_seconds": 90,
+        "min_uptime_seconds": 60,
+        "role_need_score": 0.7
+      },
+      "vision": {
+        "residency": "resident",
+        "activation_mode": "persistent",
+        "idle_timeout_seconds": 300,
+        "cooldown_seconds": 90,
+        "min_uptime_seconds": 60,
+        "role_need_score": 0.7
+      },
+      "tool": {
+        "residency": "resident",
+        "activation_mode": "persistent",
+        "idle_timeout_seconds": 300,
+        "cooldown_seconds": 90,
+        "min_uptime_seconds": 60,
+        "role_need_score": 0.7
+      },
+      "thinking": {
+        "residency": "auxiliary",
+        "activation_mode": "on_demand",
+        "idle_timeout_seconds": 420,
+        "cooldown_seconds": 120,
+        "min_uptime_seconds": 90,
+        "role_need_score": 0.78
+      },
+      "creativity": {
+        "residency": "auxiliary",
+        "activation_mode": "on_demand",
+        "idle_timeout_seconds": 420,
+        "cooldown_seconds": 120,
+        "min_uptime_seconds": 90,
+        "role_need_score": 0.74
+      }
+    }
   }
 }

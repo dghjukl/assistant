@@ -57,7 +57,7 @@
   <h3 class="sub-title" id="degradation-states">The Three States</h3>
   <div class="mode-grid">
     <div class="mode-card on"><div class="mode-name"><span class="badge active">active</span></div><div class="mode-desc">Service running and responding normally. Full capability available.</div></div>
-    <div class="mode-card warn"><div class="mode-name"><span class="badge degraded">degraded</span></div><div class="mode-desc">Service missing but a fallback is in use. Functionality continues at reduced quality or speed.</div></div>
+    <div class="mode-card warn"><div class="mode-name"><span class="badge degraded">degraded</span></div><div class="mode-desc">Service missing, intentionally dormant, or using a fallback path. Functionality continues with reduced immediacy, quality, or speed.</div></div>
     <div class="mode-card off"><div class="mode-name"><span class="badge unavail">unavailable</span></div><div class="mode-desc">Feature is cleanly disabled. EOS reports it as unavailable and does not attempt it.</div></div>
   </div>
 
@@ -67,8 +67,8 @@
       <thead><tr><th>Missing Component</th><th>State</th><th>Effect</th></tr></thead>
       <tbody>
         <tr><td>Tool helper (port 8082)</td><td><span class="badge degraded">degraded</span></td><td>Tool calls fall back to the main model</td></tr>
-        <tr><td>Thinking helper (port 8083)</td><td><span class="badge degraded">degraded</span></td><td>Reasoning falls back to the main model</td></tr>
-        <tr><td>Creativity helper (port 8084)</td><td><span class="badge degraded">degraded</span></td><td>Creativity requests fall back to main / degrade cleanly</td></tr>
+        <tr><td>Thinking helper (port 8083)</td><td><span class="badge degraded">degraded</span></td><td>Reasoning helper is elastic: it may be intentionally inactive until the executive requests it.</td></tr>
+        <tr><td>Creativity helper (port 8084)</td><td><span class="badge degraded">degraded</span></td><td>Creativity helper is elastic: it may be intentionally inactive until the executive requests it.</td></tr>
         <tr><td>Vision helper (port 8081)</td><td><span class="badge unavail">unavailable</span></td><td>Vision features cleanly disabled</td></tr>
         <tr><td>STT model</td><td><span class="badge unavail">unavailable</span></td><td>Voice input disabled. Text chat unaffected.</td></tr>
         <tr><td>TTS model</td><td><span class="badge unavail">unavailable</span></td><td>Voice output disabled. Text chat unaffected.</td></tr>

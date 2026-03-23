@@ -34,8 +34,8 @@ Deviate only when you specifically need one of these:
 
 - **Lower download size / manual model choice** → use `setup\Setup-Lite.ps1`
 - **Lower RAM or VRAM usage** → use `launchers\start-minimal.bat`
-- **Extra creativity capacity** → use `launchers\start-full.bat`
-- **Vision support** → add `launchers\start-vision-gpu.bat`
+- **Lower resident footprint with elastic auxiliary reasoning still available** → use `launchers\start-standard.bat`
+- **Vision support** → keep `vision` baseline-resident when installed, or add `launchers\start-vision-gpu.bat`
 - **Precise hardware or backend control** → use the per-server launchers
 - **Diagnostics without startup** → use `status-eos.bat` or `python eos.py --status`
 
@@ -96,10 +96,10 @@ Legacy launchers under `launchers\legacy\` are now compatibility shims only. The
 
 EOS uses a **single canonical config**: `config.json`.
 
-That file describes the full intended system — main, tool, thinking, creativity, vision, STT, and TTS. Startup behavior is modular:
+That file describes the full intended system — main, tool, thinking, creativity, vision, STT, and TTS. Resident baseline services and elastic auxiliary services are configured explicitly through `server_activation`. Startup behavior is modular:
 
 - **Per-server launchers** start exactly one backend each
-- **Bundle launchers** start common backend combinations
+- **Bundle launchers** start resident baseline combinations only; auxiliary reasoning servers stay policy-driven and on-demand by default
 - **`start-eos.bat` / `python eos.py`** discover running services and start the WebUI
 - **`status-eos.bat` / `python eos.py --status`** report current capability state without starting the WebUI
 

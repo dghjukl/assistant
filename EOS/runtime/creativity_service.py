@@ -275,7 +275,18 @@ class CreativityService:
         from runtime.on_demand import get_on_demand_manager
         manager = get_on_demand_manager()
         if manager is not None:
-            endpoint = await manager.ensure("creativity")
+            endpoint = await manager.ensure(
+                "creativity",
+                reason=f"creativity consultation for domain:{domain}",
+                task_type={
+                    DOMAIN_AUTONOMOUS: "creative_exploration",
+                    DOMAIN_BRAINSTORM: "brainstorming",
+                    DOMAIN_STUCK: "stuck_recovery",
+                }.get(domain, "creative_exploration"),
+                escalation=(domain in {DOMAIN_BRAINSTORM, DOMAIN_STUCK}),
+                operating_mode="idle_reflection" if domain == DOMAIN_AUTONOMOUS else None,
+                requested_by="executive",
+            )
         else:
             endpoint = self._topology.creativity_endpoint()
 

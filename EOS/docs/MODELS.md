@@ -50,7 +50,7 @@ This is the main language model — the one that reasons, holds identity, and pr
 
 ### Thinking Model — `models/thinking/`
 
-**Optional.** Enables background deep reasoning dispatched by idle cognition, initiative, and identity evaluation. Degrades gracefully if absent.
+**Optional.** Enables background deep reasoning dispatched by idle cognition, initiative, reflection, and escalated executive reasoning. When installed, it is treated as an elastic auxiliary backend: not resident by default, started on demand when posture and resources allow.
 
 - Place any instruct GGUF here
 - Default: `LFM2.5-1.2B-Thinking-Q5_K_M.gguf` (~805 MB)
@@ -68,7 +68,7 @@ This is the main language model — the one that reasons, holds identity, and pr
 
 ### Creativity Model — `models/creativity/`
 
-**Optional.** Enables the divergence subsystem — alternate interpretations, reframing, analogies, and ideation. Advisory only; does not make decisions. Degrades gracefully if absent.
+**Optional.** Enables the divergence subsystem — alternate interpretations, reframing, analogies, and ideation. Advisory only; does not make decisions. When installed, it is treated as an elastic auxiliary backend and is only activated on demand when policy and resources allow.
 
 - Place any instruct-tuned GGUF here
 - Bring your own model — any compatible instruct GGUF works

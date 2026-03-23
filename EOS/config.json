@@ -14,7 +14,9 @@
       "required": true,
       "enabled": true,
       "cpu_n_gpu_layers": 0,
-      "gpu_n_gpu_layers": 99
+      "gpu_n_gpu_layers": 99,
+      "residency": "resident",
+      "activation_mode": "persistent"
     },
     "vision": {
       "_role": "Perception only. Routes image inputs through VisionObservation schema. Output injected as context into primary. Does NOT converse.",
@@ -29,7 +31,9 @@
       "required": false,
       "enabled": true,
       "cpu_n_gpu_layers": 0,
-      "gpu_n_gpu_layers": 99
+      "gpu_n_gpu_layers": 99,
+      "residency": "resident",
+      "activation_mode": "persistent"
     },
     "tool": {
       "_role": "Extracts structured function calls from primary output. Does not generate responses.",
@@ -44,7 +48,9 @@
       "enabled": true,
       "cpu_n_gpu_layers": 0,
       "binary_gpu": "llama-b8149-bin-win-cuda-13.1-x64/llama-server.exe",
-      "gpu_n_gpu_layers": 99
+      "gpu_n_gpu_layers": 99,
+      "residency": "resident",
+      "activation_mode": "persistent"
     },
     "thinking": {
       "_role": "Background thinking worker. Non-blocking. Dispatched to by idle cognition, initiative, investigation, identity eval. NOT an escalation target \u2014 primary uses /think for inline reasoning.",
@@ -59,7 +65,12 @@
       "enabled": true,
       "cpu_n_gpu_layers": 0,
       "binary_gpu": "llama-b8149-bin-win-cuda-13.1-x64/llama-server.exe",
-      "gpu_n_gpu_layers": 99
+      "gpu_n_gpu_layers": 99,
+      "residency": "auxiliary",
+      "activation_mode": "on_demand",
+      "idle_timeout_seconds": 420,
+      "cooldown_seconds": 120,
+      "min_uptime_seconds": 90
     },
     "creativity": {
       "_role": "Controlled divergence subsystem. Advisory only \u2014 proposes alternate interpretations, reframes, analogies, non-obvious solution paths, and ideation. Does not decide, authorize, or override. Degrades gracefully if absent.",
@@ -74,7 +85,12 @@
       "enabled": true,
       "cpu_n_gpu_layers": 0,
       "binary_gpu": "llama-b8149-bin-win-cuda-13.1-x64/llama-server.exe",
-      "gpu_n_gpu_layers": 99
+      "gpu_n_gpu_layers": 99,
+      "residency": "auxiliary",
+      "activation_mode": "on_demand",
+      "idle_timeout_seconds": 420,
+      "cooldown_seconds": 120,
+      "min_uptime_seconds": 90
     }
   },
   "creativity": {
@@ -340,7 +356,9 @@
     "_comment": "Optional external inference via Hugging Face. Disabled by default. localhost-only. Never required for system operation.",
     "enabled": false,
     "provider": "huggingface",
-    "_provider_options": ["huggingface"],
+    "_provider_options": [
+      "huggingface"
+    ],
     "localhost_only": true,
     "_localhost_only_note": "Hard-enforced in backend. External inference will never be triggered by Discord, LAN, or any remote origin.",
     "monthly_budget_usd": 0.0,
@@ -352,12 +370,26 @@
     "daily_request_cap": null,
     "_daily_request_cap_note": "Maximum number of external requests per calendar day. Null = unlimited (budget still applies).",
     "approval_mode": "ask_for_paid_calls",
-    "_approval_mode_options": ["never", "ask_for_paid_calls", "always"],
+    "_approval_mode_options": [
+      "never",
+      "ask_for_paid_calls",
+      "always"
+    ],
     "escalation_mode": "disabled",
-    "_escalation_mode_options": ["disabled", "emergency_only", "constrained", "balanced", "permissive"],
+    "_escalation_mode_options": [
+      "disabled",
+      "emergency_only",
+      "constrained",
+      "balanced",
+      "permissive"
+    ],
     "current_billing_cycle_start": null,
     "_current_billing_cycle_start_note": "YYYY-MM-DD. Null = auto-set to the 1st of the current month.",
-    "soft_warning_thresholds": [50, 80, 95],
+    "soft_warning_thresholds": [
+      50,
+      80,
+      95
+    ],
     "_soft_warning_thresholds_note": "Percent of monthly budget at which the UI shows a warning.",
     "huggingface": {
       "model_id": "mistralai/Mistral-7B-Instruct-v0.2",
@@ -386,5 +418,70 @@
     "default_soon_minutes": 30,
     "default_morning_return_hour": 8.0,
     "llm_fallback_enabled": true
+  },
+  "server_activation": {
+    "_comment": "Centralized activation policy for elastic auxiliary servers. The executive keeps baseline services resident and may start auxiliary cognition on demand when posture + resources allow.",
+    "startup_baseline_only": true,
+    "baseline_roles": [
+      "primary",
+      "tool",
+      "vision"
+    ],
+    "auxiliary_roles": [
+      "thinking",
+      "creativity"
+    ],
+    "active_interaction_grace_seconds": 900,
+    "active_mode_threshold": 0.82,
+    "idle_mode_threshold": 0.45,
+    "resource_thresholds": {
+      "min_free_ram_mb": 2048,
+      "min_free_vram_mb": 1024,
+      "max_cpu_percent": 85,
+      "max_gpu_percent": 90,
+      "allow_when_metrics_unavailable": true
+    },
+    "roles": {
+      "primary": {
+        "residency": "resident",
+        "activation_mode": "persistent",
+        "idle_timeout_seconds": 300,
+        "cooldown_seconds": 90,
+        "min_uptime_seconds": 60,
+        "role_need_score": 0.7
+      },
+      "vision": {
+        "residency": "resident",
+        "activation_mode": "persistent",
+        "idle_timeout_seconds": 300,
+        "cooldown_seconds": 90,
+        "min_uptime_seconds": 60,
+        "role_need_score": 0.7
+      },
+      "tool": {
+        "residency": "resident",
+        "activation_mode": "persistent",
+        "idle_timeout_seconds": 300,
+        "cooldown_seconds": 90,
+        "min_uptime_seconds": 60,
+        "role_need_score": 0.7
+      },
+      "thinking": {
+        "residency": "auxiliary",
+        "activation_mode": "on_demand",
+        "idle_timeout_seconds": 420,
+        "cooldown_seconds": 120,
+        "min_uptime_seconds": 90,
+        "role_need_score": 0.78
+      },
+      "creativity": {
+        "residency": "auxiliary",
+        "activation_mode": "on_demand",
+        "idle_timeout_seconds": 420,
+        "cooldown_seconds": 120,
+        "min_uptime_seconds": 90,
+        "role_need_score": 0.74
+      }
+    }
   }
 }

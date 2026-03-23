@@ -64,18 +64,18 @@ Run:
 
 - `launchers\start-standard.bat`
 
-That opens separate windows for:
+That opens separate windows for the resident baseline services EOS expects during partner-facing use:
 
 - Main model (port 8080)
 - Tool helper (port 8082)
-- Thinking helper (port 8083)
+- Vision helper (port 8081) when installed and launchable on this machine
 
-Wait for each window to print a ready message before proceeding.
+Thinking and creativity are now elastic auxiliary servers. They stay off until the executive requests them and policy/resource checks allow activation.
 
 ### When to choose a different backend path
 
 - `launchers\start-minimal.bat` → lower-resource fallback
-- `launchers\start-full.bat` → add creativity support
+- `launchers\start-full.bat` → preload the resident baseline stack while keeping auxiliary cognition elastic
 - per-server launchers in `launchers\` → manual control over exactly what runs
 - `launchers\start-vision-gpu.bat` → add vision to any bundle
 
@@ -94,8 +94,8 @@ EOS prints a summary like:
 ```
 Main model: active
 Tool helper: active
-Thinking helper: active
-Creativity helper: unavailable (fallback to main)
+Thinking helper: degraded (managed on-demand; currently inactive)
+Creativity helper: degraded (managed on-demand; currently inactive)
 Vision: unavailable
 STT: active
 TTS: active
@@ -105,7 +105,7 @@ Effective capabilities:
 chat: available
 tools: available
 reasoning: available
-creativity: degraded
+creativity: available
 vision: unavailable
 voice: available
 ```

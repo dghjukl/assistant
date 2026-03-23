@@ -71,7 +71,7 @@ This checks Python packages, binaries, model files, port availability, and the c
 ### When to deviate from the recommended launch path
 
 - `launchers\start-minimal.bat` — use when you need a lower-resource stack
-- `launchers\start-full.bat` — use when you want creativity support in the default bundle
+- `launchers\start-full.bat` — use when you want the full installed stack available while still keeping auxiliary cognition on-demand
 - `launchers\start-vision-gpu.bat` — add vision to any normal stack
 - per-server launchers — use when you need exact hardware or backend control
 - `python eos.py` — use for direct CLI control
@@ -90,7 +90,9 @@ You can also launch one backend at a time:
 - `launchers\start-creativity-gpu.bat`
 - `launchers\start-vision-gpu.bat`
 
-`start-eos.bat` and `python eos.py` never start model servers. They only discover running services and assemble runtime capabilities.
+`start-eos.bat` and `python eos.py` never start model servers. They only discover running services, expose the activation policy, and assemble runtime capabilities.
+
+Thinking and creativity are no longer expected to be always-on. They remain installed helpers, but the executive starts them dynamically when escalation is justified and resources permit.
 
 Open **http://127.0.0.1:7860/** when the WebUI is up.
 
@@ -122,7 +124,7 @@ Python is not on your PATH. Re-install Python and enable the PATH option.
 Run `python verify.py` first, then use `launchers\Launch EOS.bat` so EOS can explain the missing model, runtime, or unsupported profile before launch.
 
 **A backend is missing from EOS startup summary**  
-Run `status-eos.bat` to see whether it is `active`, `degraded`, or `unavailable`.
+Run `status-eos.bat` to see whether it is `active`, `degraded`, or `unavailable`. For auxiliary reasoning servers, `degraded` may mean "managed on-demand and currently inactive" rather than a fault.
 
 **Port already in use**  
 Another application is using one of the required ports (8080–8084 or 7860).
