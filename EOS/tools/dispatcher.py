@@ -229,72 +229,39 @@ async def execute(
     topology: "RuntimeTopology",
     cfg: dict,
 ) -> str:
-    """Execute a tool by name with given args. Returns string result."""
-
-    # Autonomy gates — check permission first, return rich diagnostic if blocked
-    entry = TOOL_REGISTRY.get(tool)
-    if entry:
-        perm = entry["permission"]
-        if not can(perm):
-            return _permission_error(tool)
+    """Execute a tool by routing through the live ToolExecutor only."""
+    del topology, cfg  # kept for backward-compatible signature
 
     try:
-        if tool == "web_search":
-            from tools.web_search import search
-            return await search(args.get("query", ""))
+        from runtime.orchestrator import get_tool_executor
 
-        elif tool == "read_file":
-            from tools.file_ops import read_file
-            return read_file(args.get("path", ""), cfg)
-
-        elif tool == "write_file":
-            from tools.file_ops import write_file
-            return write_file(args.get("path", ""), args.get("content", ""), cfg)
-
-        elif tool == "list_dir":
-            from tools.file_ops import list_dir
-            return list_dir(args.get("path", "."), cfg)
-
-        elif tool == "screen_capture":
-            from tools.screen_capture import get_screen_description
-            return await get_screen_description(args.get("prompt"), topology)
-
-        elif tool == "webcam_capture":
-            from tools.webcam_capture import get_webcam_description
-            return await get_webcam_description(args.get("prompt"), topology)
-
-        elif tool == "query_memory":
-            from tools.memory_query import query_memory
-            return await query_memory(args.get("question", ""))
-
-        elif tool == "save_memory":
-            from tools.memory_query import save_memory
-            return await save_memory(args.get("text", ""))
-
-        elif tool == "list_events":
-            from tools.calendar import list_events
-            return await list_events(args.get("days_ahead", 7), cfg)
-
-        elif tool == "create_event":
-            from tools.calendar import create_event
-            return await create_event(
-                args.get("title", ""),
-                args.get("start_iso", ""),
-                args.get("duration_minutes", 60),
-                args.get("description", ""),
-                cfg,
-            )
-
-        elif tool == "send_discord":
-            from tools.discord_send import send_message
-            return await send_message(args.get("content", ""), args.get("channel_id"))
-
-        else:
-            return f"[Unknown tool: '{tool}' — not in the tool registry]"
-
+        executor = get_tool_executor()
     except Exception as exc:
-        logger.error("Tool '%s' failed: %s", tool, exc)
-        return f"[Tool '{tool}' failed during execution: {exc}]"
+        logger.error("ToolExecutor lookup failed for %s: %s", tool, exc)
+        return f"[Tool '{tool}' failed: ToolExecutor unavailable: {exc}]"
+
+    if executor is None:
+        return (
+            f"[Tool '{tool}' cannot run: live ToolExecutor is not wired. "
+            "Legacy TOOL_REGISTRY execution is disabled.]"
+        )
+
+    result = executor.execute(tool, args or {}, caller_trust="VERIFIED_USER")
+    if result.pending_confirmation_id:
+        return (
+            f"[Tool '{tool}' requires operator confirmation — "
+            f"confirmation_id={result.pending_confirmation_id}]"
+        )
+    if not result.success:
+        return f"[Tool '{tool}' failed: {result.error}]"
+
+    output = result.output
+    if isinstance(output, str):
+        return output
+    try:
+        return json.dumps(output, ensure_ascii=False)
+    except Exception:
+        return str(output)
 
 
 async def run_tool_intent(

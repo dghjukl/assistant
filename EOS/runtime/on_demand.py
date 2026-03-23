@@ -113,7 +113,7 @@ class OnDemandServerManager:
 
     async def _start(self, role: str) -> str | None:
         """Launch the server, wait for health, update topology. Returns endpoint or None."""
-        from runtime.boot import _launch_server, _wait_for_health_with_retry
+        from runtime.server_runtime import is_port_bound, launch_server, wait_for_health_with_retry
 
         srv_cfg = self._cfg.get("servers", {}).get(role)
         if not srv_cfg:
@@ -125,9 +125,14 @@ class OnDemandServerManager:
         endpoint = f"http://{host}:{port}"
         timeout  = float(srv_cfg.get("health_timeout", 60.0))
 
+        if is_port_bound(host, port):
+            logger.warning("[OnDemand] Port already bound for %s on %s — skipping launch", role, endpoint)
+            self._topology.mark_error(role, "port already bound")
+            return None
+
         logger.info("[OnDemand] Starting %s on %s …", role, endpoint)
         try:
-            proc = _launch_server(role, srv_cfg, self._root)
+            proc = launch_server(role, srv_cfg, self._root)
         except Exception as exc:
             logger.error("[OnDemand] Failed to launch %s: %s", role, exc)
             self._topology.mark_error(role, str(exc))
@@ -141,7 +146,7 @@ class OnDemandServerManager:
         try:
             ready = await loop.run_in_executor(
                 None,
-                lambda: _wait_for_health_with_retry(
+                lambda: wait_for_health_with_retry(
                     role, endpoint, timeout=timeout, poll_interval=1.0, proc=proc
                 ),
             )
