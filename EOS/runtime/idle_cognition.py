@@ -201,9 +201,11 @@ class IdleCognitionEngine:
             forced=True, entity_snapshot=entity_snapshot,
         )
 
-    def notify_interaction(self) -> None:
+    def notify_interaction(self, *, at_monotonic: float | None = None) -> None:
         """Record a user interaction and reset the engine's idle clock."""
-        self._last_interaction_monotonic = time.monotonic()
+        self._last_interaction_monotonic = (
+            float(at_monotonic) if at_monotonic is not None else time.monotonic()
+        )
 
     def status(self) -> dict:
         """Return current engine status for the admin panel."""
