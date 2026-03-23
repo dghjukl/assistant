@@ -5,7 +5,9 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── Credentials (real files — example templates ARE tracked) ─────────────────
-AI personal files/
+AI personal files/*
+!AI personal files/*.example.txt
+!AI personal files/*.example.json
 
 # ── Runtime auth tokens ───────────────────────────────────────────────────────
 data/google_token.json
@@ -53,6 +55,11 @@ models/utility/*.gguf
 llama-CPU/
 llama-b8149-bin-win-cuda-13.1-x64/
 Piper/
+
+# ── Local secrets / env files ────────────────────────────────────────────────
+.env
+.env.*
+*.local
 
 # ── Python ────────────────────────────────────────────────────────────────────
 __pycache__/
