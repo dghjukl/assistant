@@ -82,6 +82,7 @@ from core.entity  import build_system_prompt, should_think, should_use_tool, sho
 from core.memory  import init_db, log_interaction, get_recent_interactions, search_memory, store_memory
 from core.identity import run_evaluation_cycle, request_self_name
 from core.memory   import get_entity_name, get_relational_model
+from core.worldview import build_worldview_extraction_prompt
 from runtime.topology import RuntimeTopology
 from runtime.thinking_faculty import ThinkingFaculty, ThinkingArtifact
 from runtime.creativity_service import (
@@ -463,6 +464,29 @@ _ESCALATION_SIGNALS = (
     "diagnose", "investigate", "reason through",
 )
 
+_WORLDVIEW_PROCESSING_SIGNALS = (
+    "update the worldview profile",
+    "refresh the worldview profile",
+    "refresh your understanding from the worldview materials",
+    "refresh your understanding from worldview materials",
+    "process worldview sources",
+    "process worldview source",
+    "process the worldview sources",
+    "process the worldview source",
+    "run worldview extraction",
+    "refresh worldview",
+)
+
+_WORLDVIEW_KEYWORDS = (
+    "worldview",
+    "profile",
+    "sources",
+    "source documents",
+    "materials",
+    "extraction",
+    "understanding",
+)
+
 
 def _classify_epistemic_mode(user_input: str) -> EpistemicMode:
     """
@@ -486,6 +510,86 @@ def _classify_epistemic_mode(user_input: str) -> EpistemicMode:
         return EpistemicMode.INTERNAL_ESCALATION
 
     return EpistemicMode.DIRECT_ANSWER
+
+
+def _is_worldview_processing_request(user_input: str) -> bool:
+    """Return True when the user is clearly asking to run worldview extraction."""
+    lower = user_input.lower()
+    if any(signal in lower for signal in _WORLDVIEW_PROCESSING_SIGNALS):
+        return True
+
+    worldview_anchor = "worldview" in lower or "profile" in lower
+    action_anchor = any(
+        action in lower
+        for action in ("refresh", "update", "process", "extract", "rebuild", "incorporate", "run")
+    )
+    material_anchor = any(keyword in lower for keyword in _WORLDVIEW_KEYWORDS)
+    return worldview_anchor and action_anchor and material_anchor
+
+
+async def execute_worldview_extraction(
+    topology: RuntimeTopology,
+    user_input: str,
+    cfg: dict,
+    *,
+    entity_snapshot: Any | None = None,
+    trigger_source: str = "chat",
+) -> dict[str, Any]:
+    """
+    Execute the worldview extraction workflow using the live WorldviewService.
+
+    Returns a structured result with extraction metadata and a user-facing message.
+    """
+    import webui.server as _srv
+
+    worldview_service = getattr(_srv, "_worldview_service", None)
+    if worldview_service is None:
+        raise RuntimeError("WorldviewService not initialized")
+
+    async def _extract(payload: dict[str, Any]) -> str:
+        prompt = build_worldview_extraction_prompt(payload)
+        return await call_qwen3(
+            topology,
+            prompt,
+            cfg,
+            use_think=True,
+            override_system=(
+                "You are updating EOS's internal worldview profile from source documents. "
+                "Return only the full markdown contents for profile.md."
+            ),
+            entity_snapshot=entity_snapshot,
+        )
+
+    result = await worldview_service.refresh_profile_from_sources(
+        _extract,
+        trigger={
+            "source": trigger_source,
+            "request": user_input,
+        },
+    )
+
+    changed_count = len(result.get("changed_files", []))
+    if result.get("status") == "noop":
+        reason = result.get("reason")
+        if reason == "no_sources":
+            message = (
+                "I checked the worldview extraction path, but there are no source "
+                "documents in data/worldview/sources/ yet."
+            )
+        else:
+            message = (
+                "I checked the worldview sources and there aren't any new or changed "
+                "documents to incorporate right now."
+            )
+    else:
+        noun = "document" if changed_count == 1 else "documents"
+        message = (
+            f"I refreshed the worldview profile from {changed_count} new or changed "
+            f"source {noun}. I updated data/worldview/profile.md and extraction_log.json."
+        )
+
+    result["message"] = message
+    return result
 
 
 # ── Qwen3 call ─────────────────────────────────────────────────────────────────
@@ -683,8 +787,18 @@ async def process_turn(
             pass
 
     try:
+        if _is_worldview_processing_request(user_input):
+            workflow_result = await execute_worldview_extraction(
+                topology,
+                user_input,
+                cfg,
+                entity_snapshot=entity_snapshot,
+                trigger_source="chat",
+            )
+            final_response = workflow_result["message"]
+
         # ── DEFERRAL ──────────────────────────────────────────────────────────
-        if mode == EpistemicMode.DEFERRAL:
+        elif mode == EpistemicMode.DEFERRAL:
             deferral_prompt = (
                 f"The user asked: '{user_input}'\n\n"
                 "This requires real-time or dynamic information that may be outside "

@@ -67,7 +67,7 @@ from webui.schemas import (
 from core.audit import init_audit_store, get_audit_store
 from core.secrets import init_secrets, secrets_manager as _secrets_manager_ref
 from runtime.service_discovery import discover_runtime
-from runtime.orchestrator import startup, process_turn
+from runtime.orchestrator import startup, process_turn, execute_worldview_extraction
 from runtime.topology import RuntimeTopology
 
 # Try to import CognitionTracer and SignalBus; fail gracefully
@@ -4588,6 +4588,48 @@ async def admin_worldview_refresh():
             },
         })
     except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+@app.post("/admin/system/worldview/extract")
+async def admin_worldview_extract():
+    """
+    Trigger worldview extraction from source documents via the runtime workflow.
+    """
+    try:
+        if _worldview_service is None:
+            return JSONResponse(
+                {"ok": False, "error": "WorldviewService not initialized"},
+                status_code=503,
+            )
+        if _topology is None:
+            return JSONResponse(
+                {"ok": False, "error": "Runtime topology not initialized"},
+                status_code=503,
+            )
+
+        entity_snapshot = _build_entity_snapshot(
+            scope="admin",
+            source="admin.system.worldview.extract",
+            metadata={"route": "/admin/system/worldview/extract"},
+        )
+        result = await execute_worldview_extraction(
+            _topology,
+            "Admin API requested worldview extraction.",
+            _cfg,
+            entity_snapshot=entity_snapshot,
+            trigger_source="admin_api",
+        )
+        return JSONResponse({
+            "ok": True,
+            "data": {
+                "result": result,
+                "profile": _worldview_service.profile_summary(),
+                "sources": _worldview_service.sources_summary(),
+            },
+        })
+    except Exception as exc:
+        logger.exception("Worldview extraction route failed")
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
 
