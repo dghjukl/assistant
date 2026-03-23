@@ -217,6 +217,119 @@ def _build_entity_snapshot(
         return None
 
 
+def _presence_recent_events(limit: int = 6) -> list[dict[str, Any]]:
+    """Return recent notable runtime events for the presence layer."""
+    notable = []
+    interesting_sources = (
+        "chat", "initiative", "investigation", "backup", "health",
+        "health_monitor", "idle_cognition", "reflection", "maintenance",
+    )
+    for entry in reversed(_log_ring):
+        source = str(entry.get("source") or "")
+        if source and not any(anchor in source for anchor in interesting_sources):
+            continue
+        notable.append({
+            "timestamp": entry.get("timestamp"),
+            "level": entry.get("level"),
+            "source": source or "runtime",
+            "message": str(entry.get("message") or "").strip(),
+            "detail": entry.get("detail"),
+        })
+        if len(notable) >= limit:
+            break
+    return notable
+
+
+def _build_presence_state(
+    *,
+    entity_snapshot=None,
+    include_recent_interactions: bool = True,
+):
+    """Build a presence-layer state from live runtime services."""
+    try:
+        from runtime.presence_layer import build_presence_state
+    except Exception:
+        return None
+
+    recent_interactions: list[dict[str, Any]] = []
+    if include_recent_interactions:
+        try:
+            recent_interactions = get_recent_interactions(8)
+        except Exception:
+            recent_interactions = []
+
+    current_focus = (
+        getattr(entity_snapshot, "current_focus_summary", None)
+        if entity_snapshot is not None else None
+    ) or _get_current_focus_dict()
+    continuity = (
+        getattr(entity_snapshot, "session_summary", None)
+        if entity_snapshot is not None else None
+    ) or (_session_continuity.to_dict() if _session_continuity is not None else {"has_prior_session": False})
+    environment = (
+        getattr(entity_snapshot, "environment_summary", None)
+        if entity_snapshot is not None else None
+    ) or {}
+    capabilities = (
+        getattr(entity_snapshot, "capabilities_summary", None)
+        if entity_snapshot is not None else None
+    ) or (
+        _capability_registry.health_summary()
+        if _capability_registry is not None and hasattr(_capability_registry, "health_summary")
+        else {}
+    )
+
+    initiative = {
+        "enabled": can("initiative"),
+        "queue_depth": len(_initiative_engine.get_queue()) if _initiative_engine is not None else 0,
+    }
+    if _initiative_engine is not None and hasattr(_initiative_engine, "get_status"):
+        try:
+            initiative.update(_initiative_engine.get_status())
+        except Exception:
+            pass
+
+    idle = {"tier": "active", "seconds_since_interaction": 0.0}
+    try:
+        idle_secs = max(time.monotonic() - float(_last_interaction_monotonic or time.monotonic()), 0.0)
+        idle = {"tier": "active", "seconds_since_interaction": round(idle_secs, 2)}
+        ic_cfg = _cfg.get("idle_cognition", {})
+        resting_h = float(ic_cfg.get("resting_threshold_hours", 2.0))
+        drifting_h = float(ic_cfg.get("drifting_threshold_hours", 6.0))
+        deep_h = float(ic_cfg.get("deep_threshold_hours", 24.0))
+        idle_hours = idle_secs / 3600.0
+        if idle_hours >= deep_h:
+            idle["tier"] = "deep"
+        elif idle_hours >= drifting_h:
+            idle["tier"] = "drifting"
+        elif idle_hours >= resting_h:
+            idle["tier"] = "resting"
+        if _idle_cognition is not None and hasattr(_idle_cognition, "status"):
+            idle.update(_idle_cognition.status())
+    except Exception:
+        pass
+
+    try:
+        return build_presence_state(
+            current_focus=current_focus,
+            continuity=continuity,
+            environment=environment,
+            capabilities=capabilities,
+            recent_events=_presence_recent_events(),
+            recent_interactions=recent_interactions,
+            initiative=initiative,
+            idle=idle,
+        )
+    except Exception as exc:
+        logger.debug("Presence layer build failed: %s", exc)
+        return None
+
+
+def _build_presence_payload(*, entity_snapshot=None) -> dict[str, Any] | None:
+    state = _build_presence_state(entity_snapshot=entity_snapshot)
+    return state.to_dict() if state is not None else None
+
+
 def _get_current_focus_dict() -> dict[str, Any]:
     """Return the authoritative current-focus record as a plain dict."""
     if _current_focus_service is None:
@@ -1591,6 +1704,26 @@ async def get_memory_recent(limit: int = 20):
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
 
+@app.get("/api/presence")
+async def get_presence():
+    """Return the current presence-layer cues and supporting context."""
+    try:
+        snapshot = _build_entity_snapshot(
+            scope="turn",
+            source="api.presence",
+            metadata={"endpoint": "/api/presence"},
+        )
+        payload = _build_presence_payload(entity_snapshot=snapshot)
+        return JSONResponse({
+            "ok": True,
+            "presence": payload,
+            "current_focus": _get_current_focus_dict(),
+        })
+    except Exception as exc:
+        logger.error("Presence endpoint error: %s", exc)
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
 @app.get("/api/initiative")
 async def get_initiative():
     """Stub: initiative queue and enabled state."""
@@ -1669,11 +1802,17 @@ async def post_chat(body: ChatRequest):
             _initiative_engine.notify_turn()
 
         from core.memory import count_interactions
+        presence_snapshot = _build_entity_snapshot(
+            scope="turn",
+            source="api.chat.response",
+            metadata={"endpoint": "/api/chat", "user_input_preview": user_input[:120]},
+        )
         return JSONResponse({
             "ok": True,
             "response": response,
             "turn_count": count_interactions(),
             "current_focus": _get_current_focus_dict(),
+            "presence": _build_presence_payload(entity_snapshot=presence_snapshot),
         })
     except Exception as exc:
         logger.error("Chat endpoint error: %s", exc)
@@ -1739,11 +1878,17 @@ async def websocket_chat(websocket: WebSocket):
                 if _initiative_engine:
                     _initiative_engine.notify_turn()
                 from core.memory import count_interactions
+                presence_snapshot = _build_entity_snapshot(
+                    scope="turn",
+                    source="ws.chat.response",
+                    metadata={"endpoint": "/ws", "user_input_preview": message[:120]},
+                )
                 await websocket.send_json({
                     "type": "response",
                     "response": response,
                     "turn_count": count_interactions(),
                     "current_focus": _get_current_focus_dict(),
+                    "presence": _build_presence_payload(entity_snapshot=presence_snapshot),
                     "ok": True,
                 })
             except Exception as exc:
