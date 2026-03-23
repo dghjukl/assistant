@@ -195,6 +195,36 @@ def _sanitize_config(cfg: dict) -> dict:
     return safe
 
 
+def _notify_interaction() -> float:
+    """Update the shared interaction timestamp for all user-facing turn entry points."""
+    interaction_ts = time.monotonic()
+    app_state.last_interaction_monotonic = interaction_ts
+    if app_state.idle_cognition is not None and hasattr(app_state.idle_cognition, "notify_interaction"):
+        try:
+            app_state.idle_cognition.notify_interaction(at_monotonic=interaction_ts)
+        except TypeError:
+            app_state.idle_cognition.notify_interaction()
+    return interaction_ts
+
+
+def _notify_turn_completed() -> None:
+    """Propagate a completed turn to the turn-aware runtime engines."""
+    if app_state.reflection_pipeline:
+        app_state.reflection_pipeline.notify_turn()
+    if app_state.initiative_engine:
+        app_state.initiative_engine.notify_turn()
+
+
+def _build_discord_turn_notifier():
+    """Build a Discord turn notifier that updates shared interaction and turn state."""
+
+    def _discord_turn_notifier():
+        _notify_interaction()
+        _notify_turn_completed()
+
+    return _discord_turn_notifier
+
+
 def _build_entity_snapshot(
     *,
     scope: str,
@@ -1436,19 +1466,12 @@ async def startup_event():
         if app_state.cfg.get("discord", {}).get("enabled", False) and app_state.topology:
             try:
                 from interfaces.discord_bot import start as discord_start
-                # Build turn notifiers so Discord turns propagate to all engines
-                def _discord_turn_notifier():
-                    if app_state.reflection_pipeline:
-                        app_state.reflection_pipeline.notify_turn()
-                    if app_state.initiative_engine:
-                        app_state.initiative_engine.notify_turn()
-
                 task_discord = asyncio.create_task(
                     discord_start(
                         app_state.topology, app_state.cfg,
                         tracer=app_state.tracer,
                         bus=app_state.bus,
-                        turn_notifiers=[_discord_turn_notifier],
+                        turn_notifiers=[_build_discord_turn_notifier()],
                     )
                 )
                 app_state.background_tasks.add(task_discord)
@@ -1761,10 +1784,7 @@ async def post_chat(body: ChatRequest):
             status_code=503,
         )
     try:
-        import time as _time
-        app_state.last_interaction_monotonic = _time.monotonic()
-        if app_state.idle_cognition is not None and hasattr(app_state.idle_cognition, "notify_interaction"):
-            app_state.idle_cognition.notify_interaction()
+        _notify_interaction()
 
         user_input = body.user_message
         if not user_input:
@@ -1799,10 +1819,7 @@ async def post_chat(body: ChatRequest):
         _emit_log("info", "chat", "Turn processed", {"user": user_input[:50]})
 
         # Notify reflection pipeline + initiative engine of completed turn
-        if app_state.reflection_pipeline:
-            app_state.reflection_pipeline.notify_turn()
-        if app_state.initiative_engine:
-            app_state.initiative_engine.notify_turn()
+        _notify_turn_completed()
 
         from core.memory import count_interactions
         presence_snapshot = _build_entity_snapshot(
@@ -1845,10 +1862,7 @@ async def websocket_chat(websocket: WebSocket):
                 continue
 
             try:
-                import time as _time
-                app_state.last_interaction_monotonic = _time.monotonic()
-                if app_state.idle_cognition is not None and hasattr(app_state.idle_cognition, "notify_interaction"):
-                    app_state.idle_cognition.notify_interaction()
+                _notify_interaction()
 
                 # Resolve text attachment — prepend file content to message if present
                 attach = data.get("text_attachment")
@@ -1876,10 +1890,7 @@ async def websocket_chat(websocket: WebSocket):
                     tracer=app_state.tracer,
                     bus=app_state.bus,
                 )
-                if app_state.reflection_pipeline:
-                    app_state.reflection_pipeline.notify_turn()
-                if app_state.initiative_engine:
-                    app_state.initiative_engine.notify_turn()
+                _notify_turn_completed()
                 from core.memory import count_interactions
                 presence_snapshot = _build_entity_snapshot(
                     scope="turn",
@@ -4099,18 +4110,12 @@ async def discord_connect():
         if get_bot_status().get("connected"):
             return JSONResponse({"ok": True, "data": {"message": "Already connected"}})
 
-        def _discord_turn_notifier():
-            if app_state.reflection_pipeline:
-                app_state.reflection_pipeline.notify_turn()
-            if app_state.initiative_engine:
-                app_state.initiative_engine.notify_turn()
-
         task_discord = asyncio.create_task(
             discord_start(
                 app_state.topology, app_state.cfg,
                 tracer=app_state.tracer,
                 bus=app_state.bus,
-                turn_notifiers=[_discord_turn_notifier],
+                turn_notifiers=[_build_discord_turn_notifier()],
             )
         )
         app_state.background_tasks.add(task_discord)
@@ -4775,4 +4780,3 @@ async def api_lan_status(request: Request):
 
 
 # ── Entry point ────────────────────────────────────────────────────────────
-
