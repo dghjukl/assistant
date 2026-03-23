@@ -32,18 +32,20 @@ def client():
     """
     from fastapi.testclient import TestClient
 
-    # Patch startup so it doesn't attempt real database or backend connections
+    # Build a fresh app instance with lifecycle hooks disabled so tests stay isolated
     import unittest.mock as mock
     with mock.patch.dict("os.environ", {"EOS_TRUST_PROXY": "1"}):
-        with mock.patch("webui.server.startup_event", new=lambda: None):
-            from webui.server import app
-            with TestClient(
-                app,
-                raise_server_exceptions=False,
-                base_url="http://127.0.0.1:7860",
-                headers={"X-Real-IP": "127.0.0.1"},
-            ) as c:
-                yield c
+        from webui.server import create_app
+        app = create_app()
+        app.router.on_startup.clear()
+        app.router.on_shutdown.clear()
+        with TestClient(
+            app,
+            raise_server_exceptions=False,
+            base_url="http://127.0.0.1:7860",
+            headers={"X-Real-IP": "127.0.0.1"},
+        ) as c:
+            yield c
 
 
 class TestHealthAndStatus:
@@ -108,8 +110,9 @@ class TestUploadContractValidation:
 
     def test_upload_valid_returns_flat_fields(self, client, tmp_path, monkeypatch):
         """Valid upload returns file_id, filename, content_type, kind at root level."""
-        import base64, webui.server as srv
-        monkeypatch.setattr(srv, "_cfg", {"upload_dir": str(tmp_path)}, raising=False)
+        import base64
+        from webui.app_state import app_state
+        app_state.cfg = {"upload_dir": str(tmp_path)}
 
         payload = base64.b64encode(b"hello world").decode()
         resp = client.post("/api/upload", json={
@@ -339,15 +342,15 @@ class TestGoogleWorkspaceRoutes:
         )
         monkeypatch.setitem(sys.modules, "core.google_oauth", fake_google)
 
-        import webui.server as server
-        monkeypatch.setattr(server, "_cfg", {
+        from webui.app_state import app_state
+        app_state.cfg = {
             "google": {
                 "enabled": True,
                 "calendar_enabled": True,
                 "gmail_enabled": True,
                 "drive_enabled": True,
             }
-        }, raising=False)
+        }
         return services
 
     def test_status_returns_json(self, client):
@@ -422,10 +425,10 @@ class TestGoogleWorkspaceRoutes:
             _token_path=lambda: tmp_path / "tok.json",
         )
         monkeypatch.setitem(sys.modules, "core.google_oauth", fake_google)
-        import webui.server as server
-        monkeypatch.setattr(server, "_cfg", {
+        from webui.app_state import app_state
+        app_state.cfg = {
             "google": {"enabled": True, "calendar_enabled": True}
-        }, raising=False)
+        }
         resp = client.get("/api/google_workspace/calendar/today")
         data = resp.json()
         assert data["ok"] is False, (
@@ -449,10 +452,10 @@ class TestGoogleWorkspaceRoutes:
             _token_path=lambda: tmp_path / "tok.json",
         )
         monkeypatch.setitem(sys.modules, "core.google_oauth", fake_google)
-        import webui.server as server
-        monkeypatch.setattr(server, "_cfg", {
+        from webui.app_state import app_state
+        app_state.cfg = {
             "google": {"enabled": True, "calendar_enabled": True}
-        }, raising=False)
+        }
         resp = client.get("/api/google_workspace/calendar/upcoming")
         data = resp.json()
         assert data["ok"] is False, (
