@@ -103,7 +103,17 @@ def test_worldview_extraction_detects_changed_files_and_noops_when_clean(tmp_pat
     assert log["processed_files"][0]["sha256"] == changed[0]["sha256"]
 
 
-def test_worldview_block_pending_sources_is_internal_only(tmp_path):
+def test_worldview_block_without_sources_and_profile_preserves_human_triggered_extraction(tmp_path):
+    service = WorldviewService(_make_cfg(tmp_path))
+
+    block = service.worldview_block().lower()
+
+    assert "ask for extraction" in block
+    assert "worldview_read" not in block
+    assert "ask your partner" not in block
+
+
+def test_worldview_block_pending_sources_without_profile_omits_profile_read(tmp_path):
     service = WorldviewService(_make_cfg(tmp_path))
     _write_source(service, "values.md", "I value truth, patience, and careful reasoning.")
 
@@ -112,18 +122,30 @@ def test_worldview_block_pending_sources_is_internal_only(tmp_path):
     assert "pending extraction" in block
     assert "should not trigger unprompted acknowledgment" in block
     assert "only mention pending material if explicitly asked" in block
-    assert "worldview_read" in block
+    assert "worldview_read" not in block
     assert "ask your partner" not in block
     assert "would like you to run extraction" not in block
 
 
-def test_worldview_block_without_sources_preserves_human_triggered_extraction(tmp_path):
+def test_worldview_block_with_profile_includes_profile_read(tmp_path):
     service = WorldviewService(_make_cfg(tmp_path))
+    _write_source(service, "values.md", "I value truth, patience, and careful reasoning.")
 
-    block = service.worldview_block().lower()
+    async def _extractor(payload):
+        return (
+            "# Partner Worldview Profile\n\n"
+            "## Core Values\n"
+            "- Often emphasizes truth and patience.\n"
+        )
 
-    assert "ask for extraction" in block
-    assert "ask your partner" not in block
+    asyncio.run(service.refresh_profile_from_sources(_extractor, trigger={"source": "test"}))
+
+    block = service.worldview_block()
+
+    assert "Read full profile with worldview_read: data/worldview/profile.md" in block
+    assert "extracted from 1 source document" in block
+    assert "## Core Values" in block
+    assert "Often emphasizes truth and patience." in block
 
 
 def test_worldview_extraction_rejects_non_utf8_source_documents(tmp_path):
