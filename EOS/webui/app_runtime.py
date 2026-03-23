@@ -293,21 +293,23 @@ def _build_presence_state(
 
     idle = {"tier": "active", "seconds_since_interaction": 0.0}
     try:
-        idle_secs = max(time.monotonic() - float(app_state.last_interaction_monotonic or time.monotonic()), 0.0)
-        idle = {"tier": "active", "seconds_since_interaction": round(idle_secs, 2)}
-        ic_cfg = app_state.cfg.get("idle_cognition", {})
-        resting_h = float(ic_cfg.get("resting_threshold_hours", 2.0))
-        drifting_h = float(ic_cfg.get("drifting_threshold_hours", 6.0))
-        deep_h = float(ic_cfg.get("deep_threshold_hours", 24.0))
-        idle_hours = idle_secs / 3600.0
-        if idle_hours >= deep_h:
-            idle["tier"] = "deep"
-        elif idle_hours >= drifting_h:
-            idle["tier"] = "drifting"
-        elif idle_hours >= resting_h:
-            idle["tier"] = "resting"
         if app_state.idle_cognition is not None and hasattr(app_state.idle_cognition, "status"):
             idle.update(app_state.idle_cognition.status())
+        else:
+            idle_secs = max(time.monotonic() - float(app_state.last_interaction_monotonic or time.monotonic()), 0.0)
+            idle = {"tier": "active", "seconds_since_interaction": round(idle_secs, 2)}
+            ic_cfg = app_state.cfg.get("idle_cognition", {})
+            resting_h = float(ic_cfg.get("resting_threshold_hours", 2.0))
+            drifting_h = float(ic_cfg.get("drifting_threshold_hours", 6.0))
+            deep_h = float(ic_cfg.get("deep_threshold_hours", 24.0))
+            idle_hours = idle_secs / 3600.0
+            if idle_hours >= deep_h:
+                idle["tier"] = "deep"
+            elif idle_hours >= drifting_h:
+                idle["tier"] = "drifting"
+            elif idle_hours >= resting_h:
+                idle["tier"] = "resting"
+            idle["hours_since_last_interaction"] = round(idle_hours, 2)
     except Exception:
         pass
 
@@ -1412,7 +1414,6 @@ async def startup_event():
                     )
                     await app_state.idle_cognition.maybe_fire(
                         app_state.topology, app_state.tracer, app_state.bus,
-                        last_interaction_monotonic=app_state.last_interaction_monotonic or _time.monotonic(),
                         entity_snapshot=snapshot,
                     )
                     if app_state.current_focus_service is not None:
@@ -1762,6 +1763,8 @@ async def post_chat(body: ChatRequest):
     try:
         import time as _time
         app_state.last_interaction_monotonic = _time.monotonic()
+        if app_state.idle_cognition is not None and hasattr(app_state.idle_cognition, "notify_interaction"):
+            app_state.idle_cognition.notify_interaction()
 
         user_input = body.user_message
         if not user_input:
@@ -1844,6 +1847,8 @@ async def websocket_chat(websocket: WebSocket):
             try:
                 import time as _time
                 app_state.last_interaction_monotonic = _time.monotonic()
+                if app_state.idle_cognition is not None and hasattr(app_state.idle_cognition, "notify_interaction"):
+                    app_state.idle_cognition.notify_interaction()
 
                 # Resolve text attachment — prepend file content to message if present
                 attach = data.get("text_attachment")
