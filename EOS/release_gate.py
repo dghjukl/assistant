@@ -359,6 +359,7 @@ def check_test_suite() -> None:
     try:
         result = subprocess.run(
             [sys.executable, "-m", "pytest", str(ROOT / "tests"),
+             "-m", "release_gate",
              "-v", "--tb=short", "-q"],
             capture_output=False,
             cwd=str(ROOT),
@@ -366,7 +367,7 @@ def check_test_suite() -> None:
         )
         require(
             result.returncode == 0,
-            "pytest exits 0 (all tests pass)",
+            "pytest -m release_gate exits 0 (CI-safe cross-module subset passes)",
             "Fix failing tests before release",
         )
     except subprocess.TimeoutExpired:

@@ -18,6 +18,7 @@ import types
 
 import pytest
 
+
 # Skip the entire module if FastAPI/httpx test client isn't available
 pytest.importorskip("fastapi")
 pytest.importorskip("httpx")

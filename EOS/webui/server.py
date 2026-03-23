@@ -45,8 +45,12 @@ def create_app() -> FastAPI:
     ):
         app.include_router(router)
 
-    app.add_event_handler('startup', startup_event)
-    app.add_event_handler('shutdown', shutdown_event)
+    if hasattr(app, 'add_event_handler'):
+        app.add_event_handler('startup', startup_event)
+        app.add_event_handler('shutdown', shutdown_event)
+    else:  # FastAPI/Starlette compatibility fallback
+        app.router.on_startup.append(startup_event)
+        app.router.on_shutdown.append(shutdown_event)
     return app
 
 

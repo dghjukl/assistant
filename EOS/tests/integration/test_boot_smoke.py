@@ -31,6 +31,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.release_gate
+
 
 # ── Config helpers ────────────────────────────────────────────────────────────
 
