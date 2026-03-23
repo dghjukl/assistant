@@ -1603,13 +1603,14 @@ if (new URLSearchParams(location.search).get('embed') === '1') {
           <div id="gw-auth-section" style="margin-bottom:14px">
 
             <div id="gw-hint-setup" style="display:none" class="integ-hint">
-              ⚙ <strong>Setup required:</strong> Place your Google OAuth desktop client JSON at
-              <code>config/google/client_secret.json</code>, set
-              <code>google_workspace.enabled = true</code> in config.json, then restart.
-              Full instructions: <code>config/google/README.md</code>
+              ⚙ <strong>Setup required:</strong> Place your Google OAuth desktop client JSON in
+              <code>AI personal files/client_secret_*.json</code> (or update
+              <code>google.client_secret_path</code> in <code>EOS/config.json</code>), set
+              <code>google.enabled = true</code>, then restart. Full instructions:
+              <code>EOS/CREDENTIALS.md</code> and <code>EOS/webui/docs/google.html</code>
             </div>
             <div id="gw-hint-disabled" style="display:none" class="integ-hint">
-              ⚙ Integration is disabled. Set <code>google_workspace.enabled = true</code> in config.json and restart.
+              ⚙ Integration is disabled. Set <code>google.enabled = true</code> in <code>EOS/config.json</code> and restart.
             </div>
             <div id="gw-hint-libs" style="display:none" class="integ-hint">
               📦 Google API libraries not installed.
