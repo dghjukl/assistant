@@ -26,13 +26,15 @@ def test_registry_tool_intent_uses_live_executor(monkeypatch, registry):
     ))
     orch.wire_executor(registry)
 
-    async def _fake_extract(tool_intent, topology, available_tools=None):
+    async def _fake_extract(tool_intent, topology, available_tools=None, environment_context=""):
         assert "echo_tool" in (available_tools or {})
+        assert environment_context == "known environment"
         return {"tool": "echo_tool", "args": {"text": "hello"}}
 
     monkeypatch.setattr(dispatcher, "extract_tool_call", _fake_extract)
 
-    result = asyncio.run(orch._run_registry_tool_intent("say hello", _FakeTopology()))
+    snapshot = type("Snap", (), {"environment_tool_context": "known environment"})()
+    result = asyncio.run(orch._run_registry_tool_intent("say hello", _FakeTopology(), entity_snapshot=snapshot))
     assert json.loads(result) == {"echo": "hello"}
 
 
