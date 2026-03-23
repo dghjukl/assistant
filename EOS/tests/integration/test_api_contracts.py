@@ -146,6 +146,15 @@ class TestApiResponseKeys:
         assert "memories" in data
         assert "data" not in data
 
+    def test_presence_response_uses_presence_key(self, client):
+        """GET /api/presence must return a flat presence payload."""
+        resp = client.get("/api/presence")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ok"] is True
+        assert "presence" in data
+        assert "current_focus" in data
+
     def test_vision_settings_get_flat(self, client):
         """GET /api/vision/settings must return 'enabled' at root level."""
         resp = client.get("/api/vision/settings")
