@@ -195,7 +195,13 @@ class ThinkingFaculty:
         from runtime.on_demand import get_on_demand_manager
         manager = get_on_demand_manager()
         if manager is not None:
-            endpoint = await manager.ensure("thinking")
+            endpoint = await manager.ensure(
+                "thinking",
+                reason="executive deliberation requested auxiliary reasoning",
+                task_type="deep_reasoning",
+                escalation=True,
+                requested_by="executive",
+            )
         else:
             endpoint = self._topology.thinking_endpoint()
 

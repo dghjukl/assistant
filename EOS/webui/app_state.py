@@ -33,6 +33,7 @@ class AppState:
     computer_use_service: Any = None
     overnight_cycle_service: Any = None
     runtime_discovery: Any = None
+    server_activation_manager: Any = None
     last_interaction_monotonic: float = 0.0
     primary_degraded: bool = False
     last_maintenance_result: dict[str, Any] = field(default_factory=dict)

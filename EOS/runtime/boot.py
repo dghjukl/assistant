@@ -32,6 +32,7 @@ from runtime.server_runtime import (
     resolve_model_path as _shared_resolve_model_path,
     wait_for_health_with_retry,
 )
+from runtime.server_activation import normalize_activation_config
 from runtime.topology import (
     RuntimeTopology,
     ServerState,
@@ -51,6 +52,7 @@ def load_config(config_path: str | Path) -> dict[str, Any]:
         raise BootError(f"Config file not found: {p}")
     with p.open(encoding="utf-8") as f:
         cfg = json.load(f)
+    cfg = normalize_activation_config(cfg)
     if "deployment_mode" not in cfg:
         raise BootError("Config missing required field: deployment_mode")
     if cfg["deployment_mode"] not in ("standard", "vision"):
@@ -97,7 +99,12 @@ def boot(config_path: str | Path, root: Path | None = None) -> RuntimeTopology:
     for role, srv_cfg in servers_cfg.items():
         if not srv_cfg.get("enabled", False):
             logger.info("[%s] Disabled — skipping", role)
-            topology.mark_absent(role)
+            topology.mark_absent(role, intentional=True)
+            continue
+
+        if str(srv_cfg.get("activation_mode", "persistent")) == "on_demand":
+            logger.info("[%s] Managed as on-demand auxiliary — not started during baseline boot", role)
+            topology.mark_absent(role, intentional=True)
             continue
 
         try:

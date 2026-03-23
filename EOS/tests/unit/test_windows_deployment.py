@@ -137,7 +137,7 @@ def test_build_launch_plan_uses_cpu_fallback_when_machine_is_cpu_tier(monkeypatc
 
     plan = build_launch_plan("standard", assessment, root=deployment_root)
 
-    assert [item.role for item in plan] == ["primary", "tool", "thinking"]
+    assert [item.role for item in plan] == ["primary", "tool"]
     assert all(item.accel == "cpu" for item in plan)
 
 

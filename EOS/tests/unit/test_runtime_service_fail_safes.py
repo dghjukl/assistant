@@ -178,6 +178,7 @@ def test_startup_guidance_detects_missing_backends():
     from runtime.startup_health import START_BACKENDS_MESSAGE, detect_startup_guidance
 
     runtime_discovery = SimpleNamespace(
+        config={"server_activation": {"baseline_roles": ["primary", "tool"]}},
         services={
             "primary": SimpleNamespace(status="unavailable"),
             "tool": SimpleNamespace(status="unavailable"),

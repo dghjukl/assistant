@@ -85,7 +85,7 @@
   <div class="code-wrap"><pre>Services
   Main model       active        (port 8080)
   Tool helper      active        (port 8082)
-  Thinking helper  unavailable   (fallback: main)
+  Thinking helper  degraded      (managed on-demand; currently inactive)
   Vision           unavailable
   STT              active
   TTS              active
@@ -93,11 +93,11 @@
 Effective Capabilities
   chat             available
   tools            available
-  reasoning        degraded      (using main model fallback)
+  reasoning        available     (elastic auxiliary reasoning available on demand)
   vision           unavailable
   voice            available</pre></div>
 
-  <p class="doc-p">In the example above, the thinking helper is not running so reasoning is degraded — EOS will fall back to the main model for reasoning tasks. Everything else is fully functional. Voice is available because both STT and TTS are active.</p>
+  <p class="doc-p">In the example above, the thinking helper is intentionally dormant. EOS can still activate it later if the executive decides the task justifies escalation and the current system resources allow it. Voice is available because both STT and TTS are active.</p>
 </div>
 
 <hr class="doc-rule">

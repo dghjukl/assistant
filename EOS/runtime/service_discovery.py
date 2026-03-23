@@ -10,6 +10,7 @@ from typing import Any
 import httpx
 
 from runtime.boot import load_config
+from runtime.server_activation import normalize_activation_config
 from runtime.launch_catalog import service_label
 from runtime.topology import RuntimeTopology, build_topology_from_config
 
@@ -69,7 +70,7 @@ class RuntimeDiscovery:
 
 
 def load_runtime_config(config_path: str | Path) -> dict[str, Any]:
-    return load_config(config_path)
+    return normalize_activation_config(load_config(config_path))
 
 
 def discover_runtime(config_path: str | Path, root: Path | None = None) -> RuntimeDiscovery:
@@ -92,7 +93,7 @@ def discover_runtime(config_path: str | Path, root: Path | None = None) -> Runti
         endpoint = f"http://{host}:{port}"
 
         if not srv_cfg.get("enabled", False):
-            topology.mark_absent(role)
+            topology.mark_absent(role, intentional=True)
             services[role] = ServiceProbe(
                 key=role,
                 label=label,
@@ -102,9 +103,16 @@ def discover_runtime(config_path: str | Path, root: Path | None = None) -> Runti
             )
             continue
 
+        activation_mode = str(srv_cfg.get("activation_mode", "persistent"))
+        residency = str(srv_cfg.get("residency", "resident"))
+
         status, latency_ms, detail = _probe_http_health(endpoint, threshold_ms)
         if status in ("active", "degraded"):
             topology.mark_ready(role)
+        elif activation_mode == "on_demand" and residency == "auxiliary":
+            topology.mark_absent(role, intentional=True)
+            status = "degraded"
+            detail = "managed on-demand; currently inactive"
         else:
             topology.mark_error(role, detail)
 
@@ -112,6 +120,8 @@ def discover_runtime(config_path: str | Path, root: Path | None = None) -> Runti
         if role in {"tool", "thinking", "creativity"} and status == "unavailable":
             fallback = "fallback to main"
             detail = f"{detail}; fallback to main" if detail else "fallback to main"
+        elif role in {"tool", "thinking", "creativity"} and activation_mode == "on_demand" and status == "degraded":
+            fallback = "on-demand auxiliary"
 
         services[role] = ServiceProbe(
             key=role,
@@ -214,9 +224,9 @@ def _build_capabilities(cfg: dict[str, Any], services: dict[str, ServiceProbe]) 
         caps["reasoning"] = "unavailable"
         caps["creativity"] = "unavailable"
     else:
-        caps["tools"] = "available" if _is_active(tool) else "degraded"
-        caps["reasoning"] = "available" if _is_active(thinking) else "degraded"
-        caps["creativity"] = "available" if _is_active(creativity) else "degraded"
+        caps["tools"] = "available" if _is_usable_or_elastic(tool) else "degraded"
+        caps["reasoning"] = "available" if _is_usable_or_elastic(thinking) else "degraded"
+        caps["creativity"] = "available" if _is_usable_or_elastic(creativity) else "degraded"
 
     if _is_usable(vision):
         caps["vision"] = "available" if _is_active(vision) else "degraded"
@@ -252,4 +262,8 @@ def _is_active(probe: ServiceProbe | None) -> bool:
 
 
 def _is_usable(probe: ServiceProbe | None) -> bool:
+    return probe is not None and probe.status in {"active", "degraded"}
+
+
+def _is_usable_or_elastic(probe: ServiceProbe | None) -> bool:
     return probe is not None and probe.status in {"active", "degraded"}

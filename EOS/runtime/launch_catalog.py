@@ -64,15 +64,15 @@ LAUNCH_BUNDLES: tuple[LaunchBundle, ...] = (
     LaunchBundle(
         key="standard",
         label="Standard",
-        description="Main + tools + thinking, auto-adapted to the detected machine tier.",
-        roles=("primary", "tool", "thinking"),
+        description="Resident baseline stack only: main model plus baseline helpers. Auxiliary reasoning servers stay elastic/on-demand.",
+        roles=("primary", "tool", "vision"),
         launcher="start-standard.bat",
     ),
     LaunchBundle(
         key="full",
         label="Full",
-        description="Standard bundle plus creativity when it is installed and supported.",
-        roles=("primary", "tool", "thinking", "creativity"),
+        description="Resident baseline stack with optional vision preloaded when supported. Auxiliary cognition remains policy-driven and on-demand.",
+        roles=("primary", "tool", "vision"),
         launcher="start-full.bat",
     ),
     LaunchBundle(

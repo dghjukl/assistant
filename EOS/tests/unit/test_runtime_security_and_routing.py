@@ -37,6 +37,8 @@ def test_on_demand_port_conflict_skips_launch(monkeypatch):
                 "health_timeout": 0.1,
                 "binary_cpu": "bin/llama-server",
                 "model_path": "models/tool",
+                "residency": "auxiliary",
+                "activation_mode": "on_demand",
             }
         }
     }
@@ -52,7 +54,7 @@ def test_on_demand_port_conflict_skips_launch(monkeypatch):
     monkeypatch.setattr("runtime.server_runtime.launch_server", _unexpected_launch)
 
     try:
-        assert asyncio.run(manager.ensure("tool")) is None
+        assert asyncio.run(manager.ensure("tool", task_type="tool_extraction", escalation=True)) is None
         assert topology.last_error == ("tool", "port already bound")
         assert called["launch"] is False
     finally:

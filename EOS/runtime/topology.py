@@ -43,6 +43,13 @@ class ServerState:
     started_at: float | None = None
     model_path: str | None = None
     required: bool = False
+    residency: str = "resident"
+    activation_mode: str = "persistent"
+    last_used_at: float | None = None
+    last_stopped_at: float | None = None
+    cooldown_until: float | None = None
+    intentional_absence: bool = False
+    last_decision: dict | None = None
 
     def is_ready(self) -> bool:
         return self.status == ServerStatus.READY
@@ -125,6 +132,8 @@ class RuntimeTopology:
                 self._servers[role].pid = pid
                 self._servers[role].error = None
                 self._servers[role].started_at = time.time()
+                self._servers[role].intentional_absence = False
+                self._servers[role].cooldown_until = None
 
     def mark_error(self, role: str, error: str) -> None:
         with self._lock:
@@ -132,17 +141,36 @@ class RuntimeTopology:
                 self._servers[role].status = ServerStatus.ERROR
                 self._servers[role].error = error
 
-    def mark_absent(self, role: str) -> None:
+    def mark_absent(self, role: str, *, intentional: bool = False) -> None:
         with self._lock:
             if role in self._servers:
                 self._servers[role].status = ServerStatus.ABSENT
                 self._servers[role].error = None
+                self._servers[role].pid = None
+                self._servers[role].last_stopped_at = time.time()
+                self._servers[role].intentional_absence = intentional
 
     def mark_starting(self, role: str, pid: int) -> None:
         with self._lock:
             if role in self._servers:
                 self._servers[role].status = ServerStatus.STARTING
                 self._servers[role].pid = pid
+                self._servers[role].intentional_absence = False
+
+    def mark_used(self, role: str, when: float | None = None) -> None:
+        with self._lock:
+            if role in self._servers:
+                self._servers[role].last_used_at = when or time.time()
+
+    def mark_cooldown(self, role: str, until: float | None) -> None:
+        with self._lock:
+            if role in self._servers:
+                self._servers[role].cooldown_until = until
+
+    def mark_decision(self, role: str, decision: dict | None) -> None:
+        with self._lock:
+            if role in self._servers:
+                self._servers[role].last_decision = decision
 
     def route_image_input(self) -> dict:
         provider = self.vision_provider
@@ -169,6 +197,13 @@ class RuntimeTopology:
                     "model_path": s.model_path,
                     "error": s.error,
                     "started_at": s.started_at,
+                    "residency": s.residency,
+                    "activation_mode": s.activation_mode,
+                    "last_used_at": s.last_used_at,
+                    "last_stopped_at": s.last_stopped_at,
+                    "cooldown_until": s.cooldown_until,
+                    "intentional_absence": s.intentional_absence,
+                    "last_decision": s.last_decision,
                 }
                 for role, s in self._servers.items()
             }
@@ -200,6 +235,9 @@ class RuntimeTopology:
 
 
 def build_topology_from_config(cfg: dict) -> RuntimeTopology:
+    from runtime.server_activation import normalize_activation_config
+
+    cfg = normalize_activation_config(cfg)
     mode = cfg.get("deployment_mode", "standard")
     primary_mm = cfg.get("primary", {}).get("is_multimodal", False)
 
@@ -207,7 +245,12 @@ def build_topology_from_config(cfg: dict) -> RuntimeTopology:
     for role, srv_cfg in cfg.get("servers", {}).items():
         port = int(srv_cfg.get("port", 0))
         host = srv_cfg.get("host", "127.0.0.1")
-        status = ServerStatus.PENDING if srv_cfg.get("enabled", False) else ServerStatus.ABSENT
+        enabled = srv_cfg.get("enabled", False)
+        activation_mode = str(srv_cfg.get("activation_mode", "persistent"))
+        if enabled and activation_mode == "persistent":
+            status = ServerStatus.PENDING
+        else:
+            status = ServerStatus.ABSENT
         servers[role] = ServerState(
             role=role,
             port=port,
@@ -215,6 +258,9 @@ def build_topology_from_config(cfg: dict) -> RuntimeTopology:
             status=status,
             required=srv_cfg.get("required", False),
             model_path=srv_cfg.get("model_path"),
+            residency=str(srv_cfg.get("residency", "resident")),
+            activation_mode=activation_mode,
+            intentional_absence=bool(enabled and activation_mode == "on_demand"),
         )
 
     return RuntimeTopology(

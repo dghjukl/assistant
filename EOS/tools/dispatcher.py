@@ -170,7 +170,13 @@ async def extract_tool_call(
     from runtime.on_demand import get_on_demand_manager
     manager = get_on_demand_manager()
     if manager is not None:
-        endpoint = await manager.ensure("tool")
+        endpoint = await manager.ensure(
+            "tool",
+            reason="structured tool extraction requested",
+            task_type="tool_extraction",
+            escalation=True,
+            requested_by="executive",
+        )
     else:
         endpoint = topology.tool_endpoint()
     if not endpoint:
