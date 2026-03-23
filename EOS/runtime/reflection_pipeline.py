@@ -78,6 +78,7 @@ class ReflectionPipeline:
         topology: "RuntimeTopology",
         tracer=None,
         bus=None,
+        entity_snapshot=None,
     ) -> dict:
         """Run a single identity evaluation cycle and record results.
 
@@ -104,6 +105,10 @@ class ReflectionPipeline:
                 signal_bus=bus,
                 cfg=self._cfg,
                 continuity_monitor=continuity_monitor,
+                snapshot_context=(
+                    entity_snapshot.background_context_block()
+                    if entity_snapshot is not None else ""
+                ),
             )
             logger.info(
                 "[ReflectionPipeline] Cycle %d complete (id=%s)",
@@ -213,6 +218,7 @@ class ReflectionPipeline:
         self,
         topology: "RuntimeTopology",
         bus=None,
+        entity_snapshot=None,
     ) -> dict:
         """Run a single relational evaluation cycle and return results."""
         import time
@@ -241,6 +247,7 @@ class ReflectionPipeline:
         topology: "RuntimeTopology",
         tracer=None,
         bus=None,
+        entity_state_service=None,
     ) -> None:
         """Long-running coroutine: wakes periodically and fires evals as needed.
 
@@ -288,7 +295,17 @@ class ReflectionPipeline:
                     logger.info(
                         "[ReflectionPipeline] Triggering identity eval (reason: %s)", reason
                     )
-                    await self.run_once(topology, tracer=tracer, bus=bus)
+                    snapshot = (
+                        entity_state_service.build_snapshot(
+                            scope="background",
+                            source="reflection.identity",
+                            metadata={"reason": reason},
+                        )
+                        if entity_state_service is not None else None
+                    )
+                    await self.run_once(
+                        topology, tracer=tracer, bus=bus, entity_snapshot=snapshot
+                    )
 
                 # ── Relational eval (lower frequency) ────────────────────
                 rel_time_due  = (now - self._last_relational_run_time) >= self._relational_interval_seconds
@@ -302,7 +319,17 @@ class ReflectionPipeline:
                     logger.info(
                         "[ReflectionPipeline] Triggering relational eval (reason: %s)", rel_reason
                     )
-                    await self.run_relational_once(topology, bus=bus)
+                    snapshot = (
+                        entity_state_service.build_snapshot(
+                            scope="background",
+                            source="reflection.relational",
+                            metadata={"reason": rel_reason},
+                        )
+                        if entity_state_service is not None else None
+                    )
+                    await self.run_relational_once(
+                        topology, bus=bus, entity_snapshot=snapshot
+                    )
 
         except asyncio.CancelledError:
             logger.info("[ReflectionPipeline] Loop cancelled — shutting down.")

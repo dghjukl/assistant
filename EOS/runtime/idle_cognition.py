@@ -138,6 +138,7 @@ class IdleCognitionEngine:
         tracer: Any,
         bus: Any,
         last_interaction_monotonic: float,
+        entity_snapshot: Any | None = None,
     ) -> Optional[dict]:
         """
         Check idle tier and probabilistically fire an idle cognition.
@@ -173,18 +174,24 @@ class IdleCognitionEngine:
         if random.random() > prob:
             return None
 
-        return await self._fire(topology, tracer, bus, tier, idle_hours)
+        return await self._fire(
+            topology, tracer, bus, tier, idle_hours, entity_snapshot=entity_snapshot
+        )
 
     async def force_fire(
         self,
         topology: "RuntimeTopology",
         tracer: Any,
         bus: Any,
+        entity_snapshot: Any | None = None,
     ) -> Optional[dict]:
         """Fire an idle cognition unconditionally (admin/testing)."""
         idle_hours = _hours_since(self._last_fire_monotonic) if self._last_fire_monotonic else 0.0
         tier = self._get_tier(idle_hours)
-        return await self._fire(topology, tracer, bus, tier, idle_hours, forced=True)
+        return await self._fire(
+            topology, tracer, bus, tier, idle_hours,
+            forced=True, entity_snapshot=entity_snapshot,
+        )
 
     def notify_interaction(self) -> None:
         """Call whenever the user sends a message — resets the idle clock."""
@@ -223,7 +230,12 @@ class IdleCognitionEngine:
             IdleTier.DEEP:     self._deep_prob,
         }.get(tier, 0.0)
 
-    def _build_prompt(self, tier: str, idle_hours: float) -> str:
+    def _build_prompt(
+        self,
+        tier: str,
+        idle_hours: float,
+        entity_snapshot: Any | None = None,
+    ) -> str:
         """Build the system/user prompt for the idle cognition call."""
         tier_instructions = {
             IdleTier.RESTING: (
@@ -242,7 +254,10 @@ class IdleCognitionEngine:
                 "persists, what faded, and what feels significant. 3–5 sentences."
             ),
         }
-        return tier_instructions.get(tier, tier_instructions[IdleTier.RESTING])
+        prompt = tier_instructions.get(tier, tier_instructions[IdleTier.RESTING])
+        if entity_snapshot is not None:
+            return f"{entity_snapshot.background_context_block()}\n\n---\n{prompt}"
+        return prompt
 
     async def _fire(
         self,
@@ -252,6 +267,7 @@ class IdleCognitionEngine:
         tier: str,
         idle_hours: float,
         forced: bool = False,
+        entity_snapshot: Any | None = None,
     ) -> Optional[dict]:
         """Execute an idle cognition call via the thinking faculty delegation."""
         try:
@@ -260,15 +276,13 @@ class IdleCognitionEngine:
             logger.warning("[idle_cognition] orchestrator not available for delegation")
             return None
 
-        prompt = self._build_prompt(tier, idle_hours)
+        prompt = self._build_prompt(tier, idle_hours, entity_snapshot=entity_snapshot)
 
         try:
             result = await think_for_background(
-                task_type="idle_cognition",
-                context={"tier": tier, "idle_hours": idle_hours, "prompt": prompt},
                 topology=topology,
-                tracer=tracer,
-                bus=bus,
+                task=prompt,
+                entity_snapshot=entity_snapshot,
             )
         except Exception as exc:
             logger.error("[idle_cognition] fire failed: %s", exc)
@@ -281,8 +295,8 @@ class IdleCognitionEngine:
         text = ""
         if isinstance(result, dict):
             text = result.get("text", "") or result.get("content", "")
-        elif hasattr(result, "text"):
-            text = result.text or ""
+        else:
+            text = getattr(result, "best_text", "") or getattr(result, "text", "") or ""
 
         record = {
             "fired_at": _now_iso(),
