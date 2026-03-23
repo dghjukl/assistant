@@ -10,15 +10,36 @@ import queue
 import threading
 from pathlib import Path
 
-import numpy as np
-import sounddevice as sd
-from faster_whisper import WhisperModel
+try:
+    import numpy as np
+except ImportError:
+    np = None
+
+try:
+    import sounddevice as sd
+except ImportError:
+    sd = None
+
+try:
+    from faster_whisper import WhisperModel
+except ImportError:
+    WhisperModel = None
+
+STT_AVAILABLE = all(dep is not None for dep in (np, sd, WhisperModel))
+STT_IMPORT_ERROR = None if STT_AVAILABLE else "Missing optional STT dependencies: numpy, sounddevice, faster_whisper"
 
 _model: WhisperModel | None = None
 _model_cfg: dict = {}
 
 
+def _require_stt_dependencies() -> None:
+    if STT_AVAILABLE:
+        return
+    raise RuntimeError(STT_IMPORT_ERROR or "Speech-to-text dependencies are unavailable")
+
+
 def _get_model(cfg: dict) -> WhisperModel:
+    _require_stt_dependencies()
     global _model, _model_cfg
     stt_cfg = cfg.get("stt", {})
     if _model is None or stt_cfg != _model_cfg:
@@ -33,8 +54,9 @@ def _get_model(cfg: dict) -> WhisperModel:
     return _model
 
 
-def transcribe_array(audio: np.ndarray, cfg: dict) -> str:
+def transcribe_array(audio: "np.ndarray", cfg: dict) -> str:
     """Transcribe a float32 audio array. Returns transcript string."""
+    _require_stt_dependencies()
     model = _get_model(cfg)
     stt_cfg = cfg.get("stt", {})
     segments, _ = model.transcribe(
@@ -105,6 +127,7 @@ class MicListener:
                         print(f"[STT] Transcription error: {exc}")
 
     def start(self):
+        _require_stt_dependencies()
         _get_model(self._cfg)  # pre-load
         self._thread = threading.Thread(target=self._process_loop, daemon=True)
         self._thread.start()
