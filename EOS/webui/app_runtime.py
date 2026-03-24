@@ -1350,13 +1350,19 @@ async def startup_event(app=None, config_path: str | Path | None = None):
                 if default_mode != "off":
                     app_state.computer_use_service.set_mode(default_mode, reason="config_default")
                 state = app_state.computer_use_service.get_state()
+                state_mode = state.get("mode") if isinstance(state, dict) else getattr(state, "mode", None)
+                state_shortcuts = (
+                    state.get("approved_shortcuts", [])
+                    if isinstance(state, dict)
+                    else getattr(state, "approved_shortcuts", [])
+                )
                 _emit_log("info", "startup", "ComputerUseService initialized", {
-                    "mode":      app_state.mode,
-                    "shortcuts": len(app_state.approved_shortcuts),
+                    "mode":      state_mode,
+                    "shortcuts": len(state_shortcuts),
                 })
                 logger.info(
                     "[computer_use] Initialized. mode=%s shortcuts=%d",
-                    app_state.mode, len(app_state.approved_shortcuts),
+                    state_mode, len(state_shortcuts),
                 )
             else:
                 logger.info("[computer_use] Disabled in config (computer_use.enabled=false). Subsystem not loaded.")
