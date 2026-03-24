@@ -38,7 +38,7 @@
     "tool": {
       "_role": "Extracts structured function calls from primary output. Does not generate responses.",
       "binary_cpu": "llama-CPU/llama-server.exe",
-      "model_path": "models/tool/",
+      "model_path": "models/tools/",
       "host": "127.0.0.1",
       "port": 8082,
       "n_gpu_layers": 0,
@@ -53,7 +53,7 @@
       "activation_mode": "persistent"
     },
     "thinking": {
-      "_role": "Background thinking worker. Non-blocking. Dispatched to by idle cognition, initiative, investigation, identity eval. NOT an escalation target — primary uses /think for inline reasoning.",
+      "_role": "Background thinking worker. Non-blocking. Dispatched to by idle cognition, initiative, investigation, identity eval. NOT an escalation target \u2014 primary uses /think for inline reasoning.",
       "binary_cpu": "llama-CPU/llama-server.exe",
       "model_path": "models/thinking/",
       "host": "127.0.0.1",
@@ -73,7 +73,7 @@
       "min_uptime_seconds": 90
     },
     "creativity": {
-      "_role": "Controlled divergence subsystem. Advisory only — proposes alternate interpretations, reframes, analogies, non-obvious solution paths, and ideation. Does not decide, authorize, or override. Degrades gracefully if absent.",
+      "_role": "Controlled divergence subsystem. Advisory only \u2014 proposes alternate interpretations, reframes, analogies, non-obvious solution paths, and ideation. Does not decide, authorize, or override. Degrades gracefully if absent.",
       "binary_cpu": "llama-CPU/llama-server.exe",
       "model_path": "models/creativity/",
       "host": "127.0.0.1",
@@ -293,7 +293,7 @@
     "auto_backup_interval_hours": 24
   },
   "computer_use": {
-    "_comment": "Supervised computer-use subsystem. Layered access: mode → shortcut allowlist → per-app action policy.",
+    "_comment": "Supervised computer-use subsystem. Layered access: mode \u2192 shortcut allowlist \u2192 per-app action policy.",
     "_doc": "Enabling this does NOT grant the entity unrestricted computer access. The entity may only use applications present in approved_shortcuts_path, and only the actions listed in app_policy_path. The operator sets the mode. Halt is always available.",
     "enabled": true,
     "default_mode": "command_only",
@@ -534,6 +534,40 @@
         "min_uptime_seconds": 90,
         "role_need_score": 0.74
       }
+    }
+  },
+  "models": {
+    "primary": {
+      "source_type": "user",
+      "builtin_id": null,
+      "url": null,
+      "local_path": "models/primary/"
+    },
+    "vision": {
+      "source_type": "user",
+      "builtin_id": null,
+      "model_url": null,
+      "mmproj_url": null,
+      "model_path": "models/vision/",
+      "mmproj_path": "models/vision/"
+    },
+    "tools": {
+      "source_type": "user",
+      "builtin_id": null,
+      "url": null,
+      "local_path": "models/tools/"
+    },
+    "thinking": {
+      "source_type": "user",
+      "builtin_id": null,
+      "url": null,
+      "local_path": "models/thinking/"
+    },
+    "creativity": {
+      "source_type": "user",
+      "builtin_id": null,
+      "url": null,
+      "local_path": "models/creativity/"
     }
   }
 }

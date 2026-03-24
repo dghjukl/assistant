@@ -1,7 +1,7 @@
 ﻿# ============================================================
 #  EOS - Lite Setup  (Setup-Lite.ps1)
-#  Downloads everything EXCEPT models larger than 1 GB.
-#  Total download: ~3 GB instead of ~16 GB.
+#  Installs runtimes/supporting assets and then lets you choose model sources per role.
+#  Download size depends on your built-in vs user-provided selections.
 #
 #  HOW TO RUN:
 #    Right-click this file -> "Run with PowerShell"
@@ -115,9 +115,9 @@ function Expand-To {
 
 
 # -----------------------------------------------------------------------------
-Write-Banner "EOS  |  Lite Setup  (small models only)"
-Write-Host "  This downloads ~3 GB of supporting files." -ForegroundColor White
-Write-Host "  The primary model (Qwen3-8B, ~6.3 GB) must be added manually." -ForegroundColor Yellow
+Write-Banner "EOS  |  Lite Setup"
+Write-Host "  This installs runtimes and prompts for per-role model selections." -ForegroundColor White
+Write-Host "  Choose built-in downloads or user-provided paths for each role." -ForegroundColor Yellow
 Write-Host "  Downloads are skipped if the file already exists." -ForegroundColor Gray
 
 
@@ -178,7 +178,7 @@ $dirs = @(
     "models\primary",
     "models\stt",
     "models\thinking",
-    "models\tool",
+    "models\tools",
     "models\tts",
     "models\vision",
     "models\creativity",
@@ -322,40 +322,104 @@ if (Test-Path (Join-Path $Root "Piper\piper\piper.exe")) {
 }
 
 
-# -- 6. Download small AI models (~3 GB) --------------------------------------
-Write-Step "Downloading small AI models  (~2 GB total)"
-Write-Host "    Skipping the primary model (Qwen3-8B) - see manual steps below." -ForegroundColor DarkYellow
+# -- 6. Model role selection + downloads ---------------------------------------
+Write-Step "Model role selection"
+Write-Host "    Choose built-in model downloads or 'I will provide my own' for each role." -ForegroundColor Gray
 
-function Ensure-ModelDir {
-    param([string]$Dir, [string]$Filename, [string]$Url, [string]$Label, [long]$MB)
-    $dest     = Join-Path $Root "$Dir\$Filename"
-    $full     = Join-Path $Root $Dir
-    $existing = Get-ChildItem $full -Filter "*.gguf" -File -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($existing) {
-        Write-Skip "$Label - $($existing.Name) already present"
-        return
-    }
-    Download-File $Url $dest $Label $MB
+$ModelCatalog = @{
+    primary = @(
+        @{ id='qwen3_14b_q5_k_m'; label='Qwen3-14B-Q5_K_M.gguf'; url='https://huggingface.co/bartowski/Qwen_Qwen3-14B-GGUF/resolve/main/Qwen3-14B-Q5_K_M.gguf'; file='Qwen3-14B-Q5_K_M.gguf'; roleDir='models\primary' },
+        @{ id='qwen3_8b_q5_k_m';  label='Qwen3-8B-Q5_K_M.gguf';  url='https://huggingface.co/bartowski/Qwen_Qwen3-8B-GGUF/resolve/main/Qwen3-8B-Q5_K_M.gguf';  file='Qwen3-8B-Q5_K_M.gguf';  roleDir='models\primary' },
+        @{ id=$null;              label='I will provide my own'; user=$true; roleDir='models\primary' }
+    )
+    vision = @(
+        @{ id='qwen25_vl_3b_f16'; label='Qwen2.5-VL-3B-Instruct-f16.gguf + mmproj-Qwen2.5-VL-3B-Instruct-f16.gguf'; modelUrl='https://huggingface.co/ggml-org/Qwen2.5-VL-3B-Instruct-GGUF/resolve/main/Qwen2.5-VL-3B-Instruct-f16.gguf'; modelFile='Qwen2.5-VL-3B-Instruct-f16.gguf'; mmprojUrl='https://huggingface.co/ggml-org/Qwen2.5-VL-3B-Instruct-GGUF/resolve/main/mmproj-Qwen2.5-VL-3B-Instruct-f16.gguf'; mmprojFile='mmproj-Qwen2.5-VL-3B-Instruct-f16.gguf'; roleDir='models\vision' },
+        @{ id=$null; label='I will provide my own'; user=$true; roleDir='models\vision' }
+    )
+    tools = @(
+        @{ id='lfm2_1p2b_tool_q5_k_m'; label='LFM2-1.2B-Tool-Q5_K_M.gguf'; url='https://huggingface.co/bartowski/LiquidAI_LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q5_K_M.gguf'; file='LFM2-1.2B-Tool-Q5_K_M.gguf'; roleDir='models\tools' },
+        @{ id=$null; label='I will provide my own'; user=$true; roleDir='models\tools' }
+    )
+    thinking = @(
+        @{ id='lfm25_1p2b_thinking_q5_k_m'; label='LFM2.5-1.2B-Thinking-Q5_K_M.gguf'; url='https://huggingface.co/NexaAI/LFM2.5-1.2B-thinking-GGUF/resolve/main/LFM2.5-1.2B-Thinking-Q5_K_M.gguf'; file='LFM2.5-1.2B-Thinking-Q5_K_M.gguf'; roleDir='models\thinking' },
+        @{ id='qwen3_4b_q5_k_m'; label='Qwen3-4B-Q5_K_M.gguf'; url='https://huggingface.co/Qwen/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q5_K_M.gguf'; file='Qwen3-4B-Q5_K_M.gguf'; roleDir='models\thinking' },
+        @{ id=$null; label='I will provide my own'; user=$true; roleDir='models\thinking' }
+    )
+    creativity = @(
+        @{ id='lfm25_1p2b_thinking_q5_k_m'; label='LFM2.5-1.2B-Thinking-Q5_K_M.gguf'; url='https://huggingface.co/NexaAI/LFM2.5-1.2B-thinking-GGUF/resolve/main/LFM2.5-1.2B-Thinking-Q5_K_M.gguf'; file='LFM2.5-1.2B-Thinking-Q5_K_M.gguf'; roleDir='models\creativity' },
+        @{ id='qwen3_4b_q5_k_m'; label='Qwen3-4B-Q5_K_M.gguf'; url='https://huggingface.co/Qwen/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q5_K_M.gguf'; file='Qwen3-4B-Q5_K_M.gguf'; roleDir='models\creativity' },
+        @{ id=$null; label='I will provide my own'; user=$true; roleDir='models\creativity' }
+    )
 }
 
-# Thinking worker
-Write-Host ""
-Write-Host "    [1/4] Thinking model" -ForegroundColor White
-Ensure-ModelDir "models\thinking" "LFM2.5-1.2B-Thinking-Q5_K_M.gguf" "https://huggingface.co/LiquidAI/LFM2.5-1.2B-Thinking-GGUF/resolve/main/LFM2.5-1.2B-Thinking-Q5_K_M.gguf" "LFM2.5-1.2B-Thinking-Q5_K_M" 820
+function Select-RoleModel {
+    param([string]$Role, [array]$Options)
+    Write-Host ""; Write-Host "    [$Role] Select one option:" -ForegroundColor White
+    for ($i = 0; $i -lt $Options.Count; $i++) {
+        Write-Host "      [$($i+1)] $($Options[$i].label)" -ForegroundColor Gray
+    }
+    while ($true) {
+        $resp = Read-Host "      Enter selection number"
+        $idx = 0
+        if ([int]::TryParse($resp, [ref]$idx)) {
+            if ($idx -ge 1 -and $idx -le $Options.Count) { return $Options[$idx-1] }
+        }
+        Write-Warn "Invalid selection. Choose 1-$($Options.Count)."
+    }
+}
 
-# Tool router
-Write-Host "    [2/4] Tool-calling model" -ForegroundColor White
-Ensure-ModelDir "models\tool" "LFM2-1.2B-Tool-Q5_K_M.gguf" "https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q5_K_M.gguf" "LFM2-1.2B-Tool-Q5_K_M" 820
+$RoleOrder = @('primary', 'vision', 'tools', 'thinking', 'creativity')
+$Selected = @{}
+foreach ($role in $RoleOrder) {
+    $Selected[$role] = Select-RoleModel $role $ModelCatalog[$role]
+}
 
-# Whisper STT
-Write-Host "    [3/4] Speech-to-text model (Whisper)" -ForegroundColor White
-Download-File "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en-q8_0.bin" (Join-Path $Root "models\stt\ggml-small.en-q8_0.bin") "ggml-small.en-q8_0 (Whisper STT)" 255
+Write-Step "Downloading selected built-in models"
+foreach ($role in $RoleOrder) {
+    $choice = $Selected[$role]
+    if ($choice.user) {
+        Write-Skip "$role -> user-provided (no download)"
+        continue
+    }
 
-# Piper TTS Amy voice
-Write-Host "    [4/4] Text-to-speech voice (Piper Amy)" -ForegroundColor White
-Download-File "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/amy/medium/en_US-amy-medium.onnx" (Join-Path $Root "models\tts\en_US-amy-medium.onnx") "en_US-amy-medium.onnx (Piper TTS voice)" 63
-Download-File "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/amy/medium/en_US-amy-medium.onnx.json" (Join-Path $Root "models\tts\en_US-amy-medium.onnx.json") "en_US-amy-medium.onnx.json (voice config)" 1
+    if ($role -eq 'vision') {
+        Download-File $choice.modelUrl (Join-Path $Root "$($choice.roleDir)\$($choice.modelFile)") "$role main model ($($choice.modelFile))" 1975
+        Download-File $choice.mmprojUrl (Join-Path $Root "$($choice.roleDir)\$($choice.mmprojFile)") "$role mmproj ($($choice.mmprojFile))" 1375
+    } else {
+        Download-File $choice.url (Join-Path $Root "$($choice.roleDir)\$($choice.file)") "$role model ($($choice.file))" 0
+    }
+}
 
+Write-Step "Writing role-based model assignments to config.json"
+$configPath = Join-Path $Root "config.json"
+if (Test-Path $configPath) {
+    try {
+        $cfg = Get-Content $configPath -Raw | ConvertFrom-Json
+        if (-not $cfg.models) { $cfg | Add-Member -NotePropertyName models -NotePropertyValue (@{}) }
+
+        foreach ($role in $RoleOrder) {
+            $choice = $Selected[$role]
+            if ($role -eq 'vision') {
+                $entry = [ordered]@{ source_type = if ($choice.user) { 'user' } else { 'builtin' }; builtin_id = if ($choice.user) { $null } else { $choice.id }; model_url = if ($choice.user) { $null } else { $choice.modelUrl }; mmproj_url = if ($choice.user) { $null } else { $choice.mmprojUrl }; model_path = if ($choice.user) { $null } else { "models/vision/$($choice.modelFile)" }; mmproj_path = if ($choice.user) { $null } else { "models/vision/$($choice.mmprojFile)" } }
+                $cfg.models | Add-Member -Force -NotePropertyName vision -NotePropertyValue $entry
+                if ($cfg.servers.vision) { $cfg.servers.vision.model_path = $entry.model_path; $cfg.servers.vision.mmproj_path = $entry.mmproj_path }
+            } else {
+                $localRole = if ($role -eq 'tools') { 'tools' } else { $role }
+                $entry = [ordered]@{ source_type = if ($choice.user) { 'user' } else { 'builtin' }; builtin_id = if ($choice.user) { $null } else { $choice.id }; url = if ($choice.user) { $null } else { $choice.url }; local_path = if ($choice.user) { $null } else { "models/$localRole/$($choice.file)" } }
+                $cfg.models | Add-Member -Force -NotePropertyName $role -NotePropertyValue $entry
+                $serverKey = if ($role -eq 'tools') { 'tool' } else { $role }
+                if ($cfg.servers.$serverKey) { $cfg.servers.$serverKey.model_path = $entry.local_path }
+            }
+        }
+
+        $cfg | ConvertTo-Json -Depth 100 | Set-Content $configPath -Encoding UTF8
+        Write-OK "config.json updated with role-based model schema"
+    } catch {
+        Write-Problem "Failed to update config.json model assignments: $_"
+    }
+} else {
+    Write-Warn "config.json not found; model assignments were not persisted"
+}
 
 # -- 7. Install Python packages ------------------------------------------------
 Write-Step "Installing Python packages"
@@ -391,7 +455,7 @@ Write-Host ""
 
 $checks = [ordered]@{
     "Thinking model (.gguf in models\thinking)" = @{ type="dir_gguf"; path="models\thinking"                   }
-    "Tool model (.gguf in models\tool)"         = @{ type="dir_gguf"; path="models\tool"                       }
+    "Tool model (.gguf in models\tools)"         = @{ type="dir_gguf"; path="models\tools"                       }
     "Whisper STT"                               = @{ type="file";     path="models\stt\ggml-small.en-q8_0.bin" }
     "Piper TTS voice"                           = @{ type="file";     path="models\tts\en_US-amy-medium.onnx"  }
     "Piper binary"                              = @{ type="file";     path="Piper\piper\piper.exe"              }

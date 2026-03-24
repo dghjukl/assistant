@@ -33,6 +33,7 @@ from runtime.server_runtime import (
     wait_for_health_with_retry,
 )
 from runtime.server_activation import normalize_activation_config
+from runtime.model_registry import collect_model_issues, migrate_models_config
 from runtime.topology import (
     RuntimeTopology,
     ServerState,
@@ -52,6 +53,7 @@ def load_config(config_path: str | Path) -> dict[str, Any]:
         raise BootError(f"Config file not found: {p}")
     with p.open(encoding="utf-8") as f:
         cfg = json.load(f)
+    cfg = migrate_models_config(cfg)
     cfg = normalize_activation_config(cfg)
     if "deployment_mode" not in cfg:
         raise BootError("Config missing required field: deployment_mode")
@@ -92,6 +94,14 @@ def boot(config_path: str | Path, root: Path | None = None) -> RuntimeTopology:
 
     mode = cfg["deployment_mode"]
     logger.info("Booting EOS in %s mode", mode)
+
+    model_issues = collect_model_issues(cfg, root, enabled_only=True)
+    for role, issues in model_issues.items():
+        role_required = bool((cfg.get("servers", {}).get(role if role != "tools" else "tool", {}) or {}).get("required", False))
+        message = "; ".join(issues)
+        if role_required:
+            raise BootError(f"[{role}] model configuration invalid: {message}")
+        logger.warning("[%s] model configuration invalid — continuing as optional role: %s", role, message)
 
     # ── Phase 1: Launch enabled servers ───────────────────────────────────────
     servers_cfg = cfg.get("servers", {})

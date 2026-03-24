@@ -1,5 +1,5 @@
 {
-  "_comment": "EOS Base Mode — Primary (GPU) + Tool (CPU) only. No thinking, no creativity, no vision. Minimum footprint; fastest startup.",
+  "_comment": "EOS Base Mode \u2014 Primary (GPU) + Tool (CPU) only. No thinking, no creativity, no vision. Minimum footprint; fastest startup.",
   "deployment_mode": "standard",
   "servers": {
     "primary": {
@@ -34,7 +34,7 @@
       "_role": "Extracts structured function calls from Qwen3 output. Does not generate responses.",
       "enabled": true,
       "binary_cpu": "llama-CPU/llama-server.exe",
-      "model_path": "models/tool/",
+      "model_path": "models/tools/",
       "host": "127.0.0.1",
       "port": 8082,
       "n_gpu_layers": 0,
@@ -210,7 +210,7 @@
     "relational_interval_seconds": 1800
   },
   "idle_cognition": {
-    "_comment": "Base mode — minimal footprint. Idle cognition fires rarely; no thinking server available so uses primary model directly.",
+    "_comment": "Base mode \u2014 minimal footprint. Idle cognition fires rarely; no thinking server available so uses primary model directly.",
     "enabled": true,
     "resting_threshold_hours": 3.0,
     "drifting_threshold_hours": 8.0,
@@ -275,7 +275,7 @@
     "auto_backup_interval_hours": 24
   },
   "computer_use": {
-    "_comment": "Supervised computer-use subsystem. Layered access: mode → shortcut allowlist → per-app action policy.",
+    "_comment": "Supervised computer-use subsystem. Layered access: mode \u2192 shortcut allowlist \u2192 per-app action policy.",
     "_doc": "Enabling this does NOT grant the entity unrestricted computer access. The entity may only use applications present in approved_shortcuts_path, and only the actions listed in app_policy_path. The operator sets the mode. Halt is always available.",
     "enabled": false,
     "default_mode": "off",
@@ -401,6 +401,40 @@
         "min_uptime_seconds": 90,
         "role_need_score": 0.74
       }
+    }
+  },
+  "models": {
+    "primary": {
+      "source_type": "user",
+      "builtin_id": null,
+      "url": null,
+      "local_path": "models/primary/"
+    },
+    "vision": {
+      "source_type": "user",
+      "builtin_id": null,
+      "model_url": null,
+      "mmproj_url": null,
+      "model_path": "models/vision/",
+      "mmproj_path": "models/vision/"
+    },
+    "tools": {
+      "source_type": "user",
+      "builtin_id": null,
+      "url": null,
+      "local_path": "models/tools/"
+    },
+    "thinking": {
+      "source_type": "user",
+      "builtin_id": null,
+      "url": null,
+      "local_path": "models/thinking/"
+    },
+    "creativity": {
+      "source_type": "user",
+      "builtin_id": null,
+      "url": null,
+      "local_path": "models/creativity/"
     }
   }
 }

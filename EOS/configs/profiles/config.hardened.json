@@ -1,14 +1,14 @@
 {
-  "_comment": "EOS Hardened Profile — locked-down baseline for public/untrusted deployment. All external integrations off. Only safe, read-only toolpacks loaded. No autonomous action or initiative. Operator must explicitly re-enable features after review.",
+  "_comment": "EOS Hardened Profile \u2014 locked-down baseline for public/untrusted deployment. All external integrations off. Only safe, read-only toolpacks loaded. No autonomous action or initiative. Operator must explicitly re-enable features after review.",
   "_hardening_notes": [
-    "discord.enabled = false — no outbound Discord messaging without explicit opt-in",
-    "google.enabled = false — no OAuth or Google API access without explicit opt-in",
-    "autonomy_defaults.action = false — entity cannot execute tools autonomously",
-    "autonomy_defaults.initiative = false — entity does not self-initiate tasks",
-    "computer_use.enabled = false — no desktop/GUI access",
+    "discord.enabled = false \u2014 no outbound Discord messaging without explicit opt-in",
+    "google.enabled = false \u2014 no OAuth or Google API access without explicit opt-in",
+    "autonomy_defaults.action = false \u2014 entity cannot execute tools autonomously",
+    "autonomy_defaults.initiative = false \u2014 entity does not self-initiate tasks",
+    "computer_use.enabled = false \u2014 no desktop/GUI access",
     "toolpacks: only deterministic, text, diff, event_journal, workspace (no-delete/no-exec), telemetry, ingestion loaded",
-    "workspace_tools.allow_delete = false — workspace files cannot be deleted",
-    "workspace_tools.allow_exec = false — workspace cannot execute code"
+    "workspace_tools.allow_delete = false \u2014 workspace files cannot be deleted",
+    "workspace_tools.allow_exec = false \u2014 workspace cannot execute code"
   ],
   "deployment_mode": "standard",
   "servers": {
@@ -44,7 +44,7 @@
       "_role": "Structured function call extraction. Not active in hardened profile (no external tools loaded).",
       "enabled": false,
       "binary_cpu": "llama-CPU/llama-server.exe",
-      "model_path": "models/tool/",
+      "model_path": "models/tools/",
       "host": "127.0.0.1",
       "port": 8082,
       "n_gpu_layers": 0,
@@ -191,7 +191,7 @@
     "relational_interval_seconds": 1800
   },
   "idle_cognition": {
-    "_comment": "Hardened mode — idle cognition disabled. In hardened mode all autonomous unsupervised behaviour is off.",
+    "_comment": "Hardened mode \u2014 idle cognition disabled. In hardened mode all autonomous unsupervised behaviour is off.",
     "enabled": false,
     "resting_threshold_hours": 2.0,
     "drifting_threshold_hours": 6.0,
@@ -367,6 +367,40 @@
         "min_uptime_seconds": 90,
         "role_need_score": 0.74
       }
+    }
+  },
+  "models": {
+    "primary": {
+      "source_type": "user",
+      "builtin_id": null,
+      "url": null,
+      "local_path": "models/primary/"
+    },
+    "vision": {
+      "source_type": "user",
+      "builtin_id": null,
+      "model_url": null,
+      "mmproj_url": null,
+      "model_path": "models/vision/",
+      "mmproj_path": "models/vision/"
+    },
+    "tools": {
+      "source_type": "user",
+      "builtin_id": null,
+      "url": null,
+      "local_path": "models/tools/"
+    },
+    "thinking": {
+      "source_type": "user",
+      "builtin_id": null,
+      "url": null,
+      "local_path": "models/thinking/"
+    },
+    "creativity": {
+      "source_type": "user",
+      "builtin_id": null,
+      "url": null,
+      "local_path": "models/creativity/"
     }
   }
 }

@@ -33,7 +33,7 @@ def _write_config(tmp_path: Path) -> Path:
                 "required": False,
                 "host": "127.0.0.1",
                 "port": 8082,
-                "model_path": "models/tool",
+                "model_path": "models/tools",
                 "binary_cpu": "llama-CPU/llama-server.exe",
                 "binary_gpu": "llama-gpu/llama-server.exe",
             },
@@ -76,7 +76,7 @@ def deployment_root(tmp_path: Path) -> Path:
     _write_file(tmp_path / "llama-CPU" / "llama-server.exe")
     _write_file(tmp_path / "llama-gpu" / "llama-server.exe")
     _write_file(tmp_path / "models" / "primary" / "Qwen3-8B-Q6_K.gguf")
-    _write_file(tmp_path / "models" / "tool" / "lfm2-tool.gguf")
+    _write_file(tmp_path / "models" / "tools" / "lfm2-tool.gguf")
     _write_file(tmp_path / "models" / "thinking" / "lfm2-thinking.gguf")
     _write_file(tmp_path / "models" / "creativity" / "creative.gguf")
     _write_file(tmp_path / "models" / "vision" / "vision.gguf")
