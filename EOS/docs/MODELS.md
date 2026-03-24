@@ -1,6 +1,11 @@
+## Role-based schema
+
+`config.json` stores model assignment per role under `models.primary`, `models.vision`, `models.tools`, `models.thinking`, and `models.creativity`.
+Vision stores both `model_path` and `mmproj_path`.
+
 # EOS — Model Placement Guide
 
-All model slots use **directory-based discovery**. Place any compatible `.gguf` file in the correct directory — the filename does not matter. EOS will find it automatically.
+Model assignment is **role-based and explicit**. Each role has `source_type` (`builtin` or `user`) with stable file paths in `config.json` under `models`.
 
 The only exceptions are the STT and TTS models, which use fixed filenames because they are loaded by external binaries (faster-whisper and Piper).
 
@@ -30,7 +35,7 @@ This is the main language model — the one that reasons, holds identity, and pr
 
 ---
 
-### Tool Model — `models/tool/`
+### Tool Model — `models/tools/`
 
 **Optional.** Enables structured function/tool call extraction. Degrades gracefully if absent.
 
@@ -144,7 +149,7 @@ Requires **two files** with fixed names:
 | Directory | Required | Auto-downloaded | Fixed filename |
 |---|---|---|---|
 | `models/primary/` | Yes | Yes | No |
-| `models/tool/` | No | Yes | No |
+| `models/tools/` | No | Yes | No |
 | `models/thinking/` | No | Yes | No |
 | `models/creativity/` | No | **No — bring your own** | No |
 | `models/vision/` | Vision mode only | Yes | No (but mmproj must start with `mmproj`) |

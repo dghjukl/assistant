@@ -33,6 +33,7 @@ from runtime.server_runtime import (
     wait_for_health_with_retry,
 )
 from runtime.server_activation import normalize_activation_config
+from runtime.model_registry import migrate_models_config
 from runtime.topology import (
     RuntimeTopology,
     ServerState,
@@ -52,6 +53,7 @@ def load_config(config_path: str | Path) -> dict[str, Any]:
         raise BootError(f"Config file not found: {p}")
     with p.open(encoding="utf-8") as f:
         cfg = json.load(f)
+    cfg = migrate_models_config(cfg)
     cfg = normalize_activation_config(cfg)
     if "deployment_mode" not in cfg:
         raise BootError("Config missing required field: deployment_mode")

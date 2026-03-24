@@ -31,6 +31,17 @@ Install Python 3.10 or newer from https://www.python.org/downloads/ and enable *
 
 ## Step 2 — Run setup
 
+## Model selection during setup
+
+Both `setup\Setup-Full.ps1` and `setup\Setup-Lite.ps1` now run the same **role-based model selector**.
+For each role (primary, vision, tools, thinking, creativity), choose either:
+
+- one approved built-in download for that role, or
+- **I will provide my own** (skip download now, set local path later in `config.json`).
+
+Vision is always a dual-file assignment: a main model path and an `mmproj` path. If you select user-provided vision, both paths must be set before vision can launch.
+
+
 ### Recommended
 
 - `setup\Setup-Full.ps1` — downloads the full recommended model and binary set

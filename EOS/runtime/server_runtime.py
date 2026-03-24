@@ -137,10 +137,9 @@ def launch_server(role: str, srv_cfg: dict, root: Path) -> subprocess.Popen:
     mmproj_str = srv_cfg.get("mmproj_path")
     if mmproj_str:
         mmproj = resolve_mmproj_path(mmproj_str, root, role=f"{role}:mmproj")
-        if mmproj:
-            cmd += ["--mmproj", str(mmproj)]
-        else:
-            logger.warning("[%s] mmproj not found at %s — skipping", role, mmproj_str)
+        if mmproj is None:
+            raise BootError(f"[{role}] mmproj file not found at: {mmproj_str}")
+        cmd += ["--mmproj", str(mmproj)]
 
     logger.info("[%s] Launching: port=%d layers=%d model=%s", role, port, layers, model.name)
 
