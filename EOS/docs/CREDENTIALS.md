@@ -1,6 +1,6 @@
 # EOS — Credentials Setup Guide
 
-Both integrations are **optional**. EOS runs fully without them. If a credential file is missing, Google OAuth now fails fast with a clear error log and authorization endpoints return an explicit configuration error. If the integration is disabled in config, it remains disabled.
+Discord remains optional. Google Workspace is now a **first-class subsystem** (its routes, tools, and admin surfaces load by default), and data access is credential-gated. If a Google credential file is missing, OAuth fails fast with a clear error log and authorization endpoints return an explicit configuration error.
 
 ---
 

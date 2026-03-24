@@ -1,6 +1,6 @@
 # EOS — User Guide
 
-This guide covers day-to-day operation: the interface, all optional capabilities, and how to use each one fully.
+This guide covers day-to-day operation: the interface, all major capabilities, and how to use each one fully.
 
 ---
 
@@ -164,11 +164,11 @@ Set `"respond_only_to_mentions": false` to have EOS respond to all messages in a
 
 ---
 
-## Google Workspace integration
+## Google Workspace system
 
 ### What it does
 
-EOS can read your Google Calendar, search Gmail, and browse Google Drive files. This lets you ask EOS things like "what's on my calendar tomorrow" or "find the email from last week about the project deadline."
+Google Workspace is a first-class EOS system. Once connected, EOS can read your Google Calendar, search Gmail, and browse Google Drive files. This lets you ask EOS things like "what's on my calendar tomorrow" or "find the email from last week about the project deadline."
 
 ### Setup
 

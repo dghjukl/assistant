@@ -483,6 +483,35 @@ class TestCapabilityContractValidation:
         assert resp.status_code in (401, 422)
 
 
+    def test_admin_capabilities_includes_google_block(self, client):
+        from webui.app_state import app_state
+        app_state.cfg = {
+            "google": {
+                "enabled": True,
+                "calendar_enabled": True,
+                "gmail_enabled": True,
+                "drive_enabled": False,
+                "gmail_send_enabled": True,
+                "drive_download_enabled": False,
+            },
+            "computer_use": {"enabled": False, "default_mode": "off"},
+            "workspace_tools": {"allow_delete": False, "allow_exec": False},
+            "creativity": {"enabled": True, "injection_frequency": "medium", "invocation_domains": {"autonomous_idle": False}},
+        }
+
+        resp = client.get("/admin/capabilities", headers={"X-Admin-Token": "any"})
+        assert resp.status_code in (200, 401)
+        if resp.status_code == 200:
+            data = resp.json()
+            assert data["ok"] is True
+            google = data["data"]["google"]
+            assert google["enabled"] is True
+            assert google["calendar_enabled"] is True
+            assert google["gmail_enabled"] is True
+            assert google["drive_enabled"] is False
+            assert google["gmail_send_enabled"] is True
+            assert google["drive_download_enabled"] is False
+
 class TestOvernightApiContracts:
     def test_overnight_status_route_shape(self, client):
         resp = client.get('/api/overnight')

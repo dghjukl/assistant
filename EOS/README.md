@@ -50,7 +50,7 @@ EOS runs one or more GGUF language models through llama.cpp and presents them as
 - a persistent entity with memory and identity continuity
 - a web-based workspace and admin surface
 - optional speech-to-text and text-to-speech
-- optional Discord and Google Workspace integration
+- optional Discord integration and a first-class credential-gated Google Workspace subsystem
 - optional computer use and workspace tooling
 - graceful fallback when optional helper backends are unavailable
 

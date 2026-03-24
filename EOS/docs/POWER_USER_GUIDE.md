@@ -161,6 +161,8 @@ Intensity presets control sampling parameters. `temperature`, `top_p`, `top_k` i
 
 ### `google`
 
+Google is a first-class subsystem: `google_tools` is loaded and required at startup; credentials only control live account access.
+
 ```json
 "google": {
     "enabled": true,

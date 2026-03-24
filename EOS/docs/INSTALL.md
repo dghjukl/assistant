@@ -98,14 +98,14 @@ Open **http://127.0.0.1:7860/** when the WebUI is up.
 
 ---
 
-## Step 5 — Optional capabilities
+## Step 5 — Credential-gated and extended capabilities
 
-After the core system is running, set up any optional capabilities you want:
+After the core system is running, complete any credential-gated or extended capability setup you want:
 
 | Capability | What to do |
 |---|---|
 | Discord bot | Create a bot token and put it in `AI personal files\Discord.txt` |
-| Google Calendar / Gmail / Drive | Download an OAuth JSON and put it in `config\google\` or set an explicit `google.client_secret_path` |
+| Google Workspace system (Calendar / Gmail / Drive) | Download an OAuth JSON and put it in `config\google\` or set an explicit `google.client_secret_path` |
 | Computer Use | Enable in admin panel → Control & Permissions → Capabilities |
 | Vision | Run `launchers\start-vision-gpu.bat` alongside your normal backend bundle |
 

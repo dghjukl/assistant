@@ -128,20 +128,20 @@ Remember the hierarchy:
 
 ---
 
-## Step 6 — Set up optional capabilities
+## Step 6 — Set up credential-gated and extended capabilities
 
-The core system is running. The following capabilities need additional setup:
+The core system is running. The following credential-gated or extended capabilities need additional setup:
 
 | Capability | What you need | Instructions |
 |---|---|---|
 | **Discord bot** | Bot token in `AI personal files\Discord.txt` | [CREDENTIALS.md — Discord](CREDENTIALS.md#discord-bot) |
-| **Google Calendar / Gmail / Drive** | OAuth JSON in `config\google\` or an explicit `google.client_secret_path` | [CREDENTIALS.md — Google](CREDENTIALS.md#google-workspace-calendar-gmail-drive) |
+| **Google Workspace system (Calendar / Gmail / Drive)** | OAuth JSON in `config\google\` or an explicit `google.client_secret_path` | [CREDENTIALS.md — Google](CREDENTIALS.md#google-workspace-calendar-gmail-drive) |
 | **Computer Use** | Enable in admin panel, approve apps | [USER_GUIDE.md — Computer Use](USER_GUIDE.md#computer-use) |
 | **Vision** | Run `launchers\start-vision-gpu.bat` (GPU required) | [MODELS.md — Vision](MODELS.md#vision-model--modelsvision) |
 | **Voice (STT/TTS)** | Already active if `setup\Setup-Full.ps1` ran successfully | [USER_GUIDE.md — Voice](USER_GUIDE.md#voice-input-and-output) |
 | **Worldview** | Drop documents into `data\worldview\sources\` | [USER_GUIDE.md — Worldview](USER_GUIDE.md#worldview-system) |
 
-None of these are required. Skip anything you do not need.
+Google is first-class and loaded by default; add credentials when you want live Google data. Other items can be skipped if you do not need them.
 
 ---
 

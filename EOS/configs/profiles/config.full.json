@@ -1,5 +1,5 @@
 {
-  "_comment": "EOS Full Mode \u2014 Primary (GPU) + Tool (CPU) + Thinking (CPU) + Creativity (CPU). No vision. All cognitive subsystems active; each degrades gracefully if its model is absent.",
+  "_comment": "EOS Full Mode — Primary (GPU) + Tool (CPU) + Thinking (CPU) + Creativity (CPU). No vision. All cognitive subsystems active; each degrades gracefully if its model is absent.",
   "deployment_mode": "standard",
   "servers": {
     "primary": {
@@ -44,7 +44,7 @@
       "activation_mode": "persistent"
     },
     "thinking": {
-      "_role": "Background thinking worker. Non-blocking. Dispatched to by idle cognition, initiative, investigation, identity eval. NOT an escalation target \u2014 Qwen3 uses /think for inline reasoning.",
+      "_role": "Background thinking worker. Non-blocking. Dispatched to by idle cognition, initiative, investigation, identity eval. NOT an escalation target — Qwen3 uses /think for inline reasoning.",
       "enabled": true,
       "binary_cpu": "llama-CPU/llama-server.exe",
       "model_path": "models/thinking/",
@@ -60,7 +60,7 @@
       "min_uptime_seconds": 90
     },
     "creativity": {
-      "_role": "Controlled divergence subsystem. Advisory only \u2014 proposes alternate interpretations, reframes, analogies, non-obvious solution paths, and ideation. Does not decide, authorize, or override. Optional at runtime; system degrades gracefully if absent.",
+      "_role": "Controlled divergence subsystem. Advisory only — proposes alternate interpretations, reframes, analogies, non-obvious solution paths, and ideation. Does not decide, authorize, or override. Optional at runtime; system degrades gracefully if absent.",
       "enabled": true,
       "binary_cpu": "llama-CPU/llama-server.exe",
       "model_path": "models/creativity/",
@@ -180,7 +180,7 @@
     "relational_interval_seconds": 1800
   },
   "idle_cognition": {
-    "_comment": "Full mode \u2014 most frequent idle cognition. All cognitive subsystems active; higher daily cap and token budget.",
+    "_comment": "Full mode — most frequent idle cognition. All cognitive subsystems active; higher daily cap and token budget.",
     "enabled": true,
     "resting_threshold_hours": 1.5,
     "drifting_threshold_hours": 5.0,
@@ -245,7 +245,7 @@
     "auto_backup_interval_hours": 24
   },
   "computer_use": {
-    "_comment": "Supervised computer-use subsystem. Layered access: mode \u2192 shortcut allowlist \u2192 per-app action policy.",
+    "_comment": "Supervised computer-use subsystem. Layered access: mode → shortcut allowlist → per-app action policy.",
     "_doc": "Enabling this does NOT grant the entity unrestricted computer access. The entity may only use applications present in approved_shortcuts_path, and only the actions listed in app_policy_path. The operator sets the mode. Halt is always available.",
     "enabled": false,
     "default_mode": "off",
@@ -285,7 +285,9 @@
       "service_control_tools",
       "system_cmd_tools"
     ],
-    "required_packs": [],
+    "required_packs": [
+      "google_tools"
+    ],
     "notifications_tools": {
       "discord_credential_file": "AI personal files/Discord.txt"
     }

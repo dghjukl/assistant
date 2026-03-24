@@ -3470,6 +3470,14 @@ async def admin_get_capabilities():
                     "injection_frequency": cr.get("injection_frequency", "medium"),
                     "autonomous_idle":     cr.get("invocation_domains", {}).get("autonomous_idle", False),
                 },
+                "google": {
+                    "enabled":          goo.get("enabled", False),
+                    "calendar_enabled": goo.get("calendar_enabled", False),
+                    "gmail_enabled":    goo.get("gmail_enabled", False),
+                    "drive_enabled":    goo.get("drive_enabled", False),
+                    "gmail_send_enabled": goo.get("gmail_send_enabled", False),
+                    "drive_download_enabled": goo.get("drive_download_enabled", False),
+                },
             },
         })
     except Exception as exc:

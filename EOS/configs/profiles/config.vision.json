@@ -1,5 +1,5 @@
 {
-  "_comment": "EOS Vision Mode \u2014 Primary GPU + Vision GPU + Tool + Thinking + optional Creativity.",
+  "_comment": "EOS Vision Mode — Primary GPU + Vision GPU + Tool + Thinking + optional Creativity.",
   "deployment_mode": "vision",
   "servers": {
     "primary": {
@@ -61,7 +61,7 @@
       "min_uptime_seconds": 90
     },
     "creativity": {
-      "_role": "Controlled divergence subsystem. Advisory only \u2014 proposes alternate interpretations, reframes, analogies, non-obvious solution paths, and ideation. Does not decide, authorize, or override. Optional at runtime; system degrades gracefully if absent.",
+      "_role": "Controlled divergence subsystem. Advisory only — proposes alternate interpretations, reframes, analogies, non-obvious solution paths, and ideation. Does not decide, authorize, or override. Optional at runtime; system degrades gracefully if absent.",
       "enabled": false,
       "binary_cpu": "llama-CPU/llama-server.exe",
       "model_path": "models/creativity/",
@@ -78,7 +78,7 @@
     }
   },
   "creativity": {
-    "_comment": "Creativity subsystem \u2014 first-class cognitive service for controlled divergence. Advisory only; optional at runtime. All settings are hot-reloadable where possible. If the server is unavailable, all settings are safely ignored.",
+    "_comment": "Creativity subsystem — first-class cognitive service for controlled divergence. Advisory only; optional at runtime. All settings are hot-reloadable where possible. If the server is unavailable, all settings are safely ignored.",
     "enabled": false,
     "injection_frequency": "medium",
     "_injection_frequency_options": [
@@ -181,7 +181,7 @@
     "relational_interval_seconds": 1800
   },
   "idle_cognition": {
-    "_comment": "Vision mode \u2014 same as standard; vision server is perceptual only and doesn't affect idle cognition behaviour.",
+    "_comment": "Vision mode — same as standard; vision server is perceptual only and doesn't affect idle cognition behaviour.",
     "enabled": true,
     "resting_threshold_hours": 2.0,
     "drifting_threshold_hours": 6.0,
@@ -246,7 +246,7 @@
     "auto_backup_interval_hours": 24
   },
   "computer_use": {
-    "_comment": "Supervised computer-use subsystem. Layered access: mode \u2192 shortcut allowlist \u2192 per-app action policy.",
+    "_comment": "Supervised computer-use subsystem. Layered access: mode → shortcut allowlist → per-app action policy.",
     "_doc": "Enabling this does NOT grant the entity unrestricted computer access. The entity may only use applications present in approved_shortcuts_path, and only the actions listed in app_policy_path. The operator sets the mode. Halt is always available.",
     "enabled": false,
     "default_mode": "off",
@@ -286,7 +286,9 @@
       "service_control_tools",
       "system_cmd_tools"
     ],
-    "required_packs": [],
+    "required_packs": [
+      "google_tools"
+    ],
     "notifications_tools": {
       "discord_credential_file": "AI personal files/Discord.txt"
     }
