@@ -310,7 +310,7 @@ class IdleCognitionEngine:
         """Execute an idle cognition call via the thinking faculty delegation."""
         try:
             from runtime.orchestrator import think_for_background
-        except ImportError:
+        except Exception:
             logger.warning("[idle_cognition] orchestrator not available for delegation")
             return None
 

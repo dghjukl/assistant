@@ -386,14 +386,16 @@ def _validate_params(params: Dict[str, Any], schema: dict) -> Optional[str]:
     """Validate params against a JSON Schema dict.
 
     Returns None on success, or an error string on failure.
-    Silently skips validation if jsonschema is not installed.
+    Silently skips validation if jsonschema is unavailable or broken at import-time.
     """
     try:
         import jsonschema
-        jsonschema.validate(instance=params, schema=schema)
+    except Exception:
+        logger.debug("[executor] jsonschema unavailable — skipping param validation")
         return None
-    except ImportError:
-        logger.debug("[executor] jsonschema not installed — skipping param validation")
+
+    try:
+        jsonschema.validate(instance=params, schema=schema)
         return None
     except Exception as exc:
         return str(getattr(exc, "message", exc))

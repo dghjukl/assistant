@@ -168,6 +168,14 @@ def normalize_activation_config(cfg: dict[str, Any]) -> dict[str, Any]:
     auxiliary_roles = list(activation.get("auxiliary_roles") or auxiliary_default)
 
     roles_cfg = dict(activation.get("roles") or {})
+    # Backward compatibility: hydrate multimodal flags into servers.primary.
+    legacy_primary = dict(cfg.get("primary") or {})
+    if "primary" in servers and legacy_primary:
+        primary_server = servers["primary"]
+        for key in ("is_multimodal", "requires_mmproj", "mmproj_path"):
+            if key in legacy_primary and key not in primary_server:
+                primary_server[key] = legacy_primary[key]
+
     for role, srv_cfg in servers.items():
         role_cfg = dict(roles_cfg.get(role) or {})
         residency = role_cfg.get("residency") or srv_cfg.get("residency")

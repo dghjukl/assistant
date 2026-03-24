@@ -700,16 +700,7 @@ class BackupService:
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _eos_version() -> str:
-    for candidate in [
-        Path(__file__).parent.parent / "VERSION",
-        Path(__file__).parent.parent / "version.txt",
-    ]:
-        if candidate.exists():
-            try:
-                return candidate.read_text().strip()
-            except OSError:
-                pass
-    return "unknown"
+    return get_version()
 
 
 def _human_size(n: int) -> str:

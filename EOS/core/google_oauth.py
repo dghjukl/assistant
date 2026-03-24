@@ -154,7 +154,7 @@ def _import_google() -> tuple:
         from google_auth_oauthlib.flow import Flow
         from googleapiclient.discovery import build
         return Credentials, Request, Flow, build
-    except ImportError as exc:
+    except Exception as exc:
         raise ImportError(
             "Google auth libraries not installed.  "
             "Run: pip install google-auth google-auth-oauthlib google-api-python-client"

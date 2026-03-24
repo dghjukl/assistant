@@ -28,7 +28,7 @@ def register(registry: Any, config: Dict[str, Any]) -> None:
         """Return system health metrics."""
         try:
             import psutil
-        except ImportError:
+        except Exception:
             psutil = None
 
         health = {

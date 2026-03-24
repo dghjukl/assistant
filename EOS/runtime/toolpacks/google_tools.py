@@ -59,7 +59,7 @@ def register(registry: Any, config: Dict[str, Any]) -> None:
     try:
         from google.auth.transport.requests import Request  # noqa: F401
         google_available = True
-    except ImportError:
+    except Exception:
         google_available = False
 
     if not google_available or not enabled:

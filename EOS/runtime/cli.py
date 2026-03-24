@@ -1,0 +1,107 @@
+"""EOS CLI entrypoint."""
+from __future__ import annotations
+
+import argparse
+import logging
+import os
+import sys
+from pathlib import Path
+
+from runtime.service_discovery import discover_runtime, format_runtime_summary
+from runtime.versioning import get_version
+from webui.server import create_app
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s  %(levelname)-8s  %(name)s  %(message)s",
+    datefmt="%H:%M:%S",
+)
+logger = logging.getLogger("eos")
+
+PROFILE_REPLACEMENT = "launchers/start-*.bat or python -m runtime.launch_profile"
+NO_BOOT_REPLACEMENT = "start-eos.bat or python eos.py --status"
+ROOT = Path(__file__).parent.parent.resolve()
+
+
+def _banner(title: str) -> None:
+    cyan = "\033[36m"
+    reset = "\033[0m"
+    line = "=" * 52
+    print(f"\n{cyan}{line}{reset}")
+    print(f"{cyan}  {title}{reset}")
+    print(f"{cyan}{line}{reset}\n")
+
+
+def _find_config(arg: str | None) -> Path:
+    if arg:
+        arg_path = Path(arg)
+        candidates = [arg_path] if arg_path.is_absolute() else [Path.cwd() / arg_path, ROOT / arg_path]
+        for candidate in candidates:
+            if candidate.is_file():
+                return candidate.resolve()
+        logger.error("Config file not found. Tried: %s", ", ".join(str(c) for c in candidates))
+        raise SystemExit(1)
+
+    for candidate in (Path.cwd() / "config.json", ROOT / "config.json"):
+        if candidate.is_file():
+            return candidate.resolve()
+
+    logger.error("No config.json found in %s or %s", Path.cwd(), ROOT)
+    raise SystemExit(1)
+
+
+def _print_summary(discovery) -> None:
+    print(format_runtime_summary(discovery))
+    print()
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        prog="eos",
+        description="EOS — discover running backends and start the WebUI.",
+    )
+    parser.add_argument("--config", metavar="FILE", default=None, help="Path to the canonical JSON config file.")
+    parser.add_argument("--host", default=None, help="Host for the WebUI server.")
+    parser.add_argument("--port", type=int, default=None, help="Port for the WebUI server.")
+    parser.add_argument("--status", action="store_true", help="Print backend discovery and effective capabilities, then exit.")
+    parser.add_argument("--profile", default=None, help="Deprecated legacy flag; ignored.")
+    parser.add_argument("--no-boot", action="store_true", help="Deprecated legacy flag; ignored because eos.py no longer launches model servers.")
+    parser.add_argument("--version", action="version", version=f"eos {get_version()}")
+    args = parser.parse_args(argv) if argv is not None else parser.parse_args()
+
+    if args.profile:
+        logger.warning("--profile is deprecated and ignored. Use %s.", PROFILE_REPLACEMENT)
+    if args.no_boot:
+        logger.warning("--no-boot is deprecated and ignored. Use %s.", NO_BOOT_REPLACEMENT)
+
+    logger.info("EOS version %s", get_version())
+
+    config_path = _find_config(args.config)
+    discovery = discover_runtime(config_path, root=ROOT)
+
+    _banner("EOS  |  Runtime Discovery")
+    _print_summary(discovery)
+
+    if args.status:
+        return
+
+    os.environ["EOS_ROOT"] = str(ROOT)
+    os.chdir(ROOT)
+
+    webui_cfg = discovery.config.get("webui", {})
+    host = args.host or webui_cfg.get("host", "127.0.0.1")
+    port = args.port or webui_cfg.get("port", 7860)
+
+    logger.info("Starting WebUI at http://%s:%d/", host, port)
+    logger.info("Admin panel at  http://%s:%d/admin", host, port)
+
+    import uvicorn
+
+    app = create_app(config_path=config_path)
+    uvicorn.run(
+        app,
+        host=host,
+        port=port,
+        log_level="info",
+        reload=False,
+    )

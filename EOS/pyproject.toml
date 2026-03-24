@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "eos"
-version = "0.1.0"
+version = "1.0.0"
 description = "EOS — autonomous personal assistant runtime"
 requires-python = ">=3.10"
 license = { text = "Proprietary" }
@@ -50,7 +50,7 @@ dev = [
 ]
 
 [project.scripts]
-eos = "eos:main"
+eos = "runtime.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -59,13 +59,6 @@ exclude = ["tests*", "models*"]
 
 [tool.setuptools.package-data]
 "*" = ["*.json", "*.html", "*.css", "*.js", "*.md"]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-addopts = "-v --tb=short"
-python_files = ["test_*.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
 
 [tool.pyright]
 pythonVersion = "3.11"
