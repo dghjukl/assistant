@@ -11,7 +11,7 @@ For most users, the intended install path is:
 3. Run `python verify.py`
 4. Run `python verify.py` again if you changed models manually
 5. Run `launchers\Launch EOS.bat` to let the Windows launcher auto-detect the safest profile for this machine
-6. Or run `launchers\start-standard.bat` for a non-interactive hardened default
+6. Or run `launchers\start-standard.bat` for a non-interactive default
 7. Run `start-eos.bat` if you launched backends manually
 
 Use a different path only if you need lighter downloads, manual model control, or custom backend behavior.
@@ -63,7 +63,7 @@ This checks Python packages, binaries, model files, port availability, and the c
 1. Start `launchers\Launch EOS.bat`.
    - It inspects installed models, available runtimes, NVIDIA GPU presence, and supported degraded modes.
    - It pre-selects a constrained set of sane launch choices instead of expecting you to know which combination is safe.
-2. If you prefer no UI, start the hardened backend bundle:
+2. If you prefer no UI, start the standard backend bundle:
    - `launchers\start-standard.bat`
 3. Start the runtime bootstrap only when you launched backends manually:
    - `start-eos.bat`

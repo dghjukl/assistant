@@ -10,5 +10,7 @@ def test_role_aliases_and_service_labels_are_canonical():
 
 def test_bundle_keys_and_catalog_surface_are_exposed():
     assert BUNDLE_KEYS == ("minimal", "standard", "full", "vision")
+    assert bundle_for("minimal").roles == ("primary", "vision")
     assert bundle_for("standard").roles == ("primary", "tool", "vision")
+    assert bundle_for("full").roles == ("primary", "tool", "vision")
     assert "legacy_surfaces" not in export_catalog()

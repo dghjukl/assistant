@@ -3189,9 +3189,9 @@ async def admin_shadow_databases():
     """Get database statistics."""
     try:
         db_stats = {}
-        db_path = Path(app_state.cfg.get("db_path", "data/entity_app_state.db"))
+        db_path = Path(app_state.cfg.get("db_path", "data/entity_state.db"))
         if db_path.is_file():
-            db_stats["entity_app_state.db"] = db_path.stat().st_size
+            db_stats["entity_state.db"] = db_path.stat().st_size
 
         chroma_path = Path(app_state.cfg.get("retrieval", {}).get("chroma_path", "data/memory_store"))
         if chroma_path.is_dir():

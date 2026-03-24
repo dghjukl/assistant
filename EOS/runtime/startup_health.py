@@ -8,7 +8,9 @@ START_BACKENDS_MESSAGE = "Start baseline backend services before using UI"
 def _baseline_backend_roles(runtime_discovery: Any) -> tuple[str, ...]:
     cfg = getattr(runtime_discovery, "config", {}) or {}
     activation = cfg.get("server_activation", {}) or {}
-    baseline = activation.get("baseline_roles") or ["primary", "tool", "vision"]
+    servers = cfg.get("servers", {}) or {}
+    baseline_default = [r for r in ("primary", "tool", "vision") if servers.get(r, {}).get("enabled", False)]
+    baseline = activation.get("baseline_roles") or baseline_default or ["primary"]
     return tuple(str(role) for role in baseline)
 
 

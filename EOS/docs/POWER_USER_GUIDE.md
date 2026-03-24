@@ -47,11 +47,13 @@ Each starts exactly one backend:
 
 ### Bundle launchers
 
-Convenience wrappers that start common combinations:
+Convenience wrappers that start the resident baseline for each tier. On-demand servers (thinking, creativity) are not started by these launchers — the executive starts them when a task requires it.
 
-- `launchers\start-minimal.bat` → main + tools
-- `launchers\start-standard.bat` → main + tools + thinking
-- `launchers\start-full.bat` → main + tools + thinking + creativity
+| Launcher | Resident at boot | On-demand (elastic) |
+|---|---|---|
+| `launchers\start-minimal.bat` | main only | — |
+| `launchers\start-standard.bat` | main · tools · vision (if enabled) | thinking |
+| `launchers\start-full.bat` | main · tools · vision (if enabled) | thinking · creativity |
 
 ### Bootstrap / status
 
@@ -206,9 +208,9 @@ It builds an effective capability map:
 ```text
 Main model: active
 Tool helper: active
-Thinking helper: unavailable (fallback to main)
-Creativity helper: unavailable (fallback to main)
-Vision: unavailable
+Thinking helper: inactive (on-demand · will start when needed)
+Creativity helper: inactive (on-demand · will start when needed)
+Vision: active
 STT: active
 TTS: active
 
@@ -216,11 +218,13 @@ Effective capabilities:
 
 chat: available
 tools: available
-reasoning: degraded
-creativity: degraded
-vision: unavailable
+reasoning: available (on-demand)
+creativity: available (on-demand)
+vision: available
 voice: available
 ```
+
+Thinking and creativity showing as `inactive` at boot is expected, not a fault. They are elastic helpers — not started until the executive requests them and resource headroom allows.
 
 ---
 
@@ -228,9 +232,9 @@ voice: available
 
 | Missing | Effect |
 |---|---|
-| Tool helper | Tool routing falls back to the main model |
-| Thinking helper | Reasoning falls back to the main model |
-| Creativity helper | Creativity requests fall back to the main model / degrade cleanly |
+| Tool helper | Tool extraction unavailable; entity responds without structured tool calls |
+| Thinking helper | Executive routes deliberation to the main model instead; reasoning quality may be lower |
+| Creativity helper | Creativity subsystem skipped for that turn; **no fallback to main model** — degrades cleanly |
 | Vision helper | Vision features are disabled cleanly |
 | STT/TTS models | Voice becomes degraded or unavailable without blocking chat |
 

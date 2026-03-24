@@ -79,6 +79,7 @@ class OnDemandServerManager:
         self._last_decisions: dict[str, ActivationDecision] = {}
         self._decision_log: deque[dict[str, Any]] = deque(maxlen=100)
         self._locks = {role: asyncio.Lock() for role in self._managed_roles}
+        self._idle_task: asyncio.Task | None = None
 
         for role in self._managed_roles:
             server = self._topology.server(role)
@@ -285,9 +286,9 @@ class OnDemandServerManager:
                     await self._stop(role, reason="idle timeout")
 
     def start_idle_loop(self) -> asyncio.Task:
-        task = asyncio.create_task(self._idle_loop())
+        self._idle_task = asyncio.create_task(self._idle_loop())
         logger.info("[Elastic] Idle loop started for roles: %s", ", ".join(sorted(self._managed_roles)) or "none")
-        return task
+        return self._idle_task
 
     def _touch(self, role: str) -> None:
         now = time.monotonic()

@@ -161,8 +161,8 @@ def normalize_activation_config(cfg: dict[str, Any]) -> dict[str, Any]:
     legacy_on_demand = dict(cfg.get("on_demand") or {})
     servers = cfg.setdefault("servers", {})
 
-    baseline_default = [role for role in ("primary", "tool", "vision") if role in servers]
-    auxiliary_default = [role for role in ("thinking", "creativity") if role in servers]
+    baseline_default = [role for role in ("primary", "tool", "vision") if servers.get(role, {}).get("enabled", False)]
+    auxiliary_default = [role for role in ("thinking", "creativity") if servers.get(role, {}).get("enabled", False)]
 
     baseline_roles = list(activation.get("baseline_roles") or baseline_default)
     auxiliary_roles = list(activation.get("auxiliary_roles") or auxiliary_default)

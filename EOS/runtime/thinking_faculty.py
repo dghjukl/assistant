@@ -207,10 +207,12 @@ class ThinkingFaculty:
 
         if endpoint:
             model = "lfm25-thinking"
+            _fallback_to_primary = False
         else:
             logger.debug("[ThinkingFaculty] Thinking server absent — routing to primary")
             endpoint = self._topology.primary_endpoint()
             model = "qwen3"
+            _fallback_to_primary = True
 
         user_content = f"Context:\n{context}\n\nTask:\n{task}" if context else task
 
@@ -232,6 +234,9 @@ class ThinkingFaculty:
                 raw = resp.json()["choices"][0]["message"]["content"].strip()
 
             artifact = _parse_artifact(raw)
+            if _fallback_to_primary:
+                artifact.degraded = True
+                logger.debug("[ThinkingFaculty] Artifact produced by primary fallback — marked degraded")
             logger.debug(
                 "[ThinkingFaculty] Artifact: conf=%.2f rec=%.60s…",
                 artifact.confidence,

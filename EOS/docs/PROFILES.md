@@ -25,7 +25,7 @@ For capability governance (autonomy, computer use, workspace permissions, etc.) 
 Use:
 
 - `launchers\Launch EOS.bat` for the easiest Windows path
-- or `launchers\start-standard.bat` for the hardened non-interactive default
+- or `launchers\start-standard.bat` for the non-interactive default
 - `start-eos.bat` only if you launched backends yourself
 
 The Windows launcher detects whether the machine should run the recommended tier, a CPU-first compatibility tier, or a fuller installed stack. Degraded modes are presented as supported profiles, not implicit failure states.
@@ -47,13 +47,16 @@ The Windows launcher detects whether the machine should run the recommended tier
 
 ## Bundle overview
 
-| Bundle | Launchers | Backends started |
-|---|---|---|
-| Minimal | `launchers\start-minimal.bat` | main only, using the safest detected accelerator |
-| Standard | `launchers\start-standard.bat` | main + tools + thinking, auto-adapted to the detected machine tier |
-| Full | `launchers\start-full.bat` | main + tools + thinking + creativity, only when installed and supported |
+| Bundle | Launchers | Resident at boot | On-demand (elastic) |
+|---|---|---|---|
+| Minimal | `launchers\start-minimal.bat` | main only | — |
+| Standard | `launchers\start-standard.bat` | main · tools · vision (if enabled) | thinking |
+| Full | `launchers\start-full.bat` | main · tools · vision (if enabled) | thinking · creativity |
 
-Vision is additive: start `launchers\start-vision-gpu.bat` alongside whichever bundle you want.
+**Resident** servers are started at boot and kept running.
+**On-demand** servers are not started at boot. The executive starts them when a task requires it and resources permit, then stops them after an idle timeout.
+
+Vision is part of the standard and full resident baseline when enabled in `config.json`. Use `launchers\start-vision-gpu.bat` to add vision as a standalone GPU helper without launching a full bundle.
 
 ---
 
@@ -74,12 +77,14 @@ Vision is additive: start `launchers\start-vision-gpu.bat` alongside whichever b
 | Missing backend | Runtime effect |
 |---|---|
 | Main | chat unavailable |
-| Tools | tools degraded, fallback to main |
-| Thinking | reasoning degraded, fallback to main |
-| Creativity | creativity degraded |
+| Tools | tool extraction unavailable; entity responds without structured tool calls |
+| Thinking | executive routes deliberation to the main model instead; reasoning quality may be lower |
+| Creativity | creativity subsystem skipped; no fallback, degrades cleanly |
 | Vision | vision unavailable |
 | STT | voice degraded/unavailable |
 | TTS | voice degraded/unavailable |
+
+Note: thinking and creativity show as inactive at boot. This is expected — they are on-demand servers and have not yet been requested. `degraded` in the startup summary means managed-on-demand-and-inactive, not a fault.
 
 
 ---

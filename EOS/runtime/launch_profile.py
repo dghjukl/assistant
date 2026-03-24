@@ -80,7 +80,7 @@ def launch_plan(plan: list[LaunchItem], root: Path | None = None) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Start a hardened EOS launch profile.")
+    parser = argparse.ArgumentParser(description="Start an EOS launch profile (minimal, standard, full, or vision).")
     parser.add_argument("profile", choices=BUNDLE_KEYS, help="Profile to start")
     parser.add_argument("--root", default=str(ROOT), help="EOS root directory")
     parser.add_argument("--config", default="config.json", help="Config file to inspect")
