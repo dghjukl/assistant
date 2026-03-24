@@ -266,7 +266,7 @@ class SensorPoller:
         try:
             import psutil  # noqa: F401
             self._psutil_available = True
-        except ImportError:
+        except Exception:
             logger.warning("psutil not available — hardware sensors disabled")
 
         # Try importing pynvml once for GPU support

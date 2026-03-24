@@ -10,39 +10,66 @@ from __future__ import annotations
 
 import base64
 import io
+import logging
 from typing import TYPE_CHECKING
 
 import httpx
 
+logger = logging.getLogger("eos.vision")
+
+_VISION_IMPORT_FAILURES: dict[str, str] = {}
+_VISION_DEGRADATION_LOGGED = False
+
 try:
     import cv2
-except ImportError:
+except Exception as exc:  # pragma: no cover - depends on host runtime
     cv2 = None
+    _VISION_IMPORT_FAILURES["cv2"] = f"{type(exc).__name__}: {exc}"
 
 try:
     import mss
-except ImportError:
+except Exception as exc:  # pragma: no cover - depends on host runtime
     mss = None
+    _VISION_IMPORT_FAILURES["mss"] = f"{type(exc).__name__}: {exc}"
 
 try:
     import numpy as np
-except ImportError:
+except Exception as exc:  # pragma: no cover - depends on host runtime
     np = None
+    _VISION_IMPORT_FAILURES["numpy"] = f"{type(exc).__name__}: {exc}"
 
 try:
     from PIL import Image
-except ImportError:
+except Exception as exc:  # pragma: no cover - depends on host runtime
     Image = None
+    _VISION_IMPORT_FAILURES["PIL"] = f"{type(exc).__name__}: {exc}"
 
 if TYPE_CHECKING:
     from runtime.topology import RuntimeTopology
 
 
 VISION_AVAILABLE = all(dep is not None for dep in (cv2, mss, np, Image))
-VISION_IMPORT_ERROR = None if VISION_AVAILABLE else "Missing optional vision dependencies: cv2, mss, numpy, pillow"
+VISION_IMPORT_ERROR = (
+    None
+    if VISION_AVAILABLE
+    else "Missing optional vision dependencies: "
+    + "; ".join(f"{name} failed ({reason})" for name, reason in sorted(_VISION_IMPORT_FAILURES.items()))
+)
+
+
+def _log_vision_degradation_once() -> None:
+    global _VISION_DEGRADATION_LOGGED
+    if VISION_AVAILABLE or _VISION_DEGRADATION_LOGGED:
+        return
+    _VISION_DEGRADATION_LOGGED = True
+    logger.warning(
+        "component=vision status=degraded reason=%s impact='vision capture unavailable'",
+        VISION_IMPORT_ERROR or "unknown dependency import failure",
+    )
 
 
 def _vision_unavailable(reason: str | None = None) -> str:
+    _log_vision_degradation_once()
     return f"[Vision unavailable: {reason or VISION_IMPORT_ERROR or 'missing dependencies'}]"
 
 
@@ -108,7 +135,7 @@ async def describe(
         return f"[{routing.get('reason', 'Vision unavailable')}]"
 
     endpoint = routing["endpoint"]
-    b64      = image_to_base64(image)
+    b64 = image_to_base64(image)
 
     payload = {
         "model": "vision",
@@ -117,15 +144,15 @@ async def describe(
                 "role": "user",
                 "content": [
                     {
-                        "type":      "image_url",
+                        "type": "image_url",
                         "image_url": {"url": f"data:image/jpeg;base64,{b64}"},
                     },
                     {"type": "text", "text": prompt},
                 ],
             }
         ],
-        "max_tokens":  512,
-        "temperature": 0.2,   # low temperature: perception should be factual
+        "max_tokens": 512,
+        "temperature": 0.2,  # low temperature: perception should be factual
     }
 
     async with httpx.AsyncClient(timeout=timeout) as client:
@@ -150,8 +177,9 @@ async def describe_screen(
         return _vision_unavailable()
     img = capture_screen()
     return await describe(
-        img, topology,
-        prompt or "What is on the screen? Describe all visible content, text, and applications."
+        img,
+        topology,
+        prompt or "What is on the screen? Describe all visible content, text, and applications.",
     )
 
 
@@ -165,8 +193,9 @@ async def describe_webcam(
     if img is None:
         return "[No webcam detected or camera unavailable]"
     return await describe(
-        img, topology,
-        prompt or "Describe what you see through the webcam."
+        img,
+        topology,
+        prompt or "Describe what you see through the webcam.",
     )
 
 

@@ -120,12 +120,12 @@ async def execute_worldview_extraction(topology, user_input, cfg, **kwargs):
 # Try to import CognitionTracer and SignalBus; fail gracefully
 try:
     from runtime.cognition_tracer import CognitionTracer
-except ImportError:
+except Exception:
     CognitionTracer = None
 
 try:
     from runtime.signal_bus import SignalBus
-except ImportError:
+except Exception:
     SignalBus = None
 
 
@@ -1100,7 +1100,7 @@ async def startup_event(app=None, config_path: str | Path | None = None):
             from core.google_oauth import configure as google_oauth_configure
             google_oauth_configure(app_state.cfg)
             _emit_log("info", "startup", "Google OAuth manager configured")
-        except ImportError as exc:
+        except Exception as exc:
             issue = _record_startup_issue("import_failure", "google_oauth", "import_failed", {"error": str(exc)})
             _emit_log("error", "startup", "Google OAuth import failed", issue)
             logger.error("Google OAuth import failed: %s", exc)
@@ -1412,7 +1412,7 @@ async def startup_event(app=None, config_path: str | Path | None = None):
             app_state.sensor_poller = SensorPoller(cfg=app_state.cfg, topology=app_state.topology)
             app_state.sensor_poller.start()
             _emit_log("info", "startup", "SensorPoller started")
-        except ImportError as exc:
+        except Exception as exc:
             issue = _record_startup_issue("import_failure", "system_sensors", "import_failed", {"error": str(exc)})
             _emit_log("error", "startup", "SensorPoller import failed", issue)
             logger.warning("SensorPoller import failed: %s", exc)
@@ -1431,7 +1431,7 @@ async def startup_event(app=None, config_path: str | Path | None = None):
             )
             app_state.backend_probe.start()
             _emit_log("info", "startup", "BackendHealthProbe started")
-        except ImportError as exc:
+        except Exception as exc:
             issue = _record_startup_issue("import_failure", "backend_health_probe", "import_failed", {"error": str(exc)})
             _emit_log("error", "startup", "BackendHealthProbe import failed", issue)
             logger.warning("BackendHealthProbe import failed: %s", exc)
@@ -4493,7 +4493,7 @@ async def discord_status():
         try:
             from interfaces.discord_bot import get_bot_status
             status = get_bot_status()
-        except ImportError:
+        except Exception:
             status = {
                 "enabled":   app_state.cfg.get("discord", {}).get("enabled", False),
                 "connected": False,

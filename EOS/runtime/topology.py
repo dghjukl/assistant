@@ -239,7 +239,7 @@ def build_topology_from_config(cfg: dict) -> RuntimeTopology:
 
     cfg = normalize_activation_config(cfg)
     mode = cfg.get("deployment_mode", "standard")
-    primary_mm = cfg.get("primary", {}).get("is_multimodal", False)
+    primary_mm = cfg.get("servers", {}).get("primary", {}).get("is_multimodal", False)
 
     servers: dict[str, ServerState] = {}
     for role, srv_cfg in cfg.get("servers", {}).items():

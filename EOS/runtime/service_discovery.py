@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import importlib.util
+import importlib
 import logging
 import time
 from dataclasses import dataclass
@@ -10,11 +10,12 @@ from typing import Any
 import httpx
 
 from runtime.boot import load_config
-from runtime.server_activation import normalize_activation_config
 from runtime.launch_catalog import service_label
+from runtime.server_activation import normalize_activation_config
 from runtime.topology import RuntimeTopology, build_topology_from_config
 
 logger = logging.getLogger("eos.discovery")
+_LOGGED_DEGRADED_COMPONENTS: set[str] = set()
 
 
 @dataclass
@@ -166,20 +167,54 @@ def _probe_http_health(endpoint: str, threshold_ms: int) -> tuple[str, int | Non
         return "unavailable", None, str(exc)
 
 
+def _log_degraded_once(component: str, reason: str, impact: str) -> None:
+    if component in _LOGGED_DEGRADED_COMPONENTS:
+        return
+    _LOGGED_DEGRADED_COMPONENTS.add(component)
+    logger.warning("component=%s status=degraded reason=%s impact=%s", component, reason, impact)
+
+
+def _probe_dependency(module_name: str) -> tuple[bool, str | None]:
+    try:
+        importlib.import_module(module_name)
+        return True, None
+    except Exception as exc:  # pragma: no cover - dependency/OS specific
+        return False, f"{module_name}: {type(exc).__name__}: {exc}"
+
+
 def _probe_stt(cfg: dict[str, Any], root: Path) -> ServiceProbe:
     stt_cfg = cfg.get("stt", {})
     if not stt_cfg:
         return ServiceProbe("stt", "STT", "unavailable", "not configured")
 
     model_path = root / stt_cfg.get("model_path", "")
-    deps = ["faster_whisper", "sounddevice", "numpy"]
-    missing_deps = [name for name in deps if importlib.util.find_spec(name) is None]
+    dep_checks = [
+        _probe_dependency("faster_whisper"),
+        _probe_dependency("sounddevice"),
+        _probe_dependency("numpy"),
+    ]
+    failures = [detail for ok, detail in dep_checks if not ok and detail]
 
-    if model_path.is_file() and not missing_deps:
-        return ServiceProbe("stt", "STT", "active", "model and dependencies present")
-    if model_path.is_file() and missing_deps:
-        return ServiceProbe("stt", "STT", "degraded", f"missing Python deps: {', '.join(missing_deps)}")
-    return ServiceProbe("stt", "STT", "unavailable", f"model not found: {model_path}")
+    try:
+        from services import stt as stt_service
+
+        stt_runtime_available = bool(getattr(stt_service, "STT_AVAILABLE", False))
+        stt_runtime_reason = getattr(stt_service, "STT_IMPORT_ERROR", "runtime STT import error")
+    except Exception as exc:
+        stt_runtime_available = False
+        stt_runtime_reason = f"stt module load failed: {type(exc).__name__}: {exc}"
+
+    if model_path.is_file() and not failures and stt_runtime_available:
+        return ServiceProbe("stt", "STT", "active", "model and runtime dependencies ready")
+
+    if not model_path.is_file():
+        reason = f"model not found: {model_path}"
+        _log_degraded_once("stt", reason, "voice input unavailable")
+        return ServiceProbe("stt", "STT", "unavailable", reason)
+
+    reason = "; ".join(failures + ([str(stt_runtime_reason)] if not stt_runtime_available else []))
+    _log_degraded_once("stt", reason, "voice input unavailable")
+    return ServiceProbe("stt", "STT", "degraded", reason)
 
 
 def _probe_tts(cfg: dict[str, Any], root: Path) -> ServiceProbe:
@@ -201,9 +236,12 @@ def _probe_tts(cfg: dict[str, Any], root: Path) -> ServiceProbe:
 
     if not missing:
         return ServiceProbe("tts", "TTS", "active", "binary and voice files present")
+
+    reason = f"missing {', '.join(missing)}"
+    _log_degraded_once("tts", reason, "voice output unavailable")
     if len(missing) < 3:
-        return ServiceProbe("tts", "TTS", "degraded", f"missing {', '.join(missing)}")
-    return ServiceProbe("tts", "TTS", "unavailable", f"missing {', '.join(missing)}")
+        return ServiceProbe("tts", "TTS", "degraded", reason)
+    return ServiceProbe("tts", "TTS", "unavailable", reason)
 
 
 def _build_capabilities(cfg: dict[str, Any], services: dict[str, ServiceProbe]) -> dict[str, str]:
@@ -228,9 +266,10 @@ def _build_capabilities(cfg: dict[str, Any], services: dict[str, ServiceProbe]) 
         caps["reasoning"] = "available" if _is_usable_or_elastic(thinking) else "degraded"
         caps["creativity"] = "available" if _is_usable_or_elastic(creativity) else "degraded"
 
+    primary_cfg = cfg.get("servers", {}).get("primary", {})
     if _is_usable(vision):
         caps["vision"] = "available" if _is_active(vision) else "degraded"
-    elif cfg.get("primary", {}).get("is_multimodal", False) and caps["chat"] != "unavailable":
+    elif primary_cfg.get("is_multimodal", False) and caps["chat"] != "unavailable":
         caps["vision"] = "available"
     else:
         caps["vision"] = "unavailable"

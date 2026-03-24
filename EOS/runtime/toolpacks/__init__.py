@@ -151,7 +151,7 @@ def try_register_pack(
         logger.info(f"[toolpack] Loaded pack: {nm}")
         return {"status": "ok"}
 
-    except ImportError as e:
+    except Exception as e:
         return {
             "status": "failed",
             "error": f"Could not import pack '{nm}': {e}",

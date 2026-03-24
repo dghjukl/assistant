@@ -409,6 +409,60 @@ def check_startup_observability_guards() -> None:
                 "Fix runtime/startup_health.py or webui/app_runtime.py")
 
 
+
+
+# ── Gate: Runtime config parity ──────────────────────────────────────────────
+
+def _extract_safety_surface(cfg: dict) -> dict:
+    ad = cfg.get("autonomy_defaults", {})
+    cu = cfg.get("computer_use", {})
+    return {
+        "autonomy_action": ad.get("action", False),
+        "autonomy_initiative": ad.get("initiative", False),
+        "computer_use_enabled": cu.get("enabled", False),
+        "computer_use_default_mode": cu.get("default_mode", "off"),
+    }
+
+
+def check_runtime_config_parity() -> None:
+    section("Runtime Config Parity")
+
+    runtime_cfg_path = ROOT / "config.json"
+    require(runtime_cfg_path.is_file(), "config.json exists (runtime source of truth)")
+    if not runtime_cfg_path.is_file():
+        return
+
+    try:
+        runtime_cfg = json.loads(runtime_cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        require(False, f"config.json is valid JSON: {exc}")
+        return
+
+    runtime_surface = _extract_safety_surface(runtime_cfg)
+
+    require(
+        runtime_surface["autonomy_action"] is False,
+        "config.json: autonomy_defaults.action = false",
+        "Set config.json autonomy_defaults.action to false",
+    )
+    require(
+        runtime_surface["autonomy_initiative"] is False,
+        "config.json: autonomy_defaults.initiative = false",
+        "Set config.json autonomy_defaults.initiative to false",
+    )
+    require(
+        runtime_surface["computer_use_enabled"] is False,
+        "config.json: computer_use.enabled = false",
+        "Set config.json computer_use.enabled to false",
+    )
+    require(
+        runtime_surface["computer_use_default_mode"] == "off",
+        "config.json: computer_use.default_mode = 'off'",
+        "Set config.json computer_use.default_mode to 'off'",
+    )
+
+
+
 # ── Gate 9: Test suite ────────────────────────────────────────────────────────
 
 def check_test_suite() -> None:
@@ -453,6 +507,7 @@ def main() -> None:
     check_no_plaintext_credentials()
     check_requirements_completeness()
     check_config_key_normalization()
+    check_runtime_config_parity()
     check_survival_mode()
     check_startup_observability_guards()
 

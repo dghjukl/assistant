@@ -35,13 +35,13 @@ def register(registry: Any, config: Dict[str, Any]) -> None:
     try:
         from duckduckgo_search import DDGS
         search_available = True
-    except ImportError:
+    except Exception:
         search_available = False
 
     try:
         import httpx
         fetch_available = True
-    except ImportError:
+    except Exception:
         fetch_available = False
 
     def web_search_handler(params: Dict[str, Any]) -> str:

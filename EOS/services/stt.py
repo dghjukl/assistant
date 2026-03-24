@@ -6,35 +6,63 @@ Config is passed as a dict (cfg['stt']).
 from __future__ import annotations
 
 import asyncio
+import logging
 import queue
 import threading
 from pathlib import Path
 
+logger = logging.getLogger("eos.stt")
+
+_STT_IMPORT_FAILURES: dict[str, str] = {}
+_STT_LOGGED_DEGRADATION = False
+
+
 try:
     import numpy as np
-except ImportError:
+except Exception as exc:  # pragma: no cover - depends on host runtime
     np = None
+    _STT_IMPORT_FAILURES["numpy"] = f"{type(exc).__name__}: {exc}"
 
 try:
     import sounddevice as sd
-except ImportError:
+except Exception as exc:  # pragma: no cover - depends on host runtime
     sd = None
+    _STT_IMPORT_FAILURES["sounddevice"] = f"{type(exc).__name__}: {exc}"
 
 try:
     from faster_whisper import WhisperModel
-except ImportError:
+except Exception as exc:  # pragma: no cover - depends on host runtime
     WhisperModel = None
+    _STT_IMPORT_FAILURES["faster_whisper"] = f"{type(exc).__name__}: {exc}"
 
 STT_AVAILABLE = all(dep is not None for dep in (np, sd, WhisperModel))
-STT_IMPORT_ERROR = None if STT_AVAILABLE else "Missing optional STT dependencies: numpy, sounddevice, faster_whisper"
+if STT_AVAILABLE:
+    STT_IMPORT_ERROR = None
+else:
+    STT_IMPORT_ERROR = "Missing optional STT dependencies: " + (
+        "; ".join(f"{name} failed ({reason})" for name, reason in sorted(_STT_IMPORT_FAILURES.items()))
+        or "unknown dependency import failure"
+    )
 
 _model: WhisperModel | None = None
 _model_cfg: dict = {}
 
 
+def _log_stt_degradation_once() -> None:
+    global _STT_LOGGED_DEGRADATION
+    if STT_AVAILABLE or _STT_LOGGED_DEGRADATION:
+        return
+    _STT_LOGGED_DEGRADATION = True
+    logger.warning(
+        "component=stt status=degraded reason=%s impact='voice input unavailable'",
+        STT_IMPORT_ERROR,
+    )
+
+
 def _require_stt_dependencies() -> None:
     if STT_AVAILABLE:
         return
+    _log_stt_degradation_once()
     raise RuntimeError(STT_IMPORT_ERROR or "Speech-to-text dependencies are unavailable")
 
 
@@ -45,8 +73,8 @@ def _get_model(cfg: dict) -> WhisperModel:
     if _model is None or stt_cfg != _model_cfg:
         print("[STT] Loading Whisper model...")
         _model = WhisperModel(
-            stt_cfg.get("fw_model",   "small.en"),
-            device=stt_cfg.get("fw_device",  "cpu"),
+            stt_cfg.get("fw_model", "small.en"),
+            device=stt_cfg.get("fw_device", "cpu"),
             compute_type=stt_cfg.get("fw_compute", "int8"),
         )
         _model_cfg = stt_cfg
@@ -76,15 +104,15 @@ class MicListener:
 
     def __init__(self, on_transcript, cfg: dict):
         self.on_transcript = on_transcript
-        self._cfg          = cfg
-        self._audio_q      = queue.Queue()
-        self._stop_event   = threading.Event()
+        self._cfg = cfg
+        self._audio_q = queue.Queue()
+        self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
 
         stt_cfg = cfg.get("stt", {})
-        self.sample_rate     = stt_cfg.get("sample_rate", 16000)
-        self.chunk_samples   = int(self.sample_rate * stt_cfg.get("chunk_ms", 30) / 1000)
-        self.silence_chunks  = int(stt_cfg.get("silence_ms", 800) / stt_cfg.get("chunk_ms", 30))
+        self.sample_rate = stt_cfg.get("sample_rate", 16000)
+        self.chunk_samples = int(self.sample_rate * stt_cfg.get("chunk_ms", 30) / 1000)
+        self.silence_chunks = int(stt_cfg.get("silence_ms", 800) / stt_cfg.get("chunk_ms", 30))
         self.silence_threshold = 300  # RMS amplitude below this = silence
 
     def _sd_callback(self, indata, frames, time_info, status):
@@ -111,11 +139,7 @@ class MicListener:
                 buffer.append(chunk)
                 silence_count += 1
                 if silence_count >= self.silence_chunks:
-                    audio = (
-                        np.concatenate(buffer, axis=0)
-                        .flatten()
-                        .astype(np.float32) / 32768.0
-                    )
+                    audio = np.concatenate(buffer, axis=0).flatten().astype(np.float32) / 32768.0
                     buffer = []
                     silence_count = 0
                     speaking = False

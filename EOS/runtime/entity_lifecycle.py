@@ -71,6 +71,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+from runtime.versioning import get_version
+
 logger = logging.getLogger("eos.entity_lifecycle")
 
 UTC = timezone.utc

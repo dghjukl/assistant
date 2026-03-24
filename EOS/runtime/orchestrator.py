@@ -461,7 +461,7 @@ _conv = ConversationState()
 try:
     from runtime.focus_engine import FocusEngine as _FocusEngineClass
     _focus: _FocusEngineClass | None = _FocusEngineClass()
-except ImportError:
+except Exception:
     _focus = None
 
 
