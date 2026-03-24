@@ -190,3 +190,19 @@ def validate_role_model_config(cfg: dict[str, Any], root: Path, role: str) -> li
             issues.append(f"{role}: local_path does not exist: {local_path}")
 
     return issues
+
+
+
+def collect_model_issues(cfg: dict[str, Any], root: Path, *, enabled_only: bool = True) -> dict[str, list[str]]:
+    """Return role->issues for role-based model assignments."""
+    issues: dict[str, list[str]] = {}
+    servers = cfg.get("servers", {})
+    for role in MODEL_ROLES:
+        srv_key = ROLE_TO_SERVER[role]
+        srv_cfg = servers.get(srv_key, {})
+        if enabled_only and not bool(srv_cfg.get("enabled", False)):
+            continue
+        role_issues = validate_role_model_config(cfg, root, role)
+        if role_issues:
+            issues[role] = role_issues
+    return issues

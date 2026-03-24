@@ -1,7 +1,7 @@
 ﻿# ============================================================
 #  EOS - Full Setup  (Setup-Full.ps1)
-#  Downloads and installs EVERYTHING needed to run EOS,
-#  including all AI models (~13 GB total download).
+#  Downloads and installs runtimes needed to run EOS, then applies
+#  a role-based model selection flow (built-in downloads vs user-provided).
 #
 #  HOW TO RUN:
 #    Right-click this file -> "Run with PowerShell"
@@ -124,7 +124,7 @@ function Expand-To {
 
 # -----------------------------------------------------------------------------
 Write-Banner "EOS  |  Full Setup"
-Write-Host "  This will download approximately 13 GB of files." -ForegroundColor White
+Write-Host "  This installs runtimes and then prompts for per-role model selections." -ForegroundColor White
 Write-Host "  Downloads are skipped if the file already exists." -ForegroundColor Gray
 Write-Host "  You can safely re-run this script at any time." -ForegroundColor Gray
 

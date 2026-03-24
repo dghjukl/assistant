@@ -1,7 +1,7 @@
 ﻿# ============================================================
 #  EOS - Lite Setup  (Setup-Lite.ps1)
-#  Downloads everything EXCEPT models larger than 1 GB.
-#  Total download: ~3 GB instead of ~16 GB.
+#  Installs runtimes/supporting assets and then lets you choose model sources per role.
+#  Download size depends on your built-in vs user-provided selections.
 #
 #  HOW TO RUN:
 #    Right-click this file -> "Run with PowerShell"
@@ -115,9 +115,9 @@ function Expand-To {
 
 
 # -----------------------------------------------------------------------------
-Write-Banner "EOS  |  Lite Setup  (small models only)"
-Write-Host "  This downloads ~3 GB of supporting files." -ForegroundColor White
-Write-Host "  The primary model (Qwen3-8B, ~6.3 GB) must be added manually." -ForegroundColor Yellow
+Write-Banner "EOS  |  Lite Setup"
+Write-Host "  This installs runtimes and prompts for per-role model selections." -ForegroundColor White
+Write-Host "  Choose built-in downloads or user-provided paths for each role." -ForegroundColor Yellow
 Write-Host "  Downloads are skipped if the file already exists." -ForegroundColor Gray
 
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from runtime.model_registry import migrate_models_config, validate_role_model_config
+from runtime.model_registry import collect_model_issues, migrate_models_config, validate_role_model_config
 
 
 def _base_cfg() -> dict:
@@ -102,3 +102,17 @@ def test_missing_user_path_error_is_role_specific(tmp_path: Path):
     thinking_issues = validate_role_model_config(migrated, tmp_path, "thinking")
     assert any(issue.startswith("primary:") for issue in primary_issues)
     assert thinking_issues == []
+
+
+def test_collect_model_issues_only_reports_enabled_roles(tmp_path: Path):
+    cfg = _base_cfg()
+    cfg["servers"]["primary"]["enabled"] = True
+    cfg["servers"]["thinking"]["enabled"] = False
+    cfg["models"] = {
+        "primary": {"source_type": "user", "builtin_id": None, "local_path": "models/primary/missing.gguf"},
+        "thinking": {"source_type": "user", "builtin_id": None, "local_path": "models/thinking/missing.gguf"},
+    }
+    migrated = migrate_models_config(cfg)
+    issues = collect_model_issues(migrated, tmp_path, enabled_only=True)
+    assert "primary" in issues
+    assert "thinking" not in issues
