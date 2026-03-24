@@ -5267,13 +5267,15 @@ async def admin_ei_config_update(body: ExternalInferenceConfigUpdate, request: R
         if "escalation_mode" in updates and updates["escalation_mode"] not in VALID_ESCALATION_MODES:
             return JSONResponse({"ok": False, "error": f"Invalid escalation_mode. Must be one of: {sorted(VALID_ESCALATION_MODES)}"}, status_code=422)
 
-        # Remap model_id / timeout_sec / max_retries into the huggingface sub-dict
-        hf_updates: dict = {}
-        for hf_key in ("model_id", "timeout_sec", "max_retries"):
-            if hf_key in updates:
-                hf_updates[hf_key] = updates.pop(hf_key)
-        if hf_updates:
-            updates["huggingface"] = hf_updates
+        # Remap model_id / timeout_sec / max_retries into the named provider sub-dict.
+        # The "provider" field selects which sub-dict receives the update (default: active provider).
+        provider_target = updates.pop("provider", None) or policy.get_ei_config_safe().get("provider", "huggingface")
+        prov_updates: dict = {}
+        for prov_key in ("model_id", "timeout_sec", "max_retries"):
+            if prov_key in updates:
+                prov_updates[prov_key] = updates.pop(prov_key)
+        if prov_updates:
+            updates[provider_target] = prov_updates
 
         # Resolve config path for persistence
         config_path = getattr(app_state, "config_path", None)
@@ -5290,51 +5292,88 @@ async def admin_ei_config_update(body: ExternalInferenceConfigUpdate, request: R
 
 
 async def admin_ei_set_api_key(body: ExternalInferenceApiKeyRequest, request: Request):
-    """Store the HuggingFace API key in the secrets manager.
+    """Store a provider API key in the secrets manager.
 
     The key value is NEVER returned in any response after this call.
+    ``body.provider`` selects the target provider (default: huggingface).
     """
-    from runtime.external_inference_policy import HF_SECRET_KEY
+    from runtime.external_inference_policy import PROVIDER_SECRET_KEYS
     from core.secrets import secrets_manager as sm
     try:
-        api_key = body.api_key.strip()
+        provider = body.provider.strip().lower()
+        api_key  = body.api_key.strip()
         if not api_key:
             return JSONResponse({"ok": False, "error": "API key must not be empty"}, status_code=422)
-        # Never log the key itself
-        ok = sm.set(HF_SECRET_KEY, api_key)
+        secret_key = PROVIDER_SECRET_KEYS.get(provider)
+        if secret_key is None:
+            return JSONResponse(
+                {"ok": False, "error": f"Unknown or key-free provider: {provider!r}. "
+                 f"Valid providers: {sorted(k for k, v in PROVIDER_SECRET_KEYS.items() if v)}"},
+                status_code=422,
+            )
+        ok = sm.set(secret_key, api_key)
         if not ok:
             return JSONResponse({"ok": False, "error": "Keyring not available — secret could not be stored"}, status_code=503)
-        _emit_log("info", "ext_inference", "HuggingFace API key stored in secrets manager")
-        return JSONResponse({"ok": True, "data": {"api_key_configured": True,
-            "note": "Key stored in system keyring. It is not returned by any API."}})
+        _emit_log("info", "ext_inference", f"{provider} API key stored in secrets manager")
+        return JSONResponse({"ok": True, "data": {
+            "provider": provider, "api_key_configured": True,
+            "note": "Key stored in system keyring. It is not returned by any API.",
+        }})
     except Exception as exc:
         logger.error("admin_ei_set_api_key: %s", exc)
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
 
 async def admin_ei_delete_api_key(request: Request):
-    """Remove the HuggingFace API key from the secrets manager."""
-    from runtime.external_inference_policy import HF_SECRET_KEY
+    """Remove a provider API key from the secrets manager.
+
+    Query param ``provider`` selects the target (default: huggingface).
+    """
+    from runtime.external_inference_policy import PROVIDER_SECRET_KEYS
     from core.secrets import secrets_manager as sm
     try:
-        sm.delete(HF_SECRET_KEY)
-        _emit_log("info", "ext_inference", "HuggingFace API key removed from secrets manager")
-        return JSONResponse({"ok": True, "data": {"api_key_configured": False}})
+        provider   = (request.query_params.get("provider") or "huggingface").strip().lower()
+        secret_key = PROVIDER_SECRET_KEYS.get(provider)
+        if secret_key is None:
+            return JSONResponse(
+                {"ok": False, "error": f"Unknown or key-free provider: {provider!r}"},
+                status_code=422,
+            )
+        sm.delete(secret_key)
+        _emit_log("info", "ext_inference", f"{provider} API key removed from secrets manager")
+        return JSONResponse({"ok": True, "data": {"provider": provider, "api_key_configured": False}})
     except Exception as exc:
         logger.error("admin_ei_delete_api_key: %s", exc)
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
 
 async def admin_ei_test_connection(request: Request):
-    """Test the configured HuggingFace API key and model reachability."""
+    """Test reachability for the active (or a named) provider.
+
+    Query param ``provider`` selects the provider to test (default: active provider).
+    """
     try:
         policy = _get_ei_policy()
         if policy is None:
             return JSONResponse({"ok": False, "error": "External inference not initialised"}, status_code=503)
-        result = policy.test_connection()
+        provider = request.query_params.get("provider") or None
+        result   = policy.test_connection_provider(provider) if provider else policy.test_connection()
         return JSONResponse({"ok": result.get("ok", False), "data": result})
     except Exception as exc:
         logger.error("admin_ei_test_connection: %s", exc)
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+async def admin_ei_providers_status(request: Request):
+    """Return capability and key-configuration status for every registered provider."""
+    try:
+        policy = _get_ei_policy()
+        if policy is None:
+            return JSONResponse({"ok": True, "data": {"available": False,
+                "reason": "External inference subsystem not initialised"}})
+        return JSONResponse({"ok": True, "data": policy.get_providers_status()})
+    except Exception as exc:
+        logger.error("admin_ei_providers_status: %s", exc)
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
 

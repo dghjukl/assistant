@@ -1,17 +1,42 @@
 """
 EOS — External Inference Policy Engine
 =======================================
-Decision gate and budget enforcer for optional Hugging Face external inference.
+Decision gate and budget enforcer for optional external inference.
 
 This module is the single source of truth for whether an external inference
 call is permitted.  It is called by the orchestrator BEFORE any external HTTP
 request is made.  The backend enforces all rules — no UI-only logic bypasses
 this layer.
 
+Multi-provider routing
+-----------------------
+The policy engine delegates actual provider selection to InferenceRouter
+(runtime.providers.router).  The router selects and retries providers based
+on routing_mode, capability requirements, budget, and API key availability.
+
+Supported providers
+--------------------
+  huggingface  — HuggingFace Inference API (default, budget)
+  openai       — OpenAI Chat Completions API (premium)
+  anthropic    — Anthropic Messages API (premium)
+  gemini       — Google Gemini API (cheap/premium)
+  openrouter   — OpenRouter gateway for open-weight models (cheap)
+  local        — local llama-server (free, no key required)
+
+Routing modes (external_inference.routing_mode)
+-------------------------------------------------
+  default      — use the configured default_provider
+  explicit     — use the provider/model specified per-call
+  cheapest     — prefer lowest-cost viable provider
+  best_quality — prefer highest-quality viable provider
+  local_only   — only local backends (llama-server)
+  remote_only  — only remote/cloud backends
+  fallback     — follow fallback_order list in order
+
 Policy checks (all must pass in order)
 ---------------------------------------
   1. Feature enabled           — external_inference.enabled must be True
-  2. Provider configured       — HF API key must exist in secrets
+  2. Provider viable           — at least one enabled provider has a key (or is local)
   3. Origin is localhost        — HARD requirement; non-local origins always denied
   4. Escalation mode allows    — mode must not be "disabled"
   5. Monthly budget sufficient — estimated cost must not exceed remaining budget
@@ -22,36 +47,44 @@ Policy checks (all must pass in order)
 Denial reasons (machine keys)
 ------------------------------
   feature_disabled             — enabled flag is False
-  provider_not_configured      — no API key in secrets
+  provider_not_configured      — no API key in secrets for any enabled provider
   non_local_origin             — request did not come from localhost
-  escalation_mode_disabled     — escalation_mode == "disabled"
+  escalation_mode_disabled     — escalation_mode == "disabled" / mode mismatch
   approval_mode_never          — approval_mode == "never"
-  budget_exceeded              — estimated cost would exceed remaining monthly budget
+  budget_exceeded              — estimated cost exceeds remaining monthly budget
   per_request_cap_exceeded     — estimated cost exceeds per_request_cap_usd
   daily_cap_exceeded           — today's request count >= daily_request_cap
   zero_budget                  — monthly_budget_usd is exactly 0.0
 
 Config keys (under "external_inference" in config.json)
 ---------------------------------------------------------
-  enabled                  bool   — master gate (default False)
-  provider                 str    — "huggingface" (only supported value)
-  localhost_only           bool   — always True; not user-changeable
-  monthly_budget_usd       float  — user-set budget (0 = no spend allowed)
-  monthly_budget_override_usd  float|null — current-cycle override
-  per_request_cap_usd      float|null — hard cap per single call
-  daily_request_cap        int|null   — max non-denied requests per calendar day
-  approval_mode            str    — "never" | "ask_for_paid_calls" | "always"
-  escalation_mode          str    — "disabled" | "emergency_only" | "constrained"
-                                    | "balanced" | "permissive"
-  current_billing_cycle_start  str|null  — YYYY-MM-DD; auto-set if null
-  huggingface.model_id     str    — HF model repo name
-  huggingface.timeout_sec  float  — per-request timeout
-  huggingface.max_retries  int    — retry count on transient errors
+  enabled                      bool   — master gate (default False)
+  provider                     str    — active/default provider (default "huggingface")
+  routing_mode                 str    — routing mode (default "default")
+  default_provider             str    — alias for provider; overrides provider if set
+  fallback_order               list   — ordered provider list for fallback mode
+  enabled_providers            list   — providers the router may consider
+  localhost_only               bool   — always True; not user-changeable
+  monthly_budget_usd           float
+  monthly_budget_override_usd  float|null
+  per_request_cap_usd          float|null
+  daily_request_cap            int|null
+  approval_mode                str    — "never" | "ask_for_paid_calls" | "always"
+  escalation_mode              str    — "disabled" | ... | "permissive"
+  current_billing_cycle_start  str|null
+  soft_warning_thresholds      list
+  huggingface.model_id         str
+  huggingface.timeout_sec      float
+  huggingface.max_retries      int
+  openai.model_id / .timeout_sec / .max_retries
+  anthropic.model_id / .timeout_sec / .max_retries
+  gemini.model_id / .timeout_sec / .max_retries
+  openrouter.model_id / .timeout_sec / .max_retries
 
 Persistent state
 -----------------
-  runtime/external_inference_ledger.py — all spend tracking and billing cycle sums
-  core/secrets.py                      — HF API key storage
+  runtime/external_inference_ledger.py — spend tracking and billing cycle sums
+  core/secrets.py                      — API keys (one per provider)
 """
 from __future__ import annotations
 
@@ -63,13 +96,12 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 # Tier constant — matches core.access_control.TIER_LOCALHOST.
-# Imported directly to avoid circular imports with starlette middleware.
 TIER_LOCALHOST = "localhost"
 
 from runtime.external_inference import (
     HFInferenceResult,
-    HuggingFaceProvider,
     estimate_cost,
+    # Legacy singletons kept for backward compat; policy no longer uses them
     get_provider,
     init_provider,
 )
@@ -79,13 +111,27 @@ from runtime.external_inference_ledger import (
     LedgerEntry,
     get_ledger,
 )
+from runtime.providers.router import RoutingMode, RoutingRequest, VALID_ROUTING_MODES
+from runtime.providers._bootstrap import build_registry, build_router
 
 logger = logging.getLogger("eos.ext_inference.policy")
 
-# ── Sentinel key for the HF API key in SecretsManager ─────────────────────────
+# ── Secret key names per provider ─────────────────────────────────────────────
+# Maps provider_id → SecretsManager key name.
+# None means the provider needs no key (local).
+PROVIDER_SECRET_KEYS: Dict[str, Optional[str]] = {
+    "huggingface": "huggingface_api_key",
+    "openai":      "openai_api_key",
+    "anthropic":   "anthropic_api_key",
+    "gemini":      "gemini_api_key",
+    "openrouter":  "openrouter_api_key",
+    "local":       None,
+}
+
+# Backward-compat alias — existing code imports HF_SECRET_KEY directly
 HF_SECRET_KEY = "huggingface_api_key"
 
-# ── Approval / escalation mode enums ─────────────────────────────────────────
+# ── Approval / escalation mode constants ─────────────────────────────────────
 APPROVAL_NEVER            = "never"
 APPROVAL_ASK_PAID         = "ask_for_paid_calls"
 APPROVAL_ALWAYS           = "always"
@@ -96,38 +142,23 @@ ESCALATION_CONSTRAINED    = "constrained"
 ESCALATION_BALANCED       = "balanced"
 ESCALATION_PERMISSIVE     = "permissive"
 
-VALID_APPROVAL_MODES    = {APPROVAL_NEVER, APPROVAL_ASK_PAID, APPROVAL_ALWAYS}
-VALID_ESCALATION_MODES  = {
+VALID_APPROVAL_MODES   = {APPROVAL_NEVER, APPROVAL_ASK_PAID, APPROVAL_ALWAYS}
+VALID_ESCALATION_MODES = {
     ESCALATION_DISABLED, ESCALATION_EMERGENCY_ONLY,
     ESCALATION_CONSTRAINED, ESCALATION_BALANCED, ESCALATION_PERMISSIVE,
 }
 
-# ── Local inference outcome severity constants ─────────────────────────────────
-# Used by the orchestrator to describe what happened with the local model call.
-# These values are the canonical strings shared between orchestrator and policy.
-SEVERITY_HARD_FAIL = "hard_fail"   # connection error / timeout / no primary server
-SEVERITY_FAILED    = "failed"      # returned but empty, parse error, structured failure
-SEVERITY_DEGRADED  = "degraded"    # returned but suspiciously short / low-quality
-SEVERITY_SUCCESS   = "success"     # usable response produced
+# ── Local inference outcome severity constants ────────────────────────────────
+SEVERITY_HARD_FAIL = "hard_fail"
+SEVERITY_FAILED    = "failed"
+SEVERITY_DEGRADED  = "degraded"
+SEVERITY_SUCCESS   = "success"
 
 
 def escalation_allows(mode: str, local_outcome_severity: str) -> bool:
     """
     Return True if *mode* permits an external inference attempt given the
     observed local inference outcome severity.
-
-    Severity ladder (ascending — each mode permits the levels below it):
-      hard_fail  — connection error, timeout, no primary server reachable
-      failed     — empty response, structured parse error, or hard-fail variant
-      degraded   — response returned but too short / clearly insufficient
-      success    — usable response produced (permissive mode still allows EI)
-
-    Mode semantics:
-      disabled        → never
-      emergency_only  → only on hard_fail
-      constrained     → hard_fail OR failed
-      balanced        → hard_fail, failed, OR degraded
-      permissive      → any outcome within policy/budget/origin restrictions
     """
     if mode == ESCALATION_DISABLED:
         return False
@@ -138,14 +169,19 @@ def escalation_allows(mode: str, local_outcome_severity: str) -> bool:
     if mode == ESCALATION_BALANCED:
         return local_outcome_severity in (SEVERITY_HARD_FAIL, SEVERITY_FAILED, SEVERITY_DEGRADED)
     if mode == ESCALATION_PERMISSIVE:
-        return True  # any outcome — budget/origin/approval still apply
+        return True
     return False
+
 
 # ── Default config values ─────────────────────────────────────────────────────
 _DEFAULTS: Dict[str, Any] = {
     "enabled":                      False,
     "provider":                     "huggingface",
-    "localhost_only":                True,    # hard-coded; non-negotiable
+    "routing_mode":                 "default",
+    "default_provider":             None,       # overrides "provider" if set
+    "fallback_order":               ["huggingface", "openrouter", "openai", "anthropic", "gemini"],
+    "enabled_providers":            ["huggingface"],
+    "localhost_only":               True,
     "monthly_budget_usd":           0.0,
     "monthly_budget_override_usd":  None,
     "per_request_cap_usd":          None,
@@ -159,21 +195,41 @@ _DEFAULTS: Dict[str, Any] = {
         "timeout_sec": 30.0,
         "max_retries": 1,
     },
+    "openai": {
+        "model_id":    "gpt-4o-mini",
+        "timeout_sec": 30.0,
+        "max_retries": 1,
+    },
+    "anthropic": {
+        "model_id":    "claude-haiku-4-5-20251001",
+        "timeout_sec": 60.0,
+        "max_retries": 1,
+    },
+    "gemini": {
+        "model_id":    "gemini-2.0-flash",
+        "timeout_sec": 30.0,
+        "max_retries": 1,
+    },
+    "openrouter": {
+        "model_id":    "meta-llama/llama-3.1-8b-instruct:free",
+        "timeout_sec": 30.0,
+        "max_retries": 1,
+    },
 }
 
 
-# ── Policy decision result ────────────────────────────────────────────────────
+# ── Policy decision result ─────────────────────────────────────────────────────
 
 
 @dataclass
 class PolicyDecision:
     """Result of a policy gate check."""
-    allowed:       bool
-    denial_reason: Optional[str]   = None   # machine key if denied
-    denial_msg:    str             = ""     # human-readable
-    estimated_cost: float          = 0.0
-    budget_remaining: float        = 0.0
-    cycle_totals:  Optional[CycleTotals] = None
+    allowed:        bool
+    denial_reason:  Optional[str]   = None
+    denial_msg:     str             = ""
+    estimated_cost: float           = 0.0
+    budget_remaining: float         = 0.0
+    cycle_totals:   Optional[CycleTotals] = None
 
 
 # ── Budget state summary ──────────────────────────────────────────────────────
@@ -182,19 +238,19 @@ class PolicyDecision:
 @dataclass
 class BudgetState:
     """Current budget snapshot for display in the admin UI."""
-    cycle_start:         str
-    cycle_end:           str
-    monthly_budget_usd:  float
-    effective_budget_usd: float    # override takes precedence if set
-    spent_usd:           float
-    remaining_usd:       float
-    request_count:       int
-    denied_count:        int
-    daily_count_today:   int
-    daily_cap:           Optional[int]
-    per_request_cap_usd: Optional[float]
-    warning_level:       Optional[int]   # 50 / 80 / 95 if threshold crossed, else None
-    thresholds:          List[int]
+    cycle_start:           str
+    cycle_end:             str
+    monthly_budget_usd:    float
+    effective_budget_usd:  float
+    spent_usd:             float
+    remaining_usd:         float
+    request_count:         int
+    denied_count:          int
+    daily_count_today:     int
+    daily_cap:             Optional[int]
+    per_request_cap_usd:   Optional[float]
+    warning_level:         Optional[int]
+    thresholds:            List[int]
 
 
 # ── Main policy engine ────────────────────────────────────────────────────────
@@ -205,37 +261,40 @@ class ExternalInferencePolicy:
     Stateless policy engine that reads live config and ledger to make
     allow/deny decisions for external inference requests.
 
+    Internally delegates provider selection to InferenceRouter.
     One instance should be created at startup and held in app_state.
     """
 
     def __init__(self, cfg: dict, secrets_manager: Any) -> None:
-        """
-        Parameters
-        ----------
-        cfg             — the full EOS config dict (as loaded from config.json)
-        secrets_manager — core.secrets.SecretsManager instance
-        """
-        self._cfg            = cfg
-        self._secrets        = secrets_manager
-        self._ei_cfg: dict   = {}
-        self._hf_cfg: dict   = {}
+        self._cfg      = cfg
+        self._secrets  = secrets_manager
+        self._ei_cfg: dict = {}
+        self._hf_cfg:  dict = {}   # kept for backward compat
+        self._registry = None
+        self._router   = None
         self.reload_config(cfg)
 
     # ── Config ────────────────────────────────────────────────────────────────
 
     def reload_config(self, cfg: dict) -> None:
-        """Re-read the external_inference block from a (possibly updated) config."""
-        self._cfg   = cfg
-        ei          = cfg.get("external_inference", {})
-        merged: dict = dict(_DEFAULTS)
-        merged.update(ei)
-        # Ensure localhost_only is always True regardless of config value
-        merged["localhost_only"] = True
-        self._ei_cfg = merged
-        self._hf_cfg = dict(_DEFAULTS["huggingface"])
-        self._hf_cfg.update(ei.get("huggingface", {}))
+        """Re-read the external_inference block and rebuild the router."""
+        self._cfg = cfg
+        ei        = cfg.get("external_inference", {})
 
-        # Reinitialise the provider singleton if config changed
+        merged: dict = {}
+        for k, v in _DEFAULTS.items():
+            if isinstance(v, dict):
+                sub = dict(v)
+                sub.update(ei.get(k, {}))
+                merged[k] = sub
+            else:
+                merged[k] = ei.get(k, v)
+        merged["localhost_only"] = True   # hard-enforced, non-negotiable
+
+        self._ei_cfg = merged
+        self._hf_cfg = dict(merged.get("huggingface", _DEFAULTS["huggingface"]))
+
+        # Re-init legacy HF singleton for backward compat
         try:
             init_provider(
                 model_id    = self._hf_cfg.get("model_id",    "mistralai/Mistral-7B-Instruct-v0.2"),
@@ -243,52 +302,89 @@ class ExternalInferencePolicy:
                 max_retries = int(self._hf_cfg.get("max_retries",   1)),
             )
         except Exception as exc:
-            logger.warning("[policy] Provider init failed: %s", exc)
+            logger.warning("[policy] Legacy HF provider init failed: %s", exc)
+
+        # Build provider registry + router
+        try:
+            primary_cfg = cfg.get("servers", {}).get("primary", {})
+            host        = primary_cfg.get("host", "127.0.0.1")
+            port        = primary_cfg.get("port", 8080)
+            local_ep    = f"http://{host}:{port}"
+
+            self._registry = build_registry(merged, primary_endpoint=local_ep)
+            self._router   = build_router(merged, self._registry)
+        except Exception as exc:
+            logger.error("[policy] Router init failed: %s — external inference will not route", exc)
+            self._registry = None
+            self._router   = None
 
     def update_ei_config(self, updates: dict, persist_path: Optional[Path] = None) -> None:
         """
         Apply partial updates to the external_inference config block.
 
-        If *persist_path* points to config.json, the updated block is written
-        back to disk so it survives a restart.
+        Handles top-level keys and per-provider sub-dicts.
+        Persists to config.json if persist_path is given.
         """
         ei = dict(self._ei_cfg)
-        hf = dict(self._hf_cfg)
 
-        # Split top-level vs huggingface sub-keys
-        hf_updates = updates.pop("huggingface", {})
+        # Provider sub-configs are merged separately
+        for pid in list(PROVIDER_SECRET_KEYS.keys()) + []:
+            if pid in updates:
+                sub = dict(ei.get(pid, {}))
+                sub.update(updates.pop(pid))
+                ei[pid] = sub
+
         ei.update(updates)
-        hf.update(hf_updates)
-        ei["huggingface"] = hf
-        ei["localhost_only"] = True   # hard-enforced
-
-        self._ei_cfg = ei
-        self._hf_cfg = hf
+        ei["localhost_only"] = True
 
         if persist_path:
             self._persist_config(persist_path, ei)
 
-        # Reinitialise provider in case model / timeout changed
-        try:
-            init_provider(
-                model_id    = hf.get("model_id",    "mistralai/Mistral-7B-Instruct-v0.2"),
-                timeout_sec = float(hf.get("timeout_sec", 30.0)),
-                max_retries = int(hf.get("max_retries",   1)),
-            )
-        except Exception as exc:
-            logger.warning("[policy] Provider reinit failed: %s", exc)
+        # Rebuild from merged config
+        full_cfg = dict(self._cfg)
+        full_cfg["external_inference"] = ei
+        self.reload_config(full_cfg)
 
     def get_ei_config_safe(self) -> dict:
-        """Return the external_inference config without the API key."""
+        """Return the external_inference config without any API keys."""
         safe = dict(self._ei_cfg)
-        safe.pop("huggingface_api_key", None)   # belt-and-suspenders
-        safe["huggingface"] = {
-            k: v for k, v in self._hf_cfg.items()
-            if k != "api_key"
-        }
-        # Indicate whether a key is stored (without exposing it)
-        safe["api_key_configured"] = bool(self._secrets.get(HF_SECRET_KEY))
+        # Remove any stray key material
+        for bad in ("huggingface_api_key", "api_key"):
+            safe.pop(bad, None)
+
+        # Scrub per-provider sub-dicts of keys
+        for pid in PROVIDER_SECRET_KEYS:
+            if pid in safe and isinstance(safe[pid], dict):
+                safe[pid] = {k: v for k, v in safe[pid].items() if "key" not in k.lower()}
+
+        # Indicate which providers have keys configured
+        key_status: dict = {}
+        for pid, key_name in PROVIDER_SECRET_KEYS.items():
+            if key_name is None:
+                key_status[pid] = True   # local never needs a key
+            else:
+                key_status[pid] = bool(self._secrets.get(key_name))
+        safe["provider_key_status"] = key_status
+
+        # Legacy field for existing code that checks api_key_configured
+        safe["api_key_configured"] = key_status.get("huggingface", False)
+
         return safe
+
+    def get_providers_status(self) -> list:
+        """Return per-provider status for the admin UI."""
+        if self._registry is None:
+            return []
+        result = self._registry.summary()
+        for item in result:
+            pid      = item["provider_id"]
+            key_name = PROVIDER_SECRET_KEYS.get(pid)
+            item["key_configured"] = (
+                True if key_name is None
+                else bool(self._secrets.get(key_name))
+            )
+            item["enabled"] = pid in self._ei_cfg.get("enabled_providers", ["huggingface"])
+        return result
 
     # ── Policy gate ───────────────────────────────────────────────────────────
 
@@ -305,30 +401,26 @@ class ExternalInferencePolicy:
         """
         Run all policy checks.  Returns PolicyDecision(allowed=False) with a
         specific denial_reason if any check fails.
-
-        Parameters
-        ----------
-        origin_tier   — TIER_LOCALHOST / TIER_LAN / TIER_EXTERNAL
-        origin_ip     — raw client IP string (for logging only)
-        reason        — human-readable reason why escalation is being considered
-        tokens_input  — estimated prompt tokens (used for cost pre-check)
-        tokens_output — estimated completion tokens
         """
         ledger = get_ledger()
         ei     = self._ei_cfg
 
-        # Pre-compute estimated cost
+        # Pre-compute estimated cost (conservative flat rate)
         est_cost = estimate_cost(tokens_input=tokens_input, tokens_output=tokens_output)
 
         # 1. Feature enabled
         if not ei.get("enabled", False):
             return self._deny("feature_disabled", "External inference is disabled.", est_cost)
 
-        # 2. Provider configured (API key exists)
-        api_key = self._secrets.get(HF_SECRET_KEY)
-        if not api_key:
-            return self._deny("provider_not_configured",
-                              "No Hugging Face API key is configured.", est_cost)
+        # 2. At least one viable provider configured
+        if not self._has_any_viable_provider():
+            active = self._active_provider_id()
+            return self._deny(
+                "provider_not_configured",
+                f"No API key configured for '{active}'. "
+                "Set an API key via Admin → Ext. Inference to enable external inference.",
+                est_cost,
+            )
 
         # 3. Origin MUST be localhost — hard requirement, non-negotiable
         if origin_tier != TIER_LOCALHOST:
@@ -368,11 +460,11 @@ class ExternalInferencePolicy:
         cycle_start = self._current_cycle_start()
         totals: Optional[CycleTotals] = None
         if ledger:
-            totals = ledger.cycle_totals(cycle_start)
-            spent  = totals.total_spent_usd
-            remaining = max(0.0, effective_budget - spent)
+            totals     = ledger.cycle_totals(cycle_start)
+            spent      = totals.total_spent_usd
+            remaining  = max(0.0, effective_budget - spent)
         else:
-            remaining = effective_budget
+            remaining  = effective_budget
 
         if est_cost > remaining:
             return self._deny(
@@ -401,13 +493,12 @@ class ExternalInferencePolicy:
             if today_count >= int(daily_cap):
                 return self._deny(
                     "daily_cap_exceeded",
-                    f"Daily request cap of {daily_cap} reached ({today_count} requests today).",
+                    f"Daily request cap of {daily_cap} reached ({today_count} today).",
                     est_cost,
                     budget_remaining=remaining,
                     cycle_totals=totals,
                 )
 
-        # All checks passed
         return PolicyDecision(
             allowed=True,
             estimated_cost=est_cost,
@@ -423,31 +514,33 @@ class ExternalInferencePolicy:
         *,
         origin_tier: str,
         origin_ip:   str,
-        reason:      str = "",
-        max_tokens:  int = 512,
+        reason:      str   = "",
+        max_tokens:  int   = 512,
         temperature: float = 0.7,
         tokens_input:  Optional[int] = None,
         tokens_output: Optional[int] = None,
-        local_outcome_severity: str = SEVERITY_HARD_FAIL,
-    ) -> tuple[PolicyDecision, Optional[HFInferenceResult]]:
+        local_outcome_severity: str  = SEVERITY_HARD_FAIL,
+        routing_mode: Optional[str]  = None,
+    ) -> tuple:
         """
-        High-level entry point: runs policy check, writes ledger, calls provider.
+        High-level entry point: runs policy check, routes via InferenceRouter,
+        writes ledger, returns result.
 
         Returns (PolicyDecision, HFInferenceResult | None).
-        If the policy check fails, returns (decision, None) without making any
-        external call.
-        If the call fails, the returned HFInferenceResult has ok=False.
+        - If the policy check fails: returns (decision, None).
+        - If the call fails: returns (decision, HFInferenceResult(ok=False)).
 
         The caller must inspect decision.allowed and result.ok independently.
-        """
-        import time as _time
 
-        ledger   = get_ledger()
-        ei       = self._ei_cfg
-        provider = get_provider()
-        api_key  = self._secrets.get(HF_SECRET_KEY)
-        cycle    = self._current_cycle_start()
-        appr     = ei.get("approval_mode", APPROVAL_ASK_PAID)
+        Parameters
+        ----------
+        routing_mode — override the configured routing mode for this call.
+                       If None, uses the configured routing_mode.
+        """
+        ledger = get_ledger()
+        ei     = self._ei_cfg
+        cycle  = self._current_cycle_start()
+        appr   = ei.get("approval_mode", APPROVAL_ASK_PAID)
 
         decision = self.check(
             origin_tier=origin_tier,
@@ -459,9 +552,9 @@ class ExternalInferencePolicy:
         )
 
         if not decision.allowed:
-            # Write denial record
             if ledger:
-                entry = LedgerEntry(
+                ledger.record_attempt(LedgerEntry(
+                    provider             = self._active_provider_id(),
                     request_origin_tier  = origin_tier,
                     request_origin_ip    = origin_ip,
                     request_reason       = reason,
@@ -473,67 +566,141 @@ class ExternalInferencePolicy:
                     denied               = True,
                     denial_reason        = decision.denial_reason,
                     billing_cycle_start  = cycle,
-                )
-                ledger.record_attempt(entry)
+                ))
             return decision, None
 
-        if provider is None:
-            err = "Provider not initialised"
+        # Router required
+        if self._router is None:
+            err = "Inference router not initialised"
             logger.error("[policy] %s", err)
             if ledger:
                 ledger.record_attempt(LedgerEntry(
-                    request_origin_tier = origin_tier,
-                    request_origin_ip   = origin_ip,
-                    request_reason      = reason,
-                    model_id            = self._hf_cfg.get("model_id", ""),
-                    estimated_cost_usd  = decision.estimated_cost,
-                    approval_mode       = appr,
-                    auto_approved       = True,
-                    succeeded           = False,
-                    denied              = False,
-                    billing_cycle_start = cycle,
-                    error_detail        = err,
+                    provider             = self._active_provider_id(),
+                    request_origin_tier  = origin_tier,
+                    request_origin_ip    = origin_ip,
+                    request_reason       = reason,
+                    model_id             = self._hf_cfg.get("model_id", ""),
+                    estimated_cost_usd   = decision.estimated_cost,
+                    approval_mode        = appr,
+                    auto_approved        = True,
+                    succeeded            = False,
+                    denied               = False,
+                    billing_cycle_start  = cycle,
+                    error_detail         = err,
                 ))
-            return decision, HFInferenceResult(ok=False, error=err, error_code="provider_uninit")
+            return decision, HFInferenceResult(ok=False, error=err, error_code="router_uninit")
 
-        # Make the call
-        t0 = _time.monotonic()
-        result = provider.complete(
-            messages=messages,
-            api_key=api_key or "",
-            max_tokens=max_tokens,
-            temperature=temperature,
+        # Determine routing mode
+        raw_mode = routing_mode or ei.get("routing_mode", "default")
+        if raw_mode not in VALID_ROUTING_MODES:
+            raw_mode = "default"
+        rmode = RoutingMode(raw_mode)
+
+        request = RoutingRequest(
+            messages             = messages,
+            max_tokens           = max_tokens,
+            temperature          = temperature,
+            routing_mode         = rmode,
+            budget_remaining_usd = decision.budget_remaining if decision.budget_remaining > 0 else None,
         )
-        elapsed_ms = int((_time.monotonic() - t0) * 1000)
 
-        # Write ledger entry with actuals
+        prov_result, route_record = self._router.route(
+            request,
+            get_api_key=self._get_api_key,
+        )
+
+        # Compute actual cost from token counts if available
+        actual_cost: Optional[float] = None
+        if prov_result.ok and (prov_result.tokens_input or prov_result.tokens_output):
+            actual_cost = estimate_cost(
+                tokens_input  = prov_result.tokens_input,
+                tokens_output = prov_result.tokens_output,
+            )
+
+        # Write ledger entry
         if ledger:
-            entry = LedgerEntry(
+            ledger.record_attempt(LedgerEntry(
+                provider             = prov_result.provider or self._active_provider_id(),
                 request_origin_tier  = origin_tier,
                 request_origin_ip    = origin_ip,
                 request_reason       = reason,
-                model_id             = self._hf_cfg.get("model_id", ""),
+                model_id             = prov_result.model_id or self._hf_cfg.get("model_id", ""),
                 estimated_cost_usd   = decision.estimated_cost,
-                actual_cost_usd      = estimate_cost(
-                    tokens_input  = result.tokens_input,
-                    tokens_output = result.tokens_output,
-                ) if result.ok else None,
-                tokens_input         = result.tokens_input,
-                tokens_output        = result.tokens_output,
+                actual_cost_usd      = actual_cost,
+                tokens_input         = prov_result.tokens_input,
+                tokens_output        = prov_result.tokens_output,
                 approval_mode        = appr,
                 auto_approved        = True,
-                succeeded            = result.ok,
+                succeeded            = prov_result.ok,
                 denied               = False,
                 billing_cycle_start  = cycle,
-                response_latency_ms  = result.latency_ms or elapsed_ms,
-                error_detail         = result.error if not result.ok else None,
-            )
-            ledger.record_attempt(entry)
+                response_latency_ms  = prov_result.latency_ms,
+                error_detail         = prov_result.error if not prov_result.ok else None,
+            ))
 
-        if not result.ok:
-            logger.warning("[policy] External call failed: %s (%s)", result.error, result.error_code)
+        if not prov_result.ok:
+            logger.warning("[policy] External call failed: %s (%s) — tried: %s",
+                           prov_result.error, prov_result.error_code,
+                           route_record.attempted)
 
-        return decision, result
+        # Convert ProviderResult → HFInferenceResult for backward compat
+        hf_result = HFInferenceResult(
+            ok            = prov_result.ok,
+            content       = prov_result.content,
+            model_id      = prov_result.model_id,
+            provider      = prov_result.provider or "huggingface",
+            tokens_input  = prov_result.tokens_input,
+            tokens_output = prov_result.tokens_output,
+            latency_ms    = prov_result.latency_ms,
+            error         = prov_result.error,
+            error_code    = prov_result.error_code,
+            raw_response  = prov_result.raw_response,
+            is_external   = prov_result.is_external,
+        )
+        return decision, hf_result
+
+    # ── Connection test ───────────────────────────────────────────────────────
+
+    def test_connection(self) -> dict:
+        """
+        Test the active/default provider.  Returns a result dict.
+
+        Uses the provider configured as the active default.
+        """
+        active_pid = self._active_provider_id()
+        return self.test_connection_provider(active_pid)
+
+    def test_connection_provider(self, provider_id: str) -> dict:
+        """
+        Test a specific provider by ID.  Returns a result dict.
+
+        Safe to call for any registered provider_id.
+        """
+        if self._registry is None:
+            return {"ok": False, "error": "Registry not initialised",
+                    "error_code": "registry_uninit", "provider_id": provider_id}
+
+        provider = self._registry.get(provider_id)
+        if provider is None:
+            return {"ok": False, "error": f"Provider '{provider_id}' not registered",
+                    "error_code": "not_registered", "provider_id": provider_id}
+
+        key_name = PROVIDER_SECRET_KEYS.get(provider_id)
+        api_key  = self._secrets.get(key_name) if key_name else ""
+
+        if not api_key and not provider.capabilities.is_local:
+            return {"ok": False, "error": f"No API key configured for '{provider_id}'",
+                    "error_code": "no_api_key", "provider_id": provider_id}
+
+        result = provider.test_connection(api_key or "")
+        return {
+            "ok":          result.ok,
+            "provider_id": provider_id,
+            "model_id":    result.model_id or provider.capabilities.default_model,
+            "latency_ms":  result.latency_ms,
+            "error":       result.error,
+            "error_code":  result.error_code,
+        }
 
     # ── Budget & cycle helpers ─────────────────────────────────────────────────
 
@@ -550,18 +717,16 @@ class ExternalInferencePolicy:
         cycle_start = self._current_cycle_start()
         cycle_end   = self._current_cycle_end(cycle_start)
 
-        ledger  = get_ledger()
-        totals  = ledger.cycle_totals(cycle_start) if ledger else CycleTotals(
+        ledger      = get_ledger()
+        totals      = ledger.cycle_totals(cycle_start) if ledger else CycleTotals(
             cycle_start=cycle_start, total_spent_usd=0.0, request_count=0,
-            denied_count=0, succeeded_count=0, failed_count=0,
-            estimated_spent_usd=0.0,
+            denied_count=0, succeeded_count=0, failed_count=0, estimated_spent_usd=0.0,
         )
         daily_count = ledger.daily_request_count(cycle_start) if ledger else 0
 
         spent     = totals.total_spent_usd
         remaining = max(0.0, effective - spent)
 
-        # Compute warning level
         warning_level: Optional[int] = None
         if effective > 0:
             pct = (spent / effective) * 100.0
@@ -586,26 +751,38 @@ class ExternalInferencePolicy:
             thresholds           = thresholds,
         )
 
-    def test_connection(self) -> dict:
-        """Test the HF API key and model reachability. Returns a result dict."""
-        api_key  = self._secrets.get(HF_SECRET_KEY)
-        provider = get_provider()
-
-        if not api_key:
-            return {"ok": False, "error": "No API key configured", "error_code": "no_api_key"}
-        if provider is None:
-            return {"ok": False, "error": "Provider not initialised", "error_code": "provider_uninit"}
-
-        result = provider.test_connection(api_key)
-        return {
-            "ok":          result.ok,
-            "model_id":    result.model_id or self._hf_cfg.get("model_id", ""),
-            "latency_ms":  result.latency_ms,
-            "error":       result.error,
-            "error_code":  result.error_code,
-        }
-
     # ── Internal helpers ──────────────────────────────────────────────────────
+
+    def _active_provider_id(self) -> str:
+        """Return the configured default/active provider ID."""
+        ei = self._ei_cfg
+        return ei.get("default_provider") or ei.get("provider", "huggingface")
+
+    def _get_api_key(self, provider_id: str) -> Optional[str]:
+        """Retrieve the API key for *provider_id* from the secrets manager."""
+        key_name = PROVIDER_SECRET_KEYS.get(provider_id)
+        if key_name is None:
+            return ""   # local: no key needed
+        return self._secrets.get(key_name) or None
+
+    def _has_any_viable_provider(self) -> bool:
+        """
+        Return True if at least one enabled provider has an API key
+        configured or is a local provider (no key required).
+        """
+        ei               = self._ei_cfg
+        enabled_providers = ei.get("enabled_providers", [self._active_provider_id()])
+        fallback_order    = ei.get("fallback_order", [])
+        candidates        = list(dict.fromkeys(
+            [self._active_provider_id()] + enabled_providers + fallback_order
+        ))
+        for pid in candidates:
+            key_name = PROVIDER_SECRET_KEYS.get(pid)
+            if key_name is None:
+                return True   # local needs no key
+            if self._secrets.get(key_name):
+                return True
+        return False
 
     def _effective_budget(self) -> float:
         override = self._ei_cfg.get("monthly_budget_override_usd")
@@ -614,18 +791,11 @@ class ExternalInferencePolicy:
         return float(self._ei_cfg.get("monthly_budget_usd", 0.0))
 
     def _current_cycle_start(self) -> str:
-        """
-        Return the current billing cycle start date as YYYY-MM-DD.
-
-        If current_billing_cycle_start is configured and still in the same month,
-        use it.  Otherwise default to the 1st of the current month.
-        """
         cfg_start = self._ei_cfg.get("current_billing_cycle_start")
         today     = date.today()
         if cfg_start:
             try:
                 d = date.fromisoformat(str(cfg_start))
-                # Use configured start if it's in the same month as today
                 if d.year == today.year and d.month == today.month:
                     return d.isoformat()
             except ValueError:
@@ -634,19 +804,18 @@ class ExternalInferencePolicy:
 
     @staticmethod
     def _current_cycle_end(cycle_start: str) -> str:
-        """Return the last day of the month that cycle_start falls in."""
         import calendar
-        d = date.fromisoformat(cycle_start)
+        d        = date.fromisoformat(cycle_start)
         last_day = calendar.monthrange(d.year, d.month)[1]
         return d.replace(day=last_day).isoformat()
 
     @staticmethod
     def _deny(
-        reason:          str,
-        msg:             str,
-        estimated_cost:  float,
-        budget_remaining: float = 0.0,
-        cycle_totals:    Optional[CycleTotals] = None,
+        reason:           str,
+        msg:              str,
+        estimated_cost:   float,
+        budget_remaining: float            = 0.0,
+        cycle_totals:     Optional[CycleTotals] = None,
     ) -> PolicyDecision:
         logger.info("[policy] Denied: %s — %s", reason, msg)
         return PolicyDecision(
@@ -663,7 +832,9 @@ class ExternalInferencePolicy:
         try:
             raw  = json.loads(config_path.read_text(encoding="utf-8"))
             safe = dict(ei_cfg)
-            safe.pop("huggingface_api_key", None)   # never persist key in config
+            # Never persist any key material
+            for bad in ("huggingface_api_key", "api_key"):
+                safe.pop(bad, None)
             raw["external_inference"] = safe
             config_path.write_text(
                 json.dumps(raw, indent=2, ensure_ascii=False),
@@ -683,8 +854,10 @@ def init_policy(cfg: dict, secrets_manager: Any) -> ExternalInferencePolicy:
     """Initialise the module-level policy singleton.  Call once at startup."""
     global _policy
     _policy = ExternalInferencePolicy(cfg, secrets_manager)
-    logger.info("[policy] ExternalInferencePolicy ready (enabled=%s)",
-                cfg.get("external_inference", {}).get("enabled", False))
+    logger.info("[policy] ExternalInferencePolicy ready (enabled=%s provider=%s routing=%s)",
+                cfg.get("external_inference", {}).get("enabled", False),
+                cfg.get("external_inference", {}).get("provider", "huggingface"),
+                cfg.get("external_inference", {}).get("routing_mode", "default"))
     return _policy
 
 

@@ -35,6 +35,7 @@ from webui.app_runtime import (
     admin_ei_delete_api_key, admin_ei_test_connection,
     admin_ei_usage_history, admin_ei_budget_state,
     admin_ei_pending_list, admin_ei_pending_confirm, admin_ei_pending_deny,
+    admin_ei_providers_status,
 )
 
 router = APIRouter()
@@ -137,3 +138,4 @@ router.add_api_route('/admin/external-inference/budget',                        
 router.add_api_route('/admin/external-inference/pending',                              admin_ei_pending_list,     methods=['GET'])
 router.add_api_route('/admin/external-inference/pending/{approval_id}/confirm',        admin_ei_pending_confirm,  methods=['POST'])
 router.add_api_route('/admin/external-inference/pending/{approval_id}/deny',           admin_ei_pending_deny,     methods=['POST'])
+router.add_api_route('/admin/external-inference/providers',                            admin_ei_providers_status, methods=['GET'])

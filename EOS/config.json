@@ -355,12 +355,38 @@
     "process_terminate_enabled": false
   },
   "external_inference": {
-    "_comment": "Optional external inference via Hugging Face. Disabled by default. localhost-only. Never required for system operation.",
+    "_comment": "Optional external inference via multiple providers. Disabled by default. localhost-only. Never required for system operation.",
     "enabled": false,
     "provider": "huggingface",
     "_provider_options": [
+      "huggingface",
+      "openrouter",
+      "openai",
+      "anthropic",
+      "gemini"
+    ],
+    "routing_mode": "default",
+    "_routing_mode_options": [
+      "default",
+      "explicit",
+      "cheapest",
+      "best_quality",
+      "local_only",
+      "remote_only",
+      "fallback"
+    ],
+    "default_provider": "huggingface",
+    "fallback_order": [
+      "huggingface",
+      "openrouter",
+      "openai",
+      "anthropic",
+      "gemini"
+    ],
+    "enabled_providers": [
       "huggingface"
     ],
+    "_enabled_providers_note": "Only listed providers will be used by the router. Add providers here after configuring their API keys.",
     "localhost_only": true,
     "_localhost_only_note": "Hard-enforced in backend. External inference will never be triggered by Discord, LAN, or any remote origin.",
     "monthly_budget_usd": 0.0,
@@ -396,6 +422,30 @@
     "huggingface": {
       "model_id": "mistralai/Mistral-7B-Instruct-v0.2",
       "_model_id_note": "Any HuggingFace model repo ID that supports the Inference API chat completions endpoint.",
+      "timeout_sec": 30.0,
+      "max_retries": 1
+    },
+    "openai": {
+      "model_id": "gpt-4o-mini",
+      "_model_id_note": "OpenAI model ID. Common options: gpt-4o-mini (cheap), gpt-4o (balanced), o1-mini (reasoning).",
+      "timeout_sec": 30.0,
+      "max_retries": 1
+    },
+    "anthropic": {
+      "model_id": "claude-haiku-4-5-20251001",
+      "_model_id_note": "Anthropic model ID. Options: claude-haiku-4-5-20251001 (fast/cheap), claude-sonnet-4-6 (balanced), claude-opus-4-6 (best).",
+      "timeout_sec": 60.0,
+      "max_retries": 1
+    },
+    "gemini": {
+      "model_id": "gemini-2.0-flash",
+      "_model_id_note": "Google Gemini model ID. Options: gemini-2.0-flash, gemini-2.0-flash-lite, gemini-1.5-pro.",
+      "timeout_sec": 30.0,
+      "max_retries": 1
+    },
+    "openrouter": {
+      "model_id": "meta-llama/llama-3.1-8b-instruct:free",
+      "_model_id_note": "OpenRouter model ID. Free options end in ':free'. Covers Llama, Mistral, DeepSeek, Qwen, and others.",
       "timeout_sec": 30.0,
       "max_retries": 1
     }

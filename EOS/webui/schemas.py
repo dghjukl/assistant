@@ -7,7 +7,7 @@ endpoint.  Import from this module — do not declare inline body dicts.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -205,22 +205,33 @@ class OvernightCancelRequest(BaseModel):
 class ExternalInferenceConfigUpdate(BaseModel):
     """Partial update to the external_inference config block.
 
-    Only provided fields are changed.  The API key is handled separately via
-    the secrets endpoint — it must never appear in this payload.
+    Only provided fields are changed.  API keys are handled separately via
+    the secrets endpoint — they must never appear in this payload.
     """
-    enabled:                     Optional[bool]  = Field(None, description="Enable or disable external inference.")
-    monthly_budget_usd:          Optional[float] = Field(None, ge=0.0, description="Monthly spend cap in USD (0 = no spend allowed).")
-    monthly_budget_override_usd: Optional[float] = Field(None, ge=0.0, description="Override for the current cycle. Set to null to clear.")
-    per_request_cap_usd:         Optional[float] = Field(None, ge=0.0, description="Per-request hard cap in USD. Null = no cap.")
-    daily_request_cap:           Optional[int]   = Field(None, ge=0, description="Max non-denied requests per calendar day. Null = unlimited.")
-    approval_mode:               Optional[str]   = Field(None, description="'never' | 'ask_for_paid_calls' | 'always'")
-    escalation_mode:             Optional[str]   = Field(None, description="'disabled' | 'emergency_only' | 'constrained' | 'balanced' | 'permissive'")
-    current_billing_cycle_start: Optional[str]   = Field(None, description="YYYY-MM-DD billing cycle start. Null = auto (1st of month).")
-    model_id:                    Optional[str]   = Field(None, min_length=1, description="HuggingFace model repo ID.")
-    timeout_sec:                 Optional[float] = Field(None, gt=0, description="Per-request timeout in seconds.")
-    max_retries:                 Optional[int]   = Field(None, ge=0, le=3, description="Retry count on transient errors.")
+    enabled:                     Optional[bool]       = Field(None, description="Enable or disable external inference.")
+    monthly_budget_usd:          Optional[float]      = Field(None, ge=0.0, description="Monthly spend cap in USD (0 = no spend allowed).")
+    monthly_budget_override_usd: Optional[float]      = Field(None, ge=0.0, description="Override for the current cycle. Set to null to clear.")
+    per_request_cap_usd:         Optional[float]      = Field(None, ge=0.0, description="Per-request hard cap in USD. Null = no cap.")
+    daily_request_cap:           Optional[int]        = Field(None, ge=0, description="Max non-denied requests per calendar day. Null = unlimited.")
+    approval_mode:               Optional[str]        = Field(None, description="'never' | 'ask_for_paid_calls' | 'always'")
+    escalation_mode:             Optional[str]        = Field(None, description="'disabled' | 'emergency_only' | 'constrained' | 'balanced' | 'permissive'")
+    current_billing_cycle_start: Optional[str]        = Field(None, description="YYYY-MM-DD billing cycle start. Null = auto (1st of month).")
+    routing_mode:                Optional[str]        = Field(None, description="'default' | 'explicit' | 'cheapest' | 'best_quality' | 'local_only' | 'remote_only' | 'fallback'")
+    default_provider:            Optional[str]        = Field(None, min_length=1, description="Provider used for 'default' routing mode.")
+    fallback_order:              Optional[List[str]]  = Field(None, description="Ordered provider list for 'fallback' routing mode.")
+    enabled_providers:           Optional[List[str]]  = Field(None, description="Providers the router may use. Others are ignored.")
+    # Per-provider sub-config (forwarded to the named provider sub-dict)
+    provider:                    Optional[str]        = Field(None, min_length=1, description="Target provider for model_id/timeout_sec/max_retries updates.")
+    model_id:                    Optional[str]        = Field(None, min_length=1, description="Model ID for the target provider.")
+    timeout_sec:                 Optional[float]      = Field(None, gt=0, description="Per-request timeout in seconds for the target provider.")
+    max_retries:                 Optional[int]        = Field(None, ge=0, le=3, description="Retry count on transient errors for the target provider.")
 
 
 class ExternalInferenceApiKeyRequest(BaseModel):
-    """Set or replace the HuggingFace API key in the secrets store."""
-    api_key: str = Field(..., min_length=1, description="HuggingFace API token (hf_...).")
+    """Set or replace an external inference provider API key in the secrets store.
+
+    ``provider`` defaults to ``huggingface`` for backward compatibility.
+    The key value is NEVER returned in any response after this call.
+    """
+    api_key:  str = Field(..., min_length=1, description="API key / token for the provider.")
+    provider: str = Field("huggingface", min_length=1, description="Provider to configure: huggingface | openai | anthropic | gemini | openrouter.")

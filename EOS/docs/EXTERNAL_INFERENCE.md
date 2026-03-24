@@ -1,4 +1,4 @@
-# External Inference — Hugging Face (Optional Feature)
+# External Inference — Multi-Provider (Optional Feature)
 
 This document describes the optional Budget-Governed External Inference feature in EOS. It covers what the feature does, how to configure it, and what happens under every operating condition.
 
@@ -6,23 +6,35 @@ This document describes the optional Budget-Governed External Inference feature 
 
 EOS runs entirely locally by default. No external API calls are made, no API key is required, and no money is ever spent without explicit user configuration.
 
-The External Inference feature allows you to optionally allow EOS to call the Hugging Face Inference API when local inference produces a poor or failed result. All external calls are:
+The External Inference feature allows you to optionally allow EOS to call external inference providers when local inference produces a poor or failed result. All external calls are:
 
 - Governed by a user-set monthly spend budget
 - Limited to localhost-origin requests only
 - Triggered only when local inference fails to produce a usable response
+- Routed through a deterministic multi-provider router
 - Tracked in a persistent local ledger
 - Fully optional — the system operates identically without them
 
 ## Provider Support
 
-Only Hugging Face is supported. There is no other provider in this implementation.
+EOS supports six inference backends through a unified provider abstraction layer:
+
+| Provider | Type | Cost Tier | Quality | Default Model |
+|----------|------|-----------|---------|---------------|
+| `local` | Local (llama-server) | Free | — | Configured primary model |
+| `huggingface` | Remote | Cheap | Budget | mistralai/Mistral-7B-Instruct-v0.2 |
+| `openrouter` | Remote | Cheap | Standard | meta-llama/llama-3.1-8b-instruct:free |
+| `openai` | Remote | Moderate | Premium | gpt-4o-mini |
+| `anthropic` | Remote | Moderate | Premium | claude-haiku-4-5-20251001 |
+| `gemini` | Remote | Cheap | Premium | gemini-2.0-flash |
+
+**OpenRouter** is the recommended gateway for open-weight hosted models (Llama, Mistral, DeepSeek, Qwen, and others). A single OpenRouter API key provides access to all of them.
 
 ## Default State
 
 External inference is **disabled by default**. None of the following will ever happen without your explicit configuration:
 
-- No HuggingFace API calls are made
+- No external API calls are made
 - No API key is required at startup
 - No budget is consumed
 - No external network traffic is generated
@@ -43,56 +55,169 @@ If a non-local origin somehow reaches the escalation decision point, the policy 
 
 ## Configuration
 
-The external inference settings live in `config.json` under `external_inference`. You can also edit all settings through the Admin panel under the **Ext. Inference** tab.
+The external inference settings live in `config.json` under `external_inference`. You can also edit most settings through the Admin panel under the **Ext. Inference** tab.
 
-Key fields:
+### Global controls
 
 | Field | Default | Description |
 |-------|---------|-------------|
 | `enabled` | `false` | Master gate. Must be `true` for any external calls to occur. |
-| `monthly_budget_usd` | `0.0` | Monthly spend cap in USD. `0` = no spend permitted. Enter any numeric value. |
+| `routing_mode` | `default` | How the router selects a provider (see Routing Modes). |
+| `default_provider` | `huggingface` | Provider used when `routing_mode` is `default`. |
+| `fallback_order` | `[huggingface, openrouter, openai, anthropic, gemini]` | Provider order for `fallback` routing. |
+| `enabled_providers` | `[huggingface]` | Only listed providers are considered by the router. Add a provider here after setting its API key. |
+| `monthly_budget_usd` | `0.0` | Monthly spend cap in USD. `0` = no spend permitted. |
 | `monthly_budget_override_usd` | `null` | Override for the current billing cycle only. |
 | `per_request_cap_usd` | `null` | Maximum cost for a single request. `null` = no per-request cap. |
 | `daily_request_cap` | `null` | Maximum non-denied requests per calendar day. `null` = unlimited (budget still applies). |
 | `approval_mode` | `ask_for_paid_calls` | `never` / `ask_for_paid_calls` / `always` |
 | `escalation_mode` | `disabled` | `disabled` / `emergency_only` / `constrained` / `balanced` / `permissive` |
 | `current_billing_cycle_start` | `null` | YYYY-MM-DD. `null` = auto-set to the 1st of the current month. |
-| `huggingface.model_id` | `mistralai/Mistral-7B-Instruct-v0.2` | HuggingFace model repo ID. |
-| `huggingface.timeout_sec` | `30.0` | Per-request timeout in seconds. |
 
-## Setting the API Key
+### Per-provider sub-configs
 
-The HuggingFace API key is stored in the OS system keyring (Windows Credential Manager on Windows, macOS Keychain on macOS, Secret Service on Linux). It is **never** stored in `config.json` or any plaintext file.
+Each provider can be tuned individually under its own sub-key:
 
-To set the key via the Admin panel:
-1. Open the Admin panel → **Ext. Inference** tab
-2. Paste your HuggingFace token (starts with `hf_`) in the API Key field
-3. Click **Save Key**
-
-The key is stored immediately and cannot be retrieved through the UI after save. The panel shows only whether a key is configured (`✓` or `✗`).
-
-To set via environment variable (alternative):
+```json
+"external_inference": {
+  "huggingface": {
+    "model_id": "mistralai/Mistral-7B-Instruct-v0.2",
+    "timeout_sec": 30.0,
+    "max_retries": 1
+  },
+  "openai": {
+    "model_id": "gpt-4o-mini",
+    "timeout_sec": 30.0,
+    "max_retries": 1
+  },
+  "anthropic": {
+    "model_id": "claude-haiku-4-5-20251001",
+    "timeout_sec": 60.0,
+    "max_retries": 1
+  },
+  "gemini": {
+    "model_id": "gemini-2.0-flash",
+    "timeout_sec": 30.0,
+    "max_retries": 1
+  },
+  "openrouter": {
+    "model_id": "meta-llama/llama-3.1-8b-instruct:free",
+    "timeout_sec": 30.0,
+    "max_retries": 1
+  }
+}
 ```
-EOS_HUGGINGFACE_API_KEY=hf_yourtoken
+
+## Routing Modes
+
+The router selects an ordered candidate list based on the `routing_mode`:
+
+| Mode | Behaviour |
+|------|-----------|
+| `default` | Use the single configured `default_provider`. No fallback. |
+| `explicit` | Use the exact provider and model specified per-call. Bypasses enabled list. |
+| `cheapest` | Order `enabled_providers` by cost tier, cheapest first (free → cheap → moderate). |
+| `best_quality` | Order `enabled_providers` by quality tier, best first (premium → standard → budget). |
+| `local_only` | Restrict candidates to local (llama-server) providers only. |
+| `remote_only` | Restrict candidates to remote (cloud) providers only. |
+| `fallback` | Follow `fallback_order` in sequence; skip providers not in `enabled_providers`. |
+
+For all modes, any candidate is automatically skipped if:
+- Its API key is missing (for non-local providers)
+- The estimated call cost exceeds the remaining budget
+- The provider is not registered in the adapter registry
+
+On skip or failure, the router logs the reason and tries the next candidate. On complete exhaustion, the result is `ok=False` with `error_code="all_providers_failed"`.
+
+## Setting API Keys
+
+Each provider uses a named key in the OS system keyring. Keys are **never** stored in `config.json` or any plaintext file and are never returned by any API endpoint after they are saved.
+
+| Provider | Keyring key name |
+|----------|-----------------|
+| `huggingface` | `huggingface_api_key` |
+| `openai` | `openai_api_key` |
+| `anthropic` | `anthropic_api_key` |
+| `gemini` | `gemini_api_key` |
+| `openrouter` | `openrouter_api_key` |
+
+### Via the Admin panel
+
+1. Open the Admin panel → **Ext. Inference** tab → **Providers**
+2. Select the provider you want to configure
+3. Paste its API key and click **Save Key**
+
+The Admin panel shows only whether a key is configured (✓ or ✗) — never the key value.
+
+### Via the admin API
+
+```http
+POST /admin/external-inference/api-key
+Content-Type: application/json
+
+{"provider": "openai", "api_key": "sk-..."}
 ```
 
-The `EOS_HUGGINGFACE_API_KEY` environment variable is read at startup and takes precedence over the keyring value when both are present.
+`provider` defaults to `huggingface` if omitted (backward compatible).
+
+To delete a key:
+
+```http
+DELETE /admin/external-inference/api-key?provider=openai
+```
+
+### Via environment variable
+
+At startup, the following environment variables are read as fallbacks when a keyring entry is absent:
+
+```
+EOS_HUGGINGFACE_API_KEY=hf_...
+EOS_OPENAI_API_KEY=sk-...
+EOS_ANTHROPIC_API_KEY=sk-ant-...
+EOS_GEMINI_API_KEY=AIza...
+EOS_OPENROUTER_API_KEY=sk-or-...
+```
+
+## Enabling a Provider
+
+Adding a provider to `enabled_providers` alone is not enough — the API key must also be set. The router will skip any provider that has no key configured (even if it is listed in `enabled_providers`).
+
+Recommended minimum setup for a single provider (e.g. OpenRouter):
+
+1. Set the API key: `POST /admin/external-inference/api-key` with `{"provider": "openrouter", "api_key": "..."}`
+2. Add to `enabled_providers`: `PATCH /admin/external-inference/config` with `{"enabled_providers": ["openrouter"]}`
+3. Set `default_provider` to `openrouter` (or set `routing_mode` to `fallback`)
+4. Set a non-zero `monthly_budget_usd`
+5. Set `escalation_mode` to `constrained` or higher
+6. Set `enabled` to `true`
 
 ## Budget Controls
 
-All budget enforcement happens **locally** before any external call is made. The system never relies on HuggingFace-side billing limits.
+All budget enforcement happens **locally** before any external call is made. The system never relies on provider-side billing limits.
 
 **How the budget is enforced:**
-1. Before each potential external call, the policy engine estimates the cost conservatively (uses ~$0.005 per 1K tokens by default).
+
+1. Before each potential external call, the policy engine estimates the cost conservatively.
 2. It queries the local ledger for total spend in the current billing cycle.
 3. If `estimated_cost + spent >= budget`, the request is denied with `budget_exceeded`.
 4. The estimate is intentionally high to avoid under-counting.
+
+Default conservative rate estimates (combined per 1K tokens):
+
+| Provider | Estimated rate |
+|----------|---------------|
+| local | $0.000 (free) |
+| huggingface | $0.005 |
+| openrouter | $0.002 |
+| openai | $0.010 |
+| anthropic | $0.015 |
+| gemini | $0.003 |
 
 **When monthly_budget_usd is 0.0:**
 All external calls are denied with reason `zero_budget`. This is the default state.
 
 **Billing cycle:**
-By default the cycle resets on the 1st of each month. You can set `current_billing_cycle_start` to any YYYY-MM-DD date to align the cycle with your HuggingFace invoice.
+By default the cycle resets on the 1st of each month. You can set `current_billing_cycle_start` to any YYYY-MM-DD date to align the cycle with your provider invoice.
 
 ## Runtime Invocation
 
@@ -100,7 +225,7 @@ External inference is invoked automatically by the orchestrator when **all** of 
 
 1. Local inference produced a poor or failed result (classified by severity — see Escalation Modes)
 2. The configured `escalation_mode` permits escalation for that severity level
-3. The policy engine allows the call (enabled, key present, budget remaining, origin is localhost)
+3. The policy engine allows the call (enabled, at least one viable provider, budget remaining, origin is localhost)
 
 The orchestrator classifies local inference outcomes into four severity levels:
 
@@ -134,7 +259,7 @@ The recommended starting mode is `disabled`. Increase only when you have a speci
 | Mode | Behaviour |
 |------|-----------|
 | `never` | All external inference attempts are denied, regardless of other settings. |
-| `ask_for_paid_calls` | Each policy-passing call is queued as a pending approval. The operator must confirm or deny it via the Admin panel (Ext. Inference → Pending Approvals) before the external call is made. The turn response tells the user the call is pending approval. |
+| `ask_for_paid_calls` | Each policy-passing call is queued as a pending approval. The operator must confirm or deny it via the Admin panel before the external call is made. |
 | `always` | All policy-passing calls are executed immediately without manual confirmation. |
 
 ### ask_for_paid_calls in detail
@@ -149,25 +274,42 @@ When `approval_mode` is `ask_for_paid_calls` and a local failure triggers potent
 6. On **Deny**, the approval is discarded. No external call is made.
 7. Pending approvals are held in memory only. They do not survive a server restart.
 
-## Pending Approvals API
+## Admin API Reference
 
-The following admin endpoints manage the pending approval queue:
+### Status and configuration
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/admin/external-inference/pending` | List all pending approvals |
-| `POST` | `/admin/external-inference/pending/{approval_id}/confirm` | Execute the held call and return response |
+| `GET` | `/admin/external-inference/status` | Full config, budget state, and key status |
+| `PATCH` | `/admin/external-inference/config` | Partially update external_inference config |
+| `GET` | `/admin/external-inference/budget` | Budget summary for the current cycle |
+| `GET` | `/admin/external-inference/providers` | Per-provider capabilities and key status |
+
+### API keys
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/admin/external-inference/api-key` | Set a provider API key (`{"provider": "...", "api_key": "..."}`) |
+| `DELETE` | `/admin/external-inference/api-key?provider=<id>` | Remove a provider API key |
+| `POST` | `/admin/external-inference/test?provider=<id>` | Test connectivity for a provider |
+
+### Usage and approvals
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/admin/external-inference/usage-history` | Recent call history from the ledger |
+| `GET` | `/admin/external-inference/pending` | List pending approvals |
+| `POST` | `/admin/external-inference/pending/{approval_id}/confirm` | Execute the held call |
 | `POST` | `/admin/external-inference/pending/{approval_id}/deny` | Discard the held call |
 
-These endpoints are only accessible to authenticated admin sessions.
+## What Happens When a Provider Is Unavailable
 
-## What Happens When the Provider Is Unavailable
+If a provider is unreachable, rate-limiting, or returns an error:
 
-If HuggingFace is unreachable, rate-limiting, or returns an error:
-
+- The router logs the failure and tries the next candidate (in modes that support fallback).
+- In `default` mode (single provider), the attempt fails immediately.
 - The system records the failure in the ledger.
 - EOS falls back to local behaviour for that turn.
-- No retry storm occurs (`max_retries` defaults to 1).
 - No exception propagates to the main app.
 - Subsequent turns are unaffected.
 
@@ -189,7 +331,7 @@ Every external inference attempt (allowed, denied, or failed) is recorded in the
 
 - Timestamp and billing cycle
 - Request origin (tier and IP)
-- Model ID used
+- Provider and model ID used
 - Estimated and actual cost
 - Token counts (if available)
 - Whether the call was denied, succeeded, or failed
@@ -198,30 +340,14 @@ Every external inference attempt (allowed, denied, or failed) is recorded in the
 
 The ledger is the authoritative source for spend calculations. It is never truncated automatically.
 
-The `external_inference_ledger` table is created by the ledger module on first use. For existing installs upgrading from a version before this feature, the table is added automatically by migration `m005_add_external_inference_ledger` on next startup.
-
-## Admin Panel
-
-The **Ext. Inference** tab in the Admin panel provides:
-
-- Master enable/disable toggle
-- Budget summary with visual progress bar and warning thresholds
-- Editable monthly budget (free-form numeric input, any value)
-- Current-cycle override field
-- Per-request and daily caps
-- Escalation and approval mode selectors
-- Model ID and timeout settings
-- API key management (save, delete, connection test)
-- Recent usage history table (last 50 attempts)
-- Pending Approvals section (visible when `approval_mode` is `ask_for_paid_calls`)
-
 ## Security Notes
 
-- The API key is stored in the OS keyring, not in any config file or database.
-- The API key is never returned by any API endpoint after it is saved.
-- The API key is never logged.
-- The `config.json` persistence path strips the API key before writing.
+- API keys are stored in the OS keyring, not in any config file or database.
+- API keys are never returned by any API endpoint after they are saved.
+- API keys are never logged.
+- The `config.json` persistence path strips all provider API key fields before writing.
 - All external responses are marked `is_external=True` in the result object — they are treated as untrusted external input, not as guaranteed local output.
+- The localhost-only enforcement is backend-enforced, not UI-enforced.
 
 ## Testing
 
@@ -231,17 +357,38 @@ Run the external inference tests with:
 pytest tests/unit/test_external_inference_policy.py -v
 pytest tests/unit/test_external_inference_ledger.py -v
 pytest tests/unit/test_ei_escalation_and_approval.py -v
+pytest tests/unit/test_provider_registry_and_router.py -v
+pytest tests/unit/test_provider_adapter_formats.py -v
 pytest tests/integration/test_external_inference_integration.py -v
 ```
 
-Tests do not make real HTTP calls. The HuggingFace provider is mocked at the HTTP layer.
+Tests do not make real HTTP calls. All provider adapters and the router are mocked at the HTTP layer or through direct unit testing of format helpers.
+
+## Provider Layer Architecture
+
+The multi-provider system is structured as follows:
+
+```
+ExternalInferencePolicy
+  └── InferenceRouter          (runtime/providers/router.py)
+        ├── ProviderRegistry   (runtime/providers/registry.py)
+        │     ├── LocalAdapter       (adapters/local.py)
+        │     ├── HuggingFaceAdapter (adapters/huggingface.py)
+        │     ├── OpenAIAdapter      (adapters/openai.py)
+        │     ├── AnthropicAdapter   (adapters/anthropic.py)
+        │     ├── GeminiAdapter      (adapters/gemini.py)
+        │     └── OpenRouterAdapter  (adapters/openrouter.py)
+        └── CostPolicy         (runtime/providers/cost.py)
+```
+
+All adapters implement `BaseProvider` (runtime/providers/base.py) and return `ProviderResult`. The router selects adapters based on routing mode, capability requirements, budget, and key availability. The policy converts the final `ProviderResult` back to `HFInferenceResult` for backward compatibility with existing orchestrator code.
 
 ## Limitations
 
-- Cost estimates are conservative approximations. Actual HuggingFace billing may differ.
-- The system does not retrieve real-time per-model pricing from the HuggingFace API. The estimate is based on a configurable flat rate.
-- Pending approvals (`ask_for_paid_calls` mode) are held in memory only and are lost if the server restarts. The operator must re-trigger the original conversation turn after a restart.
-- Only the HuggingFace Inference API is supported. No other provider will be added without an explicit architecture decision.
+- Cost estimates are conservative approximations. Actual provider billing may differ.
+- The system does not retrieve real-time per-model pricing from any provider API. The estimate is based on configurable flat rates.
+- Pending approvals (`ask_for_paid_calls` mode) are held in memory only and are lost if the server restarts.
+- The `local` provider adapter requires a running llama-server; it is not automatically started if down.
 
 ## What Is Not Allowed
 
