@@ -14,7 +14,18 @@ pytest.importorskip("fastapi")
 pytest.importorskip("httpx")
 
 
-def _write_runtime_config(tmp_path, *, primary_port: int, tool_port: int, thinking_port: int, vision_port: int | None = None, primary_multimodal: bool = False, google_enabled: bool = False, discord_enabled: bool = False):
+def _write_runtime_config(
+    tmp_path,
+    *,
+    primary_port: int,
+    tool_port: int,
+    thinking_port: int,
+    vision_port: int | None = None,
+    primary_multimodal: bool = False,
+    google_enabled: bool = False,
+    discord_enabled: bool = False,
+    creativity_enabled: bool = False,
+):
     cfg = {
         "deployment_mode": "standard",
         "db_path": str(tmp_path / "entity_state.db"),
@@ -28,7 +39,7 @@ def _write_runtime_config(tmp_path, *, primary_port: int, tool_port: int, thinki
             "primary": {"enabled": True, "required": True, "host": "127.0.0.1", "port": primary_port},
             "tool": {"enabled": True, "required": False, "host": "127.0.0.1", "port": tool_port},
             "thinking": {"enabled": True, "required": False, "host": "127.0.0.1", "port": thinking_port},
-            "creativity": {"enabled": False, "required": False, "host": "127.0.0.1", "port": 18084},
+            "creativity": {"enabled": creativity_enabled, "required": False, "host": "127.0.0.1", "port": 18084},
         },
     }
     if vision_port is not None:
@@ -281,6 +292,28 @@ def test_runtime_discovery_degrades_vision_and_optional_tool_helpers(tmp_path, b
     assert discovery.capabilities["tools"] == "degraded"
     assert discovery.capabilities["reasoning"] == "available"
     assert discovery.capabilities["vision"] == "unavailable"
+
+
+def test_runtime_discovery_marks_creativity_on_demand_inactive_as_clean_degradation(tmp_path, backend_server_factory):
+    from runtime.service_discovery import discover_runtime
+
+    primary = backend_server_factory(chat_reply="primary response")
+    tool = backend_server_factory(chat_reply="tool response")
+    thinking = backend_server_factory(chat_reply="thinking response")
+
+    config_path = _write_runtime_config(
+        tmp_path,
+        primary_port=primary.port,
+        tool_port=tool.port,
+        thinking_port=thinking.port,
+        creativity_enabled=True,
+    )
+
+    discovery = discover_runtime(config_path, root=tmp_path)
+
+    assert discovery.services["creativity"].status == "degraded"
+    assert discovery.services["creativity"].fallback == "degraded cleanly"
+    assert discovery.services["creativity"].detail == "managed on-demand; currently inactive"
 
 @pytest.mark.asyncio
 async def test_fastapi_startup_path_uses_runtime_discovery_and_degrades_optional_services(monkeypatch, tmp_path, backend_server_factory):

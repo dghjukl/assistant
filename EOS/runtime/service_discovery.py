@@ -118,11 +118,16 @@ def discover_runtime(config_path: str | Path, root: Path | None = None) -> Runti
             topology.mark_error(role, detail)
 
         fallback = None
-        if role in {"tool", "thinking", "creativity"} and status == "unavailable":
+        if role in {"tool", "thinking"} and status == "unavailable":
             fallback = "fallback to main"
             detail = f"{detail}; fallback to main" if detail else "fallback to main"
-        elif role in {"tool", "thinking", "creativity"} and activation_mode == "on_demand" and status == "degraded":
+        elif role == "creativity" and status == "unavailable":
+            fallback = "skipped cleanly"
+            detail = f"{detail}; skipped cleanly" if detail else "skipped cleanly"
+        elif role in {"tool", "thinking"} and activation_mode == "on_demand" and status == "degraded":
             fallback = "on-demand auxiliary"
+        elif role == "creativity" and activation_mode == "on_demand" and status == "degraded":
+            fallback = "degraded cleanly"
 
         services[role] = ServiceProbe(
             key=role,

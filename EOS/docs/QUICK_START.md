@@ -19,7 +19,7 @@ EOS is the platform. The entity inside EOS can have its own chosen name, but tha
 
 ## Prerequisites
 
-**Python 3.11** must be installed before running anything else.
+**Python 3.10+** must be installed before running anything else.
 
 1. Download from https://www.python.org/downloads/
 2. During installation, check **"Add Python to PATH"**
@@ -74,8 +74,8 @@ Thinking and creativity are now elastic auxiliary servers. They stay off until t
 
 ### When to choose a different backend path
 
-- `launchers\start-minimal.bat` → lower-resource fallback
-- `launchers\start-full.bat` → preload the resident baseline stack while keeping auxiliary cognition elastic
+- `launchers\start-minimal.bat` → lowest-resource launch (main model only)
+- `launchers\start-full.bat` → preload the full resident stack (main + tools + thinking + creativity + vision when available)
 - per-server launchers in `launchers\` → manual control over exactly what runs
 - `launchers\start-vision-gpu.bat` → add vision to any bundle
 
