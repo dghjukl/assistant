@@ -53,7 +53,7 @@
       "activation_mode": "persistent"
     },
     "thinking": {
-      "_role": "Background thinking worker. Non-blocking. Dispatched to by idle cognition, initiative, investigation, identity eval. NOT an escalation target \u2014 primary uses /think for inline reasoning.",
+      "_role": "Background thinking worker. Non-blocking. Dispatched to by idle cognition, initiative, investigation, identity eval. NOT an escalation target — primary uses /think for inline reasoning.",
       "binary_cpu": "llama-CPU/llama-server.exe",
       "model_path": "models/thinking/",
       "host": "127.0.0.1",
@@ -73,7 +73,7 @@
       "min_uptime_seconds": 90
     },
     "creativity": {
-      "_role": "Controlled divergence subsystem. Advisory only \u2014 proposes alternate interpretations, reframes, analogies, non-obvious solution paths, and ideation. Does not decide, authorize, or override. Degrades gracefully if absent.",
+      "_role": "Controlled divergence subsystem. Advisory only — proposes alternate interpretations, reframes, analogies, non-obvious solution paths, and ideation. Does not decide, authorize, or override. Degrades gracefully if absent.",
       "binary_cpu": "llama-CPU/llama-server.exe",
       "model_path": "models/creativity/",
       "host": "127.0.0.1",
@@ -293,7 +293,7 @@
     "auto_backup_interval_hours": 24
   },
   "computer_use": {
-    "_comment": "Supervised computer-use subsystem. Layered access: mode \u2192 shortcut allowlist \u2192 per-app action policy.",
+    "_comment": "Supervised computer-use subsystem. Layered access: mode → shortcut allowlist → per-app action policy.",
     "_doc": "Enabling this does NOT grant the entity unrestricted computer access. The entity may only use applications present in approved_shortcuts_path, and only the actions listed in app_policy_path. The operator sets the mode. Halt is always available.",
     "enabled": true,
     "default_mode": "command_only",
@@ -334,7 +334,9 @@
       "system_cmd_tools",
       "privileged_tools"
     ],
-    "required_packs": [],
+    "required_packs": [
+      "google_tools"
+    ],
     "notifications_tools": {
       "discord_credential_file": "AI personal files/Discord.txt"
     }

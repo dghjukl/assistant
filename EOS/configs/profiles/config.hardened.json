@@ -1,14 +1,14 @@
 {
-  "_comment": "EOS Hardened Profile \u2014 locked-down baseline for public/untrusted deployment. All external integrations off. Only safe, read-only toolpacks loaded. No autonomous action or initiative. Operator must explicitly re-enable features after review.",
+  "_comment": "EOS Hardened Profile — locked-down baseline for public/untrusted deployment. All external integrations off. Only safe, read-only toolpacks loaded. No autonomous action or initiative. Operator must explicitly re-enable features after review.",
   "_hardening_notes": [
-    "discord.enabled = false \u2014 no outbound Discord messaging without explicit opt-in",
-    "google.enabled = false \u2014 no OAuth or Google API access without explicit opt-in",
-    "autonomy_defaults.action = false \u2014 entity cannot execute tools autonomously",
-    "autonomy_defaults.initiative = false \u2014 entity does not self-initiate tasks",
-    "computer_use.enabled = false \u2014 no desktop/GUI access",
+    "discord.enabled = false — no outbound Discord messaging without explicit opt-in",
+    "google.enabled = false — no OAuth or Google API access without explicit opt-in",
+    "autonomy_defaults.action = false — entity cannot execute tools autonomously",
+    "autonomy_defaults.initiative = false — entity does not self-initiate tasks",
+    "computer_use.enabled = false — no desktop/GUI access",
     "toolpacks: only deterministic, text, diff, event_journal, workspace (no-delete/no-exec), telemetry, ingestion loaded",
-    "workspace_tools.allow_delete = false \u2014 workspace files cannot be deleted",
-    "workspace_tools.allow_exec = false \u2014 workspace cannot execute code"
+    "workspace_tools.allow_delete = false — workspace files cannot be deleted",
+    "workspace_tools.allow_exec = false — workspace cannot execute code"
   ],
   "deployment_mode": "standard",
   "servers": {
@@ -191,7 +191,7 @@
     "relational_interval_seconds": 1800
   },
   "idle_cognition": {
-    "_comment": "Hardened mode \u2014 idle cognition disabled. In hardened mode all autonomous unsupervised behaviour is off.",
+    "_comment": "Hardened mode — idle cognition disabled. In hardened mode all autonomous unsupervised behaviour is off.",
     "enabled": false,
     "resting_threshold_hours": 2.0,
     "drifting_threshold_hours": 6.0,
@@ -272,7 +272,7 @@
     }
   },
   "toolpacks": {
-    "_comment": "Hardened: only safe read-only and sandboxed packs loaded. Network, process, privileged, system, scheduler, secrets, Google, Discord packs excluded.",
+    "_comment": "Hardened: only safe read-only and sandboxed packs loaded. Network, process, privileged, system, scheduler, secrets, Discord packs excluded. Google stays loaded as a first-class credential-gated subsystem.",
     "enabled": true,
     "packs": [
       "deterministic_tools",
@@ -281,9 +281,12 @@
       "event_journal_tools",
       "workspace_tools",
       "telemetry_tools",
-      "ingestion_tools"
+      "ingestion_tools",
+      "google_tools"
     ],
-    "required_packs": []
+    "required_packs": [
+      "google_tools"
+    ]
   },
   "overnight_cycle": {
     "enabled": true,
