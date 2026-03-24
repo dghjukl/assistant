@@ -2781,13 +2781,34 @@ def _cu_not_available():
     )
 
 
+def _serialize_cu_state(state: Any) -> dict[str, Any]:
+    """Serialize computer-use snapshot into a JSON-friendly dict."""
+    if hasattr(state, "to_dict"):
+        return state.to_dict()
+    if isinstance(state, dict):
+        return state
+    return {
+        "mode": getattr(state, "mode", None),
+        "mode_description": getattr(state, "mode_description", None),
+        "active_app_id": getattr(state, "active_app_id", None),
+        "active_shortcut_id": getattr(state, "active_shortcut_id", None),
+        "active_window_title": getattr(state, "active_window_title", None),
+        "pending_confirmation": getattr(state, "pending_confirmation", None),
+        "approved_shortcuts": list(getattr(state, "approved_shortcuts", []) or []),
+        "recent_decisions": list(getattr(state, "recent_decisions", []) or []),
+        "total_decisions": getattr(state, "total_decisions", 0),
+        "session_started_at": getattr(state, "session_started_at", None),
+        "last_action_at": getattr(state, "last_action_at", None),
+    }
+
+
 async def admin_cu_state():
     """Get full computer-use state snapshot."""
     if app_state.computer_use_service is None:
         return _cu_not_available()
     try:
         state = app_state.computer_use_service.get_state()
-        return JSONResponse({"ok": True, "data": app_state.to_dict()})
+        return JSONResponse({"ok": True, "data": _serialize_cu_state(state)})
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
@@ -2817,7 +2838,7 @@ async def admin_cu_set_mode(body: ComputerUseModeRequest, request: Request):
                                        details={"reason": body.reason, "changed": changed},
                                        origin_tier=_ot, client_ip=_ip)
         state = app_state.computer_use_service.get_state()
-        return JSONResponse({"ok": True, "data": app_state.to_dict()})
+        return JSONResponse({"ok": True, "data": _serialize_cu_state(state)})
     except ValueError as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)
     except Exception as exc:
