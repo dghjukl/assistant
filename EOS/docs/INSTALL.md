@@ -6,13 +6,12 @@ This guide defines the canonical install entry point and when to use alternative
 
 For most users, the intended install path is:
 
-1. Install Python 3.11
+1. Install Python 3.10+
 2. Run `setup\Setup-Full.ps1`
 3. Run `python verify.py`
 4. Run `python verify.py` again if you changed models manually
-5. Run `launchers\Launch EOS.bat` to let the Windows launcher auto-detect the safest profile for this machine
-6. Or run `launchers\start-standard.bat` for a non-interactive default
-7. Run `start-eos.bat` if you launched backends manually
+5. Run `launchers\Launch EOS.bat` (it launches the selected backend bundle and then bootstraps EOS/WebUI automatically)
+6. Or run `launchers\start-standard.bat` for a non-interactive backend launch, then run `start-eos.bat` manually
 
 Use a different path only if you need lighter downloads, manual model control, or custom backend behavior.
 
@@ -26,7 +25,7 @@ EOS is the platform. The running intelligence inside EOS is the entity. The enti
 
 ## Step 1 — Install Python
 
-Install Python 3.11 or newer from https://www.python.org/downloads/ and enable **Add Python to PATH**.
+Install Python 3.10 or newer from https://www.python.org/downloads/ and enable **Add Python to PATH**.
 
 ---
 
@@ -63,6 +62,7 @@ This checks Python packages, binaries, model files, port availability, and the c
 1. Start `launchers\Launch EOS.bat`.
    - It inspects installed models, available runtimes, NVIDIA GPU presence, and supported degraded modes.
    - It pre-selects a constrained set of sane launch choices instead of expecting you to know which combination is safe.
+   - After you confirm a profile, it starts the selected backends and runs the EOS bootstrap for you.
 2. If you prefer no UI, start the standard backend bundle:
    - `launchers\start-standard.bat`
 3. Start the runtime bootstrap only when you launched backends manually:
@@ -70,8 +70,8 @@ This checks Python packages, binaries, model files, port availability, and the c
 
 ### When to deviate from the recommended launch path
 
-- `launchers\start-minimal.bat` — use when you need a lower-resource stack
-- `launchers\start-full.bat` — use when you want the full installed stack available while still keeping auxiliary cognition on-demand
+- `launchers\start-minimal.bat` — use when you need the lowest-resource stack (main only)
+- `launchers\start-full.bat` — use when you want full resident stack startup (main + tools + thinking + creativity + vision when available)
 - `launchers\start-vision-gpu.bat` — add vision to any normal stack
 - per-server launchers — use when you need exact hardware or backend control
 - `python eos.py` — use for direct CLI control
@@ -92,7 +92,7 @@ You can also launch one backend at a time:
 
 `start-eos.bat` and `python eos.py` never start model servers. They only discover running services, expose the activation policy, and assemble runtime capabilities.
 
-Thinking and creativity are no longer expected to be always-on. They remain installed helpers, but the executive starts them dynamically when escalation is justified and resources permit.
+Thinking is not expected to be always-on in standard mode. Full mode preloads thinking and creativity as resident services.
 
 Open **http://127.0.0.1:7860/** when the WebUI is up.
 

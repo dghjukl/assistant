@@ -57,8 +57,8 @@ LAUNCH_BUNDLES: tuple[LaunchBundle, ...] = (
     LaunchBundle(
         key="minimal",
         label="Minimal",
-        description="Main model and vision resident; tools, thinking, and creativity are not started. Thinking and creativity remain available on-demand when the executive requests them.",
-        roles=("primary", "vision"),
+        description="Main model only. Tooling, reasoning auxiliaries, creativity, and vision are not started by this bundle.",
+        roles=("primary",),
         launcher="start-minimal.bat",
     ),
     LaunchBundle(
@@ -71,8 +71,8 @@ LAUNCH_BUNDLES: tuple[LaunchBundle, ...] = (
     LaunchBundle(
         key="full",
         label="Full",
-        description="Main model, vision, and tools resident. Thinking and creativity are not started at boot; the executive starts them on-demand when a task requires it and resources permit.",
-        roles=("primary", "tool", "vision"),
+        description="Main, tools, vision, thinking, and creativity resident. Use when you explicitly want auxiliary cognition preloaded at boot.",
+        roles=("primary", "tool", "thinking", "creativity", "vision"),
         launcher="start-full.bat",
     ),
     LaunchBundle(

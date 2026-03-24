@@ -18,15 +18,15 @@ launchers\start-standard.bat
 start-eos.bat
 ```
 
-`launchers\start-standard.bat` opens the main model, tool helper, and thinking helper in separate windows. `start-eos.bat` discovers what is running and starts the web interface.
+`launchers\start-standard.bat` opens the main model, tool helper, and vision helper (when enabled/launchable) in separate windows. Thinking and creativity stay on-demand in this profile. `start-eos.bat` discovers what is running and starts the web interface.
 
 ### Other launch options
 
 | Goal | Launchers |
 |---|---|
-| Minimal (main + tools only) | `launchers\start-minimal.bat` then `start-eos.bat` |
+| Minimal (main only) | `launchers\start-minimal.bat` then `start-eos.bat` |
 | Standard (recommended) | `launchers\start-standard.bat` then `start-eos.bat` |
-| Full (standard + creativity) | `launchers\start-full.bat` then `start-eos.bat` |
+| Full (preload tools + thinking + creativity) | `launchers\start-full.bat` then `start-eos.bat` |
 | Add vision to any stack | Your normal bundle + `launchers\start-vision-gpu.bat`, then `start-eos.bat` |
 | Check what's running | `status-eos.bat` |
 

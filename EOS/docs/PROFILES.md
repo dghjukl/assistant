@@ -50,8 +50,8 @@ The Windows launcher detects whether the machine should run the recommended tier
 | Bundle | Launchers | Resident at boot | On-demand (elastic) |
 |---|---|---|---|
 | Minimal | `launchers\start-minimal.bat` | main only | — |
-| Standard | `launchers\start-standard.bat` | main · tools · vision (if enabled) | thinking |
-| Full | `launchers\start-full.bat` | main · tools · vision (if enabled) | thinking · creativity |
+| Standard | `launchers\start-standard.bat` | main · tools · vision (if enabled) | thinking · creativity |
+| Full | `launchers\start-full.bat` | main · tools · thinking · creativity · vision (if enabled) | — |
 
 **Resident** servers are started at boot and kept running.
 **On-demand** servers are not started at boot. The executive starts them when a task requires it and resources permit, then stops them after an idle timeout.
@@ -84,7 +84,7 @@ Vision is part of the standard and full resident baseline when enabled in `confi
 | STT | voice degraded/unavailable |
 | TTS | voice degraded/unavailable |
 
-Note: thinking and creativity show as inactive at boot. This is expected — they are on-demand servers and have not yet been requested. `degraded` in the startup summary means managed-on-demand-and-inactive, not a fault.
+Note: in standard mode, thinking and creativity may show as `degraded` at boot with detail `managed on-demand; currently inactive`. This is expected, not a fault.
 
 
 ---

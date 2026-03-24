@@ -47,13 +47,13 @@ Each starts exactly one backend:
 
 ### Bundle launchers
 
-Convenience wrappers that start the resident baseline for each tier. On-demand servers (thinking, creativity) are not started by these launchers — the executive starts them when a task requires it.
+Convenience wrappers that start the resident baseline for each tier.
 
 | Launcher | Resident at boot | On-demand (elastic) |
 |---|---|---|
 | `launchers\start-minimal.bat` | main only | — |
-| `launchers\start-standard.bat` | main · tools · vision (if enabled) | thinking |
-| `launchers\start-full.bat` | main · tools · vision (if enabled) | thinking · creativity |
+| `launchers\start-standard.bat` | main · tools · vision (if enabled) | thinking · creativity |
+| `launchers\start-full.bat` | main · tools · thinking · creativity · vision (if enabled) | — |
 
 ### Bootstrap / status
 
@@ -208,8 +208,8 @@ It builds an effective capability map:
 ```text
 Main model: active
 Tool helper: active
-Thinking helper: inactive (on-demand · will start when needed)
-Creativity helper: inactive (on-demand · will start when needed)
+Thinking helper: degraded (managed on-demand; currently inactive)
+Creativity helper: degraded (managed on-demand; currently inactive)
 Vision: active
 STT: active
 TTS: active
@@ -218,13 +218,13 @@ Effective capabilities:
 
 chat: available
 tools: available
-reasoning: available (on-demand)
-creativity: available (on-demand)
+reasoning: available
+creativity: available
 vision: available
 voice: available
 ```
 
-Thinking and creativity showing as `inactive` at boot is expected, not a fault. They are elastic helpers — not started until the executive requests them and resource headroom allows.
+Thinking and creativity can show as `degraded (managed on-demand; currently inactive)` in standard mode. This is expected and not a fault.
 
 ---
 

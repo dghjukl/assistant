@@ -6,8 +6,8 @@ The files in this directory are the supported release launch surface.
 
 - `Launch EOS.bat` — interactive Windows launcher UI
 - `start-standard.bat` — recommended resident baseline bundle
-- `start-minimal.bat` — smallest supported backend bundle
-- `start-full.bat` — baseline bundle with optional vision preload when supported
+- `start-minimal.bat` — main-only backend bundle
+- `start-full.bat` — full resident bundle (main + tools + thinking + creativity + vision when supported)
 - `start-vision-gpu.bat` — additive advanced helper
 - `start-eos.bat` — WebUI bootstrap after backends are already running
 

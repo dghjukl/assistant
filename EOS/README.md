@@ -33,8 +33,9 @@ For a first-time user, the intended path is:
 Deviate only when you specifically need one of these:
 
 - **Lower download size / manual model choice** → use `setup\Setup-Lite.ps1`
-- **Lower RAM or VRAM usage** → use `launchers\start-minimal.bat`
-- **Lower resident footprint with elastic auxiliary reasoning still available** → use `launchers\start-standard.bat`
+- **Lowest runtime footprint (main model only)** → use `launchers\start-minimal.bat`
+- **Balanced default (main + tools + vision baseline, elastic auxiliary cognition)** → use `launchers\start-standard.bat`
+- **Preload full resident stack (including thinking + creativity)** → use `launchers\start-full.bat`
 - **Vision support** → keep `vision` baseline-resident when installed, or add `launchers\start-vision-gpu.bat`
 - **Precise hardware or backend control** → use the per-server launchers
 - **Diagnostics without startup** → use `status-eos.bat` or `python eos.py --status`
@@ -112,7 +113,7 @@ This keeps backend ownership separate from runtime discovery.
 | Component | Minimum | Recommended |
 |---|---|---|
 | OS | Windows 10 64-bit | Windows 11 64-bit |
-| Python | 3.10 | 3.11 |
+| Python | 3.10+ | 3.11 |
 | RAM | 16 GB | 32 GB |
 | GPU | None (CPU-only works) | NVIDIA with 8 GB+ VRAM |
 | Disk | 20 GB free | 30 GB free |
